@@ -1,0 +1,19 @@
+import { Router } from 'express';
+import * as controller from './pedidos.controller';
+import { authenticate } from '../../middleware/auth';
+import { asyncHandler } from '../../utils/async-handler';
+
+// Pedidos do vendedor (rascunho, itens, observações).
+export const pedidosRoutes = Router();
+
+pedidosRoutes.use(asyncHandler(authenticate));
+
+pedidosRoutes.get('/rascunho', asyncHandler(controller.obterRascunho));
+pedidosRoutes.post('/', asyncHandler(controller.criar));
+pedidosRoutes.delete('/:id', asyncHandler(controller.excluir));
+
+pedidosRoutes.post('/:id/itens', asyncHandler(controller.adicionarItem));
+pedidosRoutes.put('/:id/itens/:itemId', asyncHandler(controller.atualizarItem));
+pedidosRoutes.delete('/:id/itens/:itemId', asyncHandler(controller.removerItem));
+
+pedidosRoutes.put('/:id/observacoes', asyncHandler(controller.atualizarObservacoes));
