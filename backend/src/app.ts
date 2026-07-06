@@ -8,6 +8,7 @@ import { produtosRoutes } from './modules/produtos/produtos.routes';
 import { produtosAdminRoutes } from './modules/produtos/produtos.admin.routes';
 import { clientesRoutes } from './modules/clientes/clientes.routes';
 import { clientesAdminRoutes } from './modules/clientes/clientes.admin.routes';
+import { locaisRoutes } from './modules/locais/locais.routes';
 
 export const app = express();
 
@@ -25,6 +26,7 @@ app.use('/api/produtos', produtosRoutes);
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/admin/produtos', produtosAdminRoutes);
 app.use('/api/admin/clientes', clientesAdminRoutes);
+app.use('/api/locais', locaisRoutes);
 
 // Handler de erros global (captura exceções não tratadas nos controllers).
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
