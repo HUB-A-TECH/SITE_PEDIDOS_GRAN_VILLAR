@@ -4,7 +4,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleRoute } from './components/RoleRoute';
 import { SelecionarClientePage } from './pages/vendedor/SelecionarClientePage';
-import { ProdutosClientePage } from './pages/vendedor/ProdutosClientePage';
+import { PedidoPage } from './pages/vendedor/PedidoPage';
 import { AdminProdutosPage } from './pages/admin/AdminProdutosPage';
 import { AdminClientesPage } from './pages/admin/AdminClientesPage';
 import { AdminClienteMixPage } from './pages/admin/AdminClienteMixPage';
@@ -31,10 +31,10 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: '/clientes/:clienteId/produtos',
+    path: '/pedido',
     element: (
       <ProtectedRoute>
-        <ProdutosClientePage />
+        <PedidoPage />
       </ProtectedRoute>
     ),
   },
