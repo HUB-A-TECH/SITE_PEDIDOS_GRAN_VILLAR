@@ -1,6 +1,6 @@
-// Schema da Fase 1 (Fundação): User, Local, Vendedor + revogação de token.
-// As demais entidades (Cliente, Produto, Pedido, Cliente_Produtos, etc.)
-// serão adicionadas nas fases seguintes.
+// Schema do Sistema de Pedidos Gran Villar.
+// Fase 1: User, Local, Vendedor, TokenRevogado.
+// Fase 2: Cliente, Produto, ProdutoLocal, ClienteProduto, Pedido, ItemPedido.
 
 generator client {
   provider = "prisma-client-js"
@@ -17,6 +17,21 @@ enum UserType {
   ADMIN_TI
 }
 
+enum Categoria {
+  ALHOS
+  PIMENTAS
+  CHAS
+  ERVAS
+  ESPECIARIAS
+  SAIS
+}
+
+enum StatusPedido {
+  RASCUNHO
+  CONFIRMADO
+  CANCELADO
+}
+
 model Local {
   id          String   @id @default(uuid())
   codigo      String   @unique
@@ -27,8 +42,11 @@ model Local {
   ativo       Boolean  @default(true)
   criadoEm    DateTime @default(now()) @map("criado_em")
 
-  usuarios   User[]
-  vendedores Vendedor[]
+  usuarios      User[]
+  vendedores    Vendedor[]
+  clientes      Cliente[]
+  produtoLocais ProdutoLocal[]
+  pedidos       Pedido[]
 
   @@map("locais")
 }
@@ -60,13 +78,14 @@ model Vendedor {
   localId            String  @map("local_id")
   ativo              Boolean @default(true)
 
-  usuario User  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  local   Local @relation(fields: [localId], references: [id])
+  usuario User     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  local   Local    @relation(fields: [localId], references: [id])
+  pedidos Pedido[]
 
   @@map("vendedores")
 }
 
-// Suporta o logout com JWT (RN de invalidação, Seção 5.1 do planejamento).
+// Suporta o logout com JWT (invalidação de token, Seção 5.1 do planejamento).
 model TokenRevogado {
   jti        String   @id
   usuarioId  String   @map("usuario_id")
@@ -74,4 +93,112 @@ model TokenRevogado {
   expiraEm   DateTime @map("expira_em")
 
   @@map("tokens_revogados")
+}
+
+model Cliente {
+  id           String   @id @default(uuid())
+  codigo       String   @unique
+  nome         String
+  nomeFantasia String?  @map("nome_fantasia")
+  cnpj         String?
+  email        String?
+  telefone     String?
+  endereco     String?
+  localId      String   @map("local_id")
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  local           Local            @relation(fields: [localId], references: [id])
+  clienteProdutos ClienteProduto[]
+  pedidos         Pedido[]
+
+  @@map("clientes")
+}
+
+model Produto {
+  id            String    @id @default(uuid())
+  codigo        String    @unique
+  nome          String
+  categoria     Categoria
+  descricao     String?
+  preco         Decimal   @db.Decimal(10, 2)
+  unidadeMedida String    @map("unidade_medida")
+  ativo         Boolean   @default(true)
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+  atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
+
+  produtoLocais   ProdutoLocal[]
+  clienteProdutos ClienteProduto[]
+  itensPedido     ItemPedido[]
+
+  @@map("produtos")
+}
+
+// Associação produto <-> local (disponibilidade; preco_local para uso futuro).
+model ProdutoLocal {
+  id         String   @id @default(uuid())
+  produtoId  String   @map("produto_id")
+  localId    String   @map("local_id")
+  precoLocal Decimal? @map("preco_local") @db.Decimal(10, 2)
+  ativo      Boolean  @default(true)
+
+  produto Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  local   Local   @relation(fields: [localId], references: [id])
+
+  @@unique([produtoId, localId])
+  @@map("produtos_locais")
+}
+
+// "Mix do cliente" (RN-10): quais produtos cada cliente compra. Gerenciado pelo admin.
+model ClienteProduto {
+  id          String   @id @default(uuid())
+  clienteId   String   @map("cliente_id")
+  produtoId   String   @map("produto_id")
+  ativo       Boolean  @default(true)
+  associadoEm DateTime @default(now()) @map("associado_em")
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  produto Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteId, produtoId])
+  @@map("clientes_produtos")
+}
+
+model Pedido {
+  id                 String       @id @default(uuid())
+  numeroPedido       String?      @unique @map("numero_pedido")
+  vendedorId         String       @map("vendedor_id")
+  clienteId          String       @map("cliente_id")
+  localId            String       @map("local_id")
+  dataPedido         DateTime     @default(now()) @map("data_pedido") @db.Date
+  status             StatusPedido @default(RASCUNHO)
+  observacoes        String?
+  subtotal           Decimal      @default(0) @db.Decimal(10, 2)
+  total              Decimal      @default(0) @db.Decimal(10, 2)
+  criadoEm           DateTime     @default(now()) @map("criado_em")
+  confirmadoEm       DateTime?    @map("confirmado_em")
+  canceladoEm        DateTime?    @map("cancelado_em")
+  motivoCancelamento String?      @map("motivo_cancelamento")
+
+  vendedor Vendedor     @relation(fields: [vendedorId], references: [id])
+  cliente  Cliente      @relation(fields: [clienteId], references: [id])
+  local    Local        @relation(fields: [localId], references: [id])
+  itens    ItemPedido[]
+
+  @@map("pedidos")
+}
+
+model ItemPedido {
+  id            String  @id @default(uuid())
+  pedidoId      String  @map("pedido_id")
+  produtoId     String  @map("produto_id")
+  quantidade    Decimal @db.Decimal(10, 3)
+  precoUnitario Decimal @map("preco_unitario") @db.Decimal(10, 2)
+  subtotal      Decimal @db.Decimal(10, 2)
+
+  pedido  Pedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  produto Produto @relation(fields: [produtoId], references: [id])
+
+  @@map("itens_pedido")
 }
