@@ -1,0 +1,77 @@
+// Schema da Fase 1 (Fundação): User, Local, Vendedor + revogação de token.
+// As demais entidades (Cliente, Produto, Pedido, Cliente_Produtos, etc.)
+// serão adicionadas nas fases seguintes.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserType {
+  VENDEDOR
+  ADMIN_COMERCIAL
+  ADMIN_TI
+}
+
+model Local {
+  id          String   @id @default(uuid())
+  codigo      String   @unique
+  nome        String
+  endereco    String?
+  telefone    String?
+  responsavel String?
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  usuarios   User[]
+  vendedores Vendedor[]
+
+  @@map("locais")
+}
+
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  type         UserType
+  localId      String?   @map("local_id")
+  ativo        Boolean   @default(true)
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
+  ultimoAcesso DateTime? @map("ultimo_acesso")
+
+  local    Local?    @relation(fields: [localId], references: [id])
+  vendedor Vendedor?
+
+  @@map("usuarios")
+}
+
+model Vendedor {
+  id                 String  @id @default(uuid())
+  usuarioId          String  @unique @map("usuario_id")
+  nomeCompleto       String  @map("nome_completo")
+  telefone           String?
+  comissaoPercentual Float?  @map("comissao_percentual")
+  localId            String  @map("local_id")
+  ativo              Boolean @default(true)
+
+  usuario User  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  local   Local @relation(fields: [localId], references: [id])
+
+  @@map("vendedores")
+}
+
+// Suporta o logout com JWT (RN de invalidação, Seção 5.1 do planejamento).
+model TokenRevogado {
+  jti        String   @id
+  usuarioId  String   @map("usuario_id")
+  revogadoEm DateTime @default(now()) @map("revogado_em")
+  expiraEm   DateTime @map("expira_em")
+
+  @@map("tokens_revogados")
+}
