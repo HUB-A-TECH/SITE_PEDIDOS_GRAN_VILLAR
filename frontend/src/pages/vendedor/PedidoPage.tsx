@@ -32,6 +32,8 @@ export function PedidoPage() {
   const [sugestoes, setSugestoes] = useState<ProdutoHistorico[]>([]);
   const [popupHistorico, setPopupHistorico] = useState(false);
   const [aplicandoHistorico, setAplicandoHistorico] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [confirmado, setConfirmado] = useState<{ numero: string; pedidoId: string } | null>(null);
 
   function aplicarPedido(p: Pedido) {
     setPedido(p);
@@ -125,6 +127,20 @@ export function PedidoPage() {
     if (!pedido || obs === (pedido.observacoes ?? '')) return;
     const atualizado = await pedidosApi.atualizarObservacoes(pedido.id, obs);
     aplicarPedido(atualizado);
+  }
+
+  async function enviarPedido() {
+    if (!pedido || pedido.itens.length === 0) return;
+    setEnviando(true);
+    try {
+      const { numeroPedido } = await pedidosApi.confirmar(pedido.id);
+      localStorage.removeItem(CACHE_KEY);
+      setConfirmado({ numero: numeroPedido, pedidoId: pedido.id });
+    } catch {
+      alert('Não foi possível enviar o pedido. Tente novamente.');
+    } finally {
+      setEnviando(false);
+    }
   }
 
   async function descartar() {
@@ -304,14 +320,41 @@ export function PedidoPage() {
             <p className="text-lg font-bold text-slate-800">{brl(pedido.total)}</p>
           </div>
           <button
-            disabled
-            title="Disponível na Fase 6"
-            className="cursor-not-allowed rounded-lg bg-slate-300 px-5 py-2.5 font-medium text-white"
+            onClick={enviarPedido}
+            disabled={enviando || totalItens === 0}
+            className="rounded-lg bg-emerald-600 px-5 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            Salvar e Enviar
+            {enviando ? 'Enviando…' : 'Salvar e Enviar'}
           </button>
         </div>
       </div>
+
+      <Modal
+        titulo="Pedido enviado!"
+        aberto={confirmado !== null}
+        onFechar={() => navigate('/meus-pedidos', { replace: true })}
+      >
+        {confirmado && (
+          <div className="space-y-4 text-center">
+            <div className="text-5xl">✅</div>
+            <p className="text-slate-700">
+              Pedido <strong>{confirmado.numero}</strong> confirmado com sucesso.
+            </p>
+            <a
+              href={pedidosApi.txtHref(confirmado.pedidoId)}
+              className="block w-full rounded-lg bg-slate-800 py-2.5 font-medium text-white hover:bg-slate-900"
+            >
+              Baixar TXT
+            </a>
+            <button
+              onClick={() => navigate('/meus-pedidos', { replace: true })}
+              className="w-full rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Concluir
+            </button>
+          </div>
+        )}
+      </Modal>
     </AppLayout>
   );
 }

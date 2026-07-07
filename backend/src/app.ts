@@ -10,6 +10,7 @@ import { clientesRoutes } from './modules/clientes/clientes.routes';
 import { clientesAdminRoutes } from './modules/clientes/clientes.admin.routes';
 import { locaisRoutes } from './modules/locais/locais.routes';
 import { pedidosRoutes } from './modules/pedidos/pedidos.routes';
+import { pedidosAdminRoutes } from './modules/pedidos/pedidos.admin.routes';
 
 export const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/clientes', clientesRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 app.use('/api/admin/produtos', produtosAdminRoutes);
 app.use('/api/admin/clientes', clientesAdminRoutes);
+app.use('/api/admin/pedidos', pedidosAdminRoutes);
 app.use('/api/locais', locaisRoutes);
 
 // Handler de erros global (captura exceções não tratadas nos controllers).

@@ -98,3 +98,42 @@ export async function atualizarObservacoes(
   );
   return res.data.pedido;
 }
+
+export async function confirmar(
+  pedidoId: string,
+): Promise<{ numeroPedido: string }> {
+  const res = await api.post<{ numeroPedido: string }>(
+    `/pedidos/${pedidoId}/confirmar`,
+    {},
+  );
+  return res.data;
+}
+
+export async function cancelar(pedidoId: string, motivo?: string): Promise<void> {
+  await api.post(`/pedidos/${pedidoId}/cancelar`, { motivo });
+}
+
+/** URL de download do TXT (mesma origem via proxy; cookie enviado). */
+export function txtHref(pedidoId: string): string {
+  return `/api/pedidos/${pedidoId}/txt`;
+}
+
+export interface PedidoAdmin {
+  pedidoId: string;
+  numeroPedido: string | null;
+  cliente: { id: string; codigo: string; nome: string };
+  vendedor: { id: string; nomeCompleto: string };
+  data: string;
+  total: number;
+  status: 'CONFIRMADO' | 'CANCELADO';
+  itensCount: number;
+}
+
+export async function adminListarPedidos(
+  periodo: 3 | 6 | 12 = 6,
+): Promise<PedidoAdmin[]> {
+  const res = await api.get<{ pedidos: PedidoAdmin[] }>('/admin/pedidos', {
+    params: { periodo },
+  });
+  return res.data.pedidos;
+}
