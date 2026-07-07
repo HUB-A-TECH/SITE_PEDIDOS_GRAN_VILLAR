@@ -4,7 +4,9 @@ import type { Vendedor } from '@prisma/client';
 import * as service from './pedidos.service';
 import * as historico from '../historico/historico.service';
 import { isUniqueConstraintError } from '../../utils/prisma-errors';
+import PDFDocument from 'pdfkit';
 import { gerarTxtPedido } from '../../utils/gerar-txt';
+import { desenharPedidoPdf } from '../../utils/gerar-pdf';
 
 const JANELA_CANCELAMENTO_MS = 24 * 60 * 60 * 1000; // 1 dia (RN-08)
 
@@ -320,26 +322,37 @@ export async function cancelar(req: Request, res: Response): Promise<void> {
   res.json({ pedidoId: pedido.id, status: 'CANCELADO' });
 }
 
-export async function baixarTxt(req: Request, res: Response): Promise<void> {
+type PedidoCompleto = NonNullable<
+  Awaited<ReturnType<typeof service.getPedidoCompleto>>
+>;
+
+/** Carrega o pedido para exportação (TXT/PDF), aplicando escopo e validações. */
+async function carregarExportavel(
+  req: Request,
+  res: Response,
+): Promise<PedidoCompleto | null> {
   const isAdmin = req.user!.type !== 'VENDEDOR';
   const pedido = await service.getPedidoCompleto(req.params.id);
   if (!pedido) {
     res.status(404).json({ mensagem: 'Pedido não encontrado' });
-    return;
+    return null;
   }
   if (!isAdmin) {
     const vendedor = await service.getVendedorByUsuario(req.user!.sub);
     if (!vendedor || pedido.vendedorId !== vendedor.id) {
       res.status(404).json({ mensagem: 'Pedido não encontrado' });
-      return;
+      return null;
     }
   }
   if (pedido.status === 'RASCUNHO') {
-    res.status(400).json({ mensagem: 'Rascunho não possui TXT' });
-    return;
+    res.status(400).json({ mensagem: 'Rascunho não possui documento' });
+    return null;
   }
+  return pedido;
+}
 
-  const txt = gerarTxtPedido({
+function dadosExport(pedido: PedidoCompleto) {
+  return {
     numeroPedido: pedido.numeroPedido,
     status: pedido.status,
     confirmadoEm: pedido.confirmadoEm,
@@ -358,12 +371,29 @@ export async function baixarTxt(req: Request, res: Response): Promise<void> {
       precoUnitario: Number(i.precoUnitario),
       subtotal: Number(i.subtotal),
     })),
-  });
+  };
+}
 
+export async function baixarTxt(req: Request, res: Response): Promise<void> {
+  const pedido = await carregarExportavel(req, res);
+  if (!pedido) return;
+  const txt = gerarTxtPedido(dadosExport(pedido));
   const nome = `pedido_${pedido.numeroPedido ?? pedido.id}.txt`;
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
   res.send(txt);
+}
+
+export async function baixarPdf(req: Request, res: Response): Promise<void> {
+  const pedido = await carregarExportavel(req, res);
+  if (!pedido) return;
+  const nome = `pedido_${pedido.numeroPedido ?? pedido.id}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+  const doc = new PDFDocument({ size: 'A4', margin: 50 });
+  doc.pipe(res);
+  desenharPedidoPdf(doc, dadosExport(pedido));
+  doc.end();
 }
 
 export async function adminListar(req: Request, res: Response): Promise<void> {

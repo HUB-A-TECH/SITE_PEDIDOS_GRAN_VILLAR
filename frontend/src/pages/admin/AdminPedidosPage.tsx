@@ -69,12 +69,22 @@ export function AdminPedidosPage() {
                   </span>
                 </div>
               </div>
-              <a
-                href={pedidosApi.txtHref(p.pedidoId)}
-                className="mt-3 block rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
-              >
-                Baixar TXT
-              </a>
+              <div className="mt-3 flex gap-2">
+                <a
+                  href={pedidosApi.pdfHref(p.pedidoId)}
+                  target="_blank"
+                  rel="noopener"
+                  className="flex-1 rounded-lg bg-emerald-600 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500"
+                >
+                  Baixar PDF
+                </a>
+                <a
+                  href={pedidosApi.txtHref(p.pedidoId)}
+                  className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
+                >
+                  Baixar TXT
+                </a>
+              </div>
             </li>
           ))}
         </ul>

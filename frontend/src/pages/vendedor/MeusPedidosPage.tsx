@@ -106,21 +106,29 @@ export function MeusPedidosPage() {
                 </div>
                 <div className="mt-3 flex gap-2">
                   <a
+                    href={pedidosApi.pdfHref(p.pedidoId)}
+                    target="_blank"
+                    rel="noopener"
+                    className="flex-1 rounded-lg bg-emerald-600 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500"
+                  >
+                    Baixar PDF
+                  </a>
+                  <a
                     href={pedidosApi.txtHref(p.pedidoId)}
                     className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
                   >
                     Baixar TXT
                   </a>
-                  {podeCancelar && (
-                    <button
-                      onClick={() => cancelar(p)}
-                      disabled={processando === p.pedidoId}
-                      className="flex-1 rounded-lg border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      {processando === p.pedidoId ? 'Cancelando…' : 'Cancelar'}
-                    </button>
-                  )}
                 </div>
+                {podeCancelar && (
+                  <button
+                    onClick={() => cancelar(p)}
+                    disabled={processando === p.pedidoId}
+                    className="mt-2 w-full rounded-lg border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {processando === p.pedidoId ? 'Cancelando…' : 'Cancelar'}
+                  </button>
+                )}
               </li>
             );
           })}

@@ -22,3 +22,4 @@ pedidosRoutes.put('/:id/observacoes', asyncHandler(controller.atualizarObservaco
 pedidosRoutes.post('/:id/confirmar', asyncHandler(controller.confirmar));
 pedidosRoutes.post('/:id/cancelar', asyncHandler(controller.cancelar));
 pedidosRoutes.get('/:id/txt', asyncHandler(controller.baixarTxt));
+pedidosRoutes.get('/:id/pdf', asyncHandler(controller.baixarPdf));

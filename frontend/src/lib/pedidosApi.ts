@@ -118,6 +118,11 @@ export function txtHref(pedidoId: string): string {
   return `/api/pedidos/${pedidoId}/txt`;
 }
 
+/** URL de download do PDF (documento para entregar ao cliente). */
+export function pdfHref(pedidoId: string): string {
+  return `/api/pedidos/${pedidoId}/pdf`;
+}
+
 export interface PedidoAdmin {
   pedidoId: string;
   numeroPedido: string | null;
