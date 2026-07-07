@@ -341,8 +341,16 @@ export function PedidoPage() {
               Pedido <strong>{confirmado.numero}</strong> confirmado com sucesso.
             </p>
             <a
+              href={pedidosApi.pdfHref(confirmado.pedidoId)}
+              target="_blank"
+              rel="noopener"
+              className="block w-full rounded-lg bg-emerald-600 py-2.5 font-medium text-white hover:bg-emerald-500"
+            >
+              Baixar PDF (entregar ao cliente)
+            </a>
+            <a
               href={pedidosApi.txtHref(confirmado.pedidoId)}
-              className="block w-full rounded-lg bg-slate-800 py-2.5 font-medium text-white hover:bg-slate-900"
+              className="block w-full rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
             >
               Baixar TXT
             </a>

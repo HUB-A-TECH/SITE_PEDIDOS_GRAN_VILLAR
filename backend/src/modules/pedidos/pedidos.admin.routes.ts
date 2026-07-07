@@ -12,3 +12,4 @@ pedidosAdminRoutes.use(
 );
 pedidosAdminRoutes.get('/', asyncHandler(controller.adminListar));
 pedidosAdminRoutes.get('/:id/txt', asyncHandler(controller.baixarTxt));
+pedidosAdminRoutes.get('/:id/pdf', asyncHandler(controller.baixarPdf));
