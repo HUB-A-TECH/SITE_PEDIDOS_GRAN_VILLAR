@@ -13,7 +13,7 @@ const loginSchema = z.object({
 const cookieOptions = {
   httpOnly: true,
   secure: env.cookieSecure,
-  sameSite: 'strict' as const,
+  sameSite: 'lax' as const,
   maxAge: 8 * 60 * 60 * 1000, // 8 horas
   path: '/',
 };

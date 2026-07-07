@@ -1,3 +1,4 @@
+import path from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -31,6 +32,17 @@ app.use('/api/admin/produtos', produtosAdminRoutes);
 app.use('/api/admin/clientes', clientesAdminRoutes);
 app.use('/api/admin/pedidos', pedidosAdminRoutes);
 app.use('/api/locais', locaisRoutes);
+
+// Em produção, o mesmo serviço serve o site (React já buildado) — mesmo domínio
+// da API, o que evita CORS e mantém o cookie de sessão "same-origin".
+if (env.nodeEnv === 'production') {
+  const frontendDir = path.resolve(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendDir, 'index.html'));
+  });
+}
 
 // Handler de erros global (captura exceções não tratadas nos controllers).
 // eslint-disable-next-line @typescript-eslint/no-unused-vars

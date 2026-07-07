@@ -1,0 +1,21 @@
+# Blueprint do Render — cria o serviço web automaticamente ao conectar o repositório.
+services:
+  - type: web
+    name: gran-villar
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      # Definidos manualmente no painel do Render (secretos):
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
