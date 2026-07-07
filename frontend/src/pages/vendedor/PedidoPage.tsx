@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
+import { Modal } from '../../components/Modal';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { Pedido } from '../../lib/pedidosApi';
 import * as produtosApi from '../../lib/produtosApi';
+import * as historicoApi from '../../lib/historicoApi';
+import type { ProdutoHistorico } from '../../lib/historicoApi';
 import {
   CATEGORIAS,
   CATEGORIA_LABEL,
@@ -26,6 +29,9 @@ export function PedidoPage() {
   const [processando, setProcessando] = useState<Set<string>>(new Set());
   const [obs, setObs] = useState('');
   const [salvo, setSalvo] = useState(false);
+  const [sugestoes, setSugestoes] = useState<ProdutoHistorico[]>([]);
+  const [popupHistorico, setPopupHistorico] = useState(false);
+  const [aplicandoHistorico, setAplicandoHistorico] = useState(false);
 
   function aplicarPedido(p: Pedido) {
     setPedido(p);
@@ -46,6 +52,14 @@ export function PedidoPage() {
         setObs(p.observacoes ?? '');
         const mix = await produtosApi.listarPorMix(p.clienteId);
         setProdutos(mix);
+        // Rascunho novo/vazio: oferece preencher pelo histórico.
+        if (p.itens.length === 0) {
+          const freq = await historicoApi.produtosHistorico(p.clienteId, 6);
+          if (freq.length > 0) {
+            setSugestoes(freq);
+            setPopupHistorico(true);
+          }
+        }
       })
       .finally(() => setCarregando(false));
   }, [navigate]);
@@ -92,6 +106,21 @@ export function PedidoPage() {
     }
   }
 
+  async function usarHistorico() {
+    if (!pedido) return;
+    setAplicandoHistorico(true);
+    try {
+      for (const s of sugestoes) {
+        await pedidosApi.adicionarItem(pedido.id, s.produtoId, s.quantidadeUltima);
+      }
+      const atualizado = await pedidosApi.obterRascunho();
+      if (atualizado) aplicarPedido(atualizado);
+      setPopupHistorico(false);
+    } finally {
+      setAplicandoHistorico(false);
+    }
+  }
+
   async function salvarObs() {
     if (!pedido || obs === (pedido.observacoes ?? '')) return;
     const atualizado = await pedidosApi.atualizarObservacoes(pedido.id, obs);
@@ -121,11 +150,58 @@ export function PedidoPage() {
       titulo={`Pedido · ${pedido.cliente.nome}`}
       voltarPara="/clientes"
       acao={
-        salvo ? (
-          <span className="text-xs text-emerald-300">Salvo ✓</span>
-        ) : undefined
+        <div className="flex items-center gap-2">
+          {salvo && <span className="text-xs text-emerald-300">Salvo ✓</span>}
+          <Link
+            to={`/clientes/${pedido.clienteId}/historico`}
+            className="rounded-lg bg-slate-700 px-2.5 py-1.5 text-xs hover:bg-slate-600"
+          >
+            Histórico
+          </Link>
+        </div>
       }
     >
+      <Modal
+        titulo="Usar histórico?"
+        aberto={popupHistorico}
+        onFechar={() => setPopupHistorico(false)}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Este cliente costuma comprar estes produtos. Quer preencher o pedido
+            com as <strong>últimas quantidades</strong>? Você pode ajustar depois.
+          </p>
+          <ul className="max-h-52 space-y-1 overflow-y-auto text-sm">
+            {sugestoes.map((s) => (
+              <li key={s.produtoId} className="flex justify-between">
+                <span className="text-slate-700">{s.nome}</span>
+                <span className="font-medium text-slate-800">
+                  {s.quantidadeUltima} {s.unidadeMedida}
+                  <span className="ml-1 text-xs text-slate-400">
+                    ({s.numeroCompras}x)
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={usarHistorico}
+            disabled={aplicandoHistorico}
+            className="w-full rounded-lg bg-slate-800 py-2.5 font-medium text-white hover:bg-slate-900 disabled:opacity-60"
+          >
+            {aplicandoHistorico
+              ? 'Preenchendo…'
+              : `Usar histórico (${sugestoes.length} itens)`}
+          </button>
+          <button
+            onClick={() => setPopupHistorico(false)}
+            className="w-full rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Começar vazio
+          </button>
+        </div>
+      </Modal>
+
       <div className="pb-40">
         <input
           type="search"

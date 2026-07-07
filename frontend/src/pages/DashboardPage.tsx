@@ -30,7 +30,7 @@ export function DashboardPage() {
     : [
         { titulo: 'Novo Pedido', desc: 'Começa selecionando o cliente', to: '/clientes' },
         { titulo: 'Selecionar Cliente', desc: 'Ver clientes e produtos', to: '/clientes' },
-        { titulo: 'Meus Pedidos', desc: 'Histórico de pedidos (em breve)' },
+        { titulo: 'Meus Pedidos', desc: 'Histórico de pedidos enviados', to: '/meus-pedidos' },
         { titulo: 'Minha Conta', desc: 'Dados e configurações (em breve)' },
       ];
 
