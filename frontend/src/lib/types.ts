@@ -6,7 +6,8 @@ export type Categoria =
   | 'CHAS'
   | 'ERVAS'
   | 'ESPECIARIAS'
-  | 'SAIS';
+  | 'SAIS'
+  | 'OUTROS';
 
 export type UnidadeMedida = 'UND' | 'KG' | 'G' | 'ML' | 'L';
 
@@ -55,6 +56,7 @@ export const CATEGORIAS: Categoria[] = [
   'ERVAS',
   'ESPECIARIAS',
   'SAIS',
+  'OUTROS',
 ];
 
 export const UNIDADES: UnidadeMedida[] = ['UND', 'KG', 'G', 'ML', 'L'];
@@ -66,4 +68,5 @@ export const CATEGORIA_LABEL: Record<Categoria, string> = {
   ERVAS: 'Ervas',
   ESPECIARIAS: 'Especiarias',
   SAIS: 'Sais',
+  OUTROS: 'Outros',
 };
