@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Vendedor } from '@prisma/client';
 import * as service from './pedidos.service';
+import * as historico from '../historico/historico.service';
 import { isUniqueConstraintError } from '../../utils/prisma-errors';
 
 type PedidoComItens = NonNullable<
@@ -80,6 +81,25 @@ async function responderPedidoAtualizado(
   await service.recomputarTotais(pedidoId);
   const atualizado = await service.getPedidoDoVendedor(pedidoId, vendedorId);
   res.json({ pedido: atualizado ? serialize(atualizado) : null });
+}
+
+export async function meuHistorico(req: Request, res: Response): Promise<void> {
+  const vendedor = await exigirVendedor(req, res);
+  if (!vendedor) return;
+  const periodo = historico.normalizarPeriodo(req.query.periodo);
+  const pedidos = await historico.meusPedidos(vendedor.id, periodo);
+  res.json({
+    periodo,
+    pedidos: pedidos.map((p) => ({
+      pedidoId: p.id,
+      numeroPedido: p.numeroPedido,
+      cliente: p.cliente,
+      data: p.confirmadoEm ?? p.criadoEm,
+      total: Number(p.total),
+      status: p.status,
+      itensCount: p._count.itens,
+    })),
+  });
 }
 
 export async function obterRascunho(req: Request, res: Response): Promise<void> {

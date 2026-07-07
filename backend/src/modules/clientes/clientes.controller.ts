@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Cliente } from '@prisma/client';
 import * as service from './clientes.service';
+import * as historico from '../historico/historico.service';
 import { isUniqueConstraintError, isNotFoundError } from '../../utils/prisma-errors';
 
 function serialize(c: Cliente) {
@@ -41,6 +42,58 @@ export async function listar(req: Request, res: Response): Promise<void> {
   const apenasAtivos = parsed.data.ativos !== 'false';
   const clientes = await service.listByLocal(localId, apenasAtivos);
   res.json({ clientes: clientes.map(serialize) });
+}
+
+// ---- Histórico (vendedor/admin) ----
+
+/** Garante que o vendedor só acesse clientes do próprio local. */
+async function clienteAcessivel(
+  req: Request,
+  res: Response,
+): Promise<Cliente | null> {
+  const cliente = await service.getById(req.params.id);
+  if (!cliente) {
+    res.status(404).json({ mensagem: 'Cliente não encontrado' });
+    return null;
+  }
+  if (req.user!.type === 'VENDEDOR' && cliente.localId !== req.user!.localId) {
+    res.status(403).json({ mensagem: 'Cliente pertence a outro local' });
+    return null;
+  }
+  return cliente;
+}
+
+export async function historicoCliente(req: Request, res: Response): Promise<void> {
+  const cliente = await clienteAcessivel(req, res);
+  if (!cliente) return;
+  const periodo = historico.normalizarPeriodo(req.query.periodo);
+  const pedidos = await historico.pedidosConfirmadosDoCliente(cliente.id, periodo);
+  res.json({
+    periodo,
+    historico: pedidos.map((p) => ({
+      pedidoId: p.id,
+      numeroPedido: p.numeroPedido,
+      data: p.confirmadoEm ?? p.criadoEm,
+      total: Number(p.total),
+      itens: p.itens.map((i) => ({
+        codigo: i.produto.codigo,
+        nome: i.produto.nome,
+        quantidade: Number(i.quantidade),
+        unidadeMedida: i.produto.unidadeMedida,
+      })),
+    })),
+  });
+}
+
+export async function produtosHistoricoCliente(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const cliente = await clienteAcessivel(req, res);
+  if (!cliente) return;
+  const periodo = historico.normalizarPeriodo(req.query.periodo);
+  const produtos = await historico.produtosFrequentes(cliente.id, periodo);
+  res.json({ periodo, produtos });
 }
 
 // ---- Admin ----

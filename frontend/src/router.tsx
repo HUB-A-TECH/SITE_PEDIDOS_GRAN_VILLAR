@@ -5,6 +5,8 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleRoute } from './components/RoleRoute';
 import { SelecionarClientePage } from './pages/vendedor/SelecionarClientePage';
 import { PedidoPage } from './pages/vendedor/PedidoPage';
+import { HistoricoClientePage } from './pages/vendedor/HistoricoClientePage';
+import { MeusPedidosPage } from './pages/vendedor/MeusPedidosPage';
 import { AdminProdutosPage } from './pages/admin/AdminProdutosPage';
 import { AdminClientesPage } from './pages/admin/AdminClientesPage';
 import { AdminClienteMixPage } from './pages/admin/AdminClienteMixPage';
@@ -35,6 +37,22 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <PedidoPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/meus-pedidos',
+    element: (
+      <ProtectedRoute>
+        <MeusPedidosPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/clientes/:clienteId/historico',
+    element: (
+      <ProtectedRoute>
+        <HistoricoClientePage />
       </ProtectedRoute>
     ),
   },
