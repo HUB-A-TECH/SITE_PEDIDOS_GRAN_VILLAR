@@ -25,7 +25,7 @@ export function DashboardPage() {
     ? [
         { titulo: 'Produtos', desc: 'Catálogo: adicionar e editar', to: '/admin/produtos' },
         { titulo: 'Clientes', desc: 'Cadastro e mix de cada cliente', to: '/admin/clientes' },
-        { titulo: 'Pedidos', desc: 'Ver e exportar TXT (em breve)' },
+        { titulo: 'Pedidos', desc: 'Ver pedidos e baixar TXT', to: '/admin/pedidos' },
       ]
     : [
         { titulo: 'Novo Pedido', desc: 'Começa selecionando o cliente', to: '/clientes' },

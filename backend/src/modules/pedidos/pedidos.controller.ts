@@ -4,6 +4,9 @@ import type { Vendedor } from '@prisma/client';
 import * as service from './pedidos.service';
 import * as historico from '../historico/historico.service';
 import { isUniqueConstraintError } from '../../utils/prisma-errors';
+import { gerarTxtPedido } from '../../utils/gerar-txt';
+
+const JANELA_CANCELAMENTO_MS = 24 * 60 * 60 * 1000; // 1 dia (RN-08)
 
 type PedidoComItens = NonNullable<
   Awaited<ReturnType<typeof service.getRascunhoAtual>>
@@ -263,4 +266,132 @@ export async function atualizarObservacoes(
   await service.atualizarObservacoes(pedido.id, parsed.data.observacoes);
   const atualizado = await service.getPedidoDoVendedor(pedido.id, vendedor.id);
   res.json({ pedido: atualizado ? serialize(atualizado) : null });
+}
+
+export async function confirmar(req: Request, res: Response): Promise<void> {
+  const vendedor = await exigirVendedor(req, res);
+  if (!vendedor) return;
+  const pedido = await carregarRascunho(req.params.id, vendedor.id, res);
+  if (!pedido) return;
+
+  const totalItens = await service.contarItens(pedido.id);
+  if (totalItens === 0) {
+    res.status(400).json({ mensagem: 'Não é possível enviar um pedido sem itens' });
+    return;
+  }
+
+  const numero = await service.confirmarPedido(pedido.id);
+  res.json({
+    pedidoId: pedido.id,
+    numeroPedido: numero,
+    status: 'CONFIRMADO',
+    txtDisponivel: true,
+  });
+}
+
+export async function cancelar(req: Request, res: Response): Promise<void> {
+  const vendedor = await exigirVendedor(req, res);
+  if (!vendedor) return;
+
+  const pedido = await service.getPedidoDoVendedor(req.params.id, vendedor.id);
+  if (!pedido) {
+    res.status(404).json({ mensagem: 'Pedido não encontrado' });
+    return;
+  }
+  if (pedido.status !== 'CONFIRMADO') {
+    res.status(409).json({ mensagem: 'Apenas pedidos confirmados podem ser cancelados' });
+    return;
+  }
+  // Janela de 1 dia para o vendedor cancelar sozinho (RN-08).
+  const confirmadoEm = pedido.confirmadoEm?.getTime() ?? 0;
+  if (Date.now() - confirmadoEm > JANELA_CANCELAMENTO_MS) {
+    res.status(403).json({
+      mensagem: 'Prazo de cancelamento (1 dia) expirado. Solicite a um administrador.',
+    });
+    return;
+  }
+
+  const parsed = z
+    .object({ motivo: z.string().max(500).optional() })
+    .safeParse(req.body ?? {});
+  const motivo = parsed.success ? (parsed.data.motivo ?? null) : null;
+
+  await service.cancelarPedido(pedido.id, motivo);
+  res.json({ pedidoId: pedido.id, status: 'CANCELADO' });
+}
+
+export async function baixarTxt(req: Request, res: Response): Promise<void> {
+  const isAdmin = req.user!.type !== 'VENDEDOR';
+  const pedido = await service.getPedidoCompleto(req.params.id);
+  if (!pedido) {
+    res.status(404).json({ mensagem: 'Pedido não encontrado' });
+    return;
+  }
+  if (!isAdmin) {
+    const vendedor = await service.getVendedorByUsuario(req.user!.sub);
+    if (!vendedor || pedido.vendedorId !== vendedor.id) {
+      res.status(404).json({ mensagem: 'Pedido não encontrado' });
+      return;
+    }
+  }
+  if (pedido.status === 'RASCUNHO') {
+    res.status(400).json({ mensagem: 'Rascunho não possui TXT' });
+    return;
+  }
+
+  const txt = gerarTxtPedido({
+    numeroPedido: pedido.numeroPedido,
+    status: pedido.status,
+    confirmadoEm: pedido.confirmadoEm,
+    criadoEm: pedido.criadoEm,
+    observacoes: pedido.observacoes,
+    total: Number(pedido.total),
+    subtotal: Number(pedido.subtotal),
+    local: pedido.local,
+    vendedor: pedido.vendedor,
+    cliente: pedido.cliente,
+    itens: pedido.itens.map((i) => ({
+      produtoCodigo: i.produto.codigo,
+      produtoNome: i.produto.nome,
+      unidadeMedida: i.produto.unidadeMedida,
+      quantidade: Number(i.quantidade),
+      precoUnitario: Number(i.precoUnitario),
+      subtotal: Number(i.subtotal),
+    })),
+  });
+
+  const nome = `pedido_${pedido.numeroPedido ?? pedido.id}.txt`;
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+  res.send(txt);
+}
+
+export async function adminListar(req: Request, res: Response): Promise<void> {
+  const schema = z.object({
+    periodo: z.string().optional(),
+    vendedor_id: z.string().uuid().optional(),
+    cliente_id: z.string().uuid().optional(),
+  });
+  const parsed = schema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'Parâmetros inválidos' });
+    return;
+  }
+  const pedidos = await service.listarPedidosAdmin({
+    meses: historico.normalizarPeriodo(parsed.data.periodo),
+    vendedorId: parsed.data.vendedor_id,
+    clienteId: parsed.data.cliente_id,
+  });
+  res.json({
+    pedidos: pedidos.map((p) => ({
+      pedidoId: p.id,
+      numeroPedido: p.numeroPedido,
+      cliente: p.cliente,
+      vendedor: p.vendedor,
+      data: p.confirmadoEm ?? p.criadoEm,
+      total: Number(p.total),
+      status: p.status,
+      itensCount: p._count.itens,
+    })),
+  });
 }

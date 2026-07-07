@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import type { Cliente, ItemPedido, Produto, Vendedor } from '@prisma/client';
+import { isUniqueConstraintError } from '../../utils/prisma-errors';
 
 export function getVendedorByUsuario(usuarioId: string): Promise<Vendedor | null> {
   return prisma.vendedor.findUnique({ where: { usuarioId } });
@@ -128,5 +129,91 @@ export function atualizarObservacoes(pedidoId: string, observacoes: string) {
   return prisma.pedido.update({
     where: { id: pedidoId },
     data: { observacoes },
+  });
+}
+
+export function contarItens(pedidoId: string): Promise<number> {
+  return prisma.itemPedido.count({ where: { pedidoId } });
+}
+
+/** Confirma o rascunho: gera número sequencial por ano e marca CONFIRMADO. */
+export async function confirmarPedido(pedidoId: string): Promise<string> {
+  const ano = new Date().getFullYear();
+  for (let tentativa = 0; tentativa < 5; tentativa++) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const ultimo = await tx.pedido.findFirst({
+          where: { numeroPedido: { startsWith: `${ano}-` } },
+          orderBy: { numeroPedido: 'desc' },
+          select: { numeroPedido: true },
+        });
+        const seq = ultimo ? Number(ultimo.numeroPedido!.split('-')[1]) + 1 : 1;
+        const numero = `${ano}-${String(seq).padStart(6, '0')}`;
+        await tx.pedido.update({
+          where: { id: pedidoId },
+          data: {
+            status: 'CONFIRMADO',
+            numeroPedido: numero,
+            confirmadoEm: new Date(),
+          },
+        });
+        return numero;
+      });
+    } catch (e) {
+      if (isUniqueConstraintError(e) && tentativa < 4) continue;
+      throw e;
+    }
+  }
+  throw new Error('Não foi possível gerar o número do pedido');
+}
+
+export function cancelarPedido(pedidoId: string, motivo: string | null) {
+  return prisma.pedido.update({
+    where: { id: pedidoId },
+    data: {
+      status: 'CANCELADO',
+      canceladoEm: new Date(),
+      motivoCancelamento: motivo,
+    },
+  });
+}
+
+/** Pedido com todos os dados necessários para o TXT / detalhe. */
+export function getPedidoCompleto(id: string) {
+  return prisma.pedido.findUnique({
+    where: { id },
+    include: {
+      local: { select: { codigo: true, nome: true } },
+      vendedor: { select: { nomeCompleto: true } },
+      cliente: {
+        select: { codigo: true, nome: true, nomeFantasia: true, cnpj: true },
+      },
+      itens: { include: { produto: true }, orderBy: { produto: { nome: 'asc' } } },
+    },
+  });
+}
+
+export interface FiltroAdminPedidos {
+  meses: number;
+  vendedorId?: string;
+  clienteId?: string;
+}
+
+export function listarPedidosAdmin(filtro: FiltroAdminPedidos) {
+  const desde = new Date();
+  desde.setMonth(desde.getMonth() - filtro.meses);
+  return prisma.pedido.findMany({
+    where: {
+      status: { in: ['CONFIRMADO', 'CANCELADO'] },
+      confirmadoEm: { gte: desde },
+      ...(filtro.vendedorId ? { vendedorId: filtro.vendedorId } : {}),
+      ...(filtro.clienteId ? { clienteId: filtro.clienteId } : {}),
+    },
+    include: {
+      cliente: { select: { id: true, codigo: true, nome: true } },
+      vendedor: { select: { id: true, nomeCompleto: true } },
+      _count: { select: { itens: true } },
+    },
+    orderBy: { confirmadoEm: 'desc' },
   });
 }

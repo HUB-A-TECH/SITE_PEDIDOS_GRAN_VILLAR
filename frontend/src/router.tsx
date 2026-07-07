@@ -10,6 +10,7 @@ import { MeusPedidosPage } from './pages/vendedor/MeusPedidosPage';
 import { AdminProdutosPage } from './pages/admin/AdminProdutosPage';
 import { AdminClientesPage } from './pages/admin/AdminClientesPage';
 import { AdminClienteMixPage } from './pages/admin/AdminClienteMixPage';
+import { AdminPedidosPage } from './pages/admin/AdminPedidosPage';
 import type { UserType } from './lib/types';
 
 const ADMIN: UserType[] = ['ADMIN_COMERCIAL', 'ADMIN_TI'];
@@ -77,6 +78,14 @@ export const router = createBrowserRouter([
     element: (
       <RoleRoute permitido={ADMIN}>
         <AdminClienteMixPage />
+      </RoleRoute>
+    ),
+  },
+  {
+    path: '/admin/pedidos',
+    element: (
+      <RoleRoute permitido={ADMIN}>
+        <AdminPedidosPage />
       </RoleRoute>
     ),
   },
