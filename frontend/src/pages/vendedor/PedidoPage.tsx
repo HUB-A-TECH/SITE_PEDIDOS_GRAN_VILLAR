@@ -143,6 +143,16 @@ export function PedidoPage() {
     }
   }
 
+  async function baixarProposta() {
+    if (!pedido || pedido.itens.length === 0) return;
+    await salvarObs(); // garante que as observações estejam salvas no PDF
+    const a = document.createElement('a');
+    a.href = pedidosApi.pdfHref(pedido.id);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
   async function descartar() {
     if (!pedido) return;
     if (!confirm('Descartar este rascunho? Esta ação não pode ser desfeita.')) return;
@@ -218,7 +228,7 @@ export function PedidoPage() {
         </div>
       </Modal>
 
-      <div className="pb-40">
+      <div className="pb-52">
         <input
           type="search"
           placeholder="Buscar produto no mix…"
@@ -302,6 +312,12 @@ export function PedidoPage() {
           />
         </div>
 
+        <div className="mt-4 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
+          💡 O pedido é salvo automaticamente. Toque em <strong>Baixar PDF</strong>{' '}
+          para o cliente conferir. Quando ele aprovar, use{' '}
+          <strong>Salvar e Enviar</strong> para mandar à administração.
+        </div>
+
         <button
           onClick={descartar}
           className="mt-4 w-full rounded-lg border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
@@ -310,21 +326,30 @@ export function PedidoPage() {
         </button>
       </div>
 
-      {/* Barra fixa de total */}
+      {/* Barra fixa de ações */}
       <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-md items-center gap-3 p-4">
-          <div className="flex-1">
-            <p className="text-xs text-slate-500">
-              {totalItens} {totalItens === 1 ? 'item' : 'itens'}
-            </p>
-            <p className="text-lg font-bold text-slate-800">{brl(pedido.total)}</p>
+        <div className="mx-auto max-w-md space-y-2 p-3">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <p className="text-xs text-slate-500">
+                {totalItens} {totalItens === 1 ? 'item' : 'itens'} · salvo automaticamente
+              </p>
+              <p className="text-lg font-bold text-slate-800">{brl(pedido.total)}</p>
+            </div>
+            <button
+              onClick={baixarProposta}
+              disabled={totalItens === 0}
+              className="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
+            >
+              Baixar PDF
+            </button>
           </div>
           <button
             onClick={enviarPedido}
             disabled={enviando || totalItens === 0}
-            className="rounded-lg bg-brand-600 px-5 py-2.5 font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            {enviando ? 'Enviando…' : 'Salvar e Enviar'}
+            {enviando ? 'Enviando…' : 'Salvar e Enviar (para a administração)'}
           </button>
         </div>
       </div>
