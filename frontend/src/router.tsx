@@ -11,9 +11,11 @@ import { AdminProdutosPage } from './pages/admin/AdminProdutosPage';
 import { AdminClientesPage } from './pages/admin/AdminClientesPage';
 import { AdminClienteMixPage } from './pages/admin/AdminClienteMixPage';
 import { AdminPedidosPage } from './pages/admin/AdminPedidosPage';
+import { AdminUsuariosPage } from './pages/admin/AdminUsuariosPage';
 import type { UserType } from './lib/types';
 
 const ADMIN: UserType[] = ['ADMIN_COMERCIAL', 'ADMIN_TI'];
+const ADMIN_TI: UserType[] = ['ADMIN_TI'];
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -86,6 +88,14 @@ export const router = createBrowserRouter([
     element: (
       <RoleRoute permitido={ADMIN}>
         <AdminPedidosPage />
+      </RoleRoute>
+    ),
+  },
+  {
+    path: '/admin/usuarios',
+    element: (
+      <RoleRoute permitido={ADMIN_TI}>
+        <AdminUsuariosPage />
       </RoleRoute>
     ),
   },

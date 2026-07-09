@@ -20,12 +20,22 @@ export function DashboardPage() {
   if (!usuario) return null;
 
   const isAdmin = usuario.type !== 'VENDEDOR';
+  const isAdminTI = usuario.type === 'ADMIN_TI';
 
   const itens: ItemMenu[] = isAdmin
     ? [
         { titulo: 'Produtos', desc: 'Catálogo: adicionar e editar', to: '/admin/produtos' },
         { titulo: 'Clientes', desc: 'Cadastro e mix de cada cliente', to: '/admin/clientes' },
         { titulo: 'Pedidos', desc: 'Ver pedidos e baixar TXT', to: '/admin/pedidos' },
+        ...(isAdminTI
+          ? [
+              {
+                titulo: 'Usuários',
+                desc: 'Cadastrar administradores e vendedores',
+                to: '/admin/usuarios',
+              },
+            ]
+          : []),
       ]
     : [
         { titulo: 'Novo Pedido', desc: 'Começa selecionando o cliente', to: '/clientes' },

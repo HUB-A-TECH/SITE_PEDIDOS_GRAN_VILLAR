@@ -25,6 +25,19 @@ async function main() {
     },
   });
 
+  const senhaComercial = await hashPassword('comercial123');
+  await prisma.user.upsert({
+    where: { username: 'comercial' },
+    update: {},
+    create: {
+      username: 'comercial',
+      email: 'comercial@granvillar.local',
+      passwordHash: senhaComercial,
+      type: 'ADMIN_COMERCIAL',
+      localId: local.id,
+    },
+  });
+
   const senhaVendedor = await hashPassword('vendedor123');
   const vendedorUser = await prisma.user.upsert({
     where: { username: 'vendedor' },
@@ -49,8 +62,9 @@ async function main() {
   });
 
   console.log('Seed concluído.');
-  console.log('  Admin TI:  admin / admin123');
-  console.log('  Vendedor:  vendedor / vendedor123');
+  console.log('  Admin TI:        admin / admin123');
+  console.log('  Admin Comercial: comercial / comercial123');
+  console.log('  Vendedor:        vendedor / vendedor123');
 }
 
 main()
