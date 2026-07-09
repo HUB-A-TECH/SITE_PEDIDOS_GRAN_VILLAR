@@ -167,10 +167,10 @@ export function PedidoPage() {
       voltarPara="/clientes"
       acao={
         <div className="flex items-center gap-2">
-          {salvo && <span className="text-xs text-emerald-300">Salvo ✓</span>}
+          {salvo && <span className="text-xs text-brand-100">Salvo ✓</span>}
           <Link
             to={`/clientes/${pedido.clienteId}/historico`}
-            className="rounded-lg bg-slate-700 px-2.5 py-1.5 text-xs hover:bg-slate-600"
+            className="rounded-lg bg-brand-700 px-2.5 py-1.5 text-xs hover:bg-brand-800"
           >
             Histórico
           </Link>
@@ -203,7 +203,7 @@ export function PedidoPage() {
           <button
             onClick={usarHistorico}
             disabled={aplicandoHistorico}
-            className="w-full rounded-lg bg-slate-800 py-2.5 font-medium text-white hover:bg-slate-900 disabled:opacity-60"
+            className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
           >
             {aplicandoHistorico
               ? 'Preenchendo…'
@@ -248,7 +248,7 @@ export function PedidoPage() {
               <li
                 key={p.id}
                 className={`rounded-xl bg-white p-4 shadow-sm ${
-                  qtd > 0 ? 'ring-1 ring-emerald-300' : ''
+                  qtd > 0 ? 'ring-1 ring-brand-300' : ''
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -277,7 +277,7 @@ export function PedidoPage() {
                     <button
                       onClick={() => definirQuantidade(p.id, 1)}
                       disabled={ocupado}
-                      className="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                      className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
                     >
                       Adicionar
                     </button>
@@ -322,7 +322,7 @@ export function PedidoPage() {
           <button
             onClick={enviarPedido}
             disabled={enviando || totalItens === 0}
-            className="rounded-lg bg-emerald-600 px-5 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="rounded-lg bg-brand-600 px-5 py-2.5 font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {enviando ? 'Enviando…' : 'Salvar e Enviar'}
           </button>
@@ -344,7 +344,7 @@ export function PedidoPage() {
               href={pedidosApi.pdfHref(confirmado.pedidoId)}
               target="_blank"
               rel="noopener"
-              className="block w-full rounded-lg bg-emerald-600 py-2.5 font-medium text-white hover:bg-emerald-500"
+              className="block w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-500"
             >
               Baixar PDF (entregar ao cliente)
             </a>
@@ -443,7 +443,7 @@ function Chip({
     <button
       onClick={onClick}
       className={`rounded-full px-3 py-1 text-sm ${
-        ativa ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
+        ativa ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
       }`}
     >
       {label}

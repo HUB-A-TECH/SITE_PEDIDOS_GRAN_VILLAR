@@ -111,7 +111,7 @@ export function AdminClienteMixPage() {
                   className={`rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${
                     noMix
                       ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                      : 'bg-brand-600 text-white hover:bg-brand-500'
                   }`}
                 >
                   {noMix ? 'Remover' : 'Adicionar'}
@@ -138,7 +138,7 @@ function Chip({
     <button
       onClick={onClick}
       className={`rounded-full px-3 py-1 text-sm ${
-        ativa ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
+        ativa ? 'bg-brand-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
       }`}
     >
       {label}

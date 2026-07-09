@@ -15,24 +15,24 @@ export function AppLayout({ titulo, voltarPara, children, acao }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      <header className="sticky top-0 z-10 flex items-center gap-3 bg-slate-800 px-4 py-3 text-white">
+      <header className="sticky top-0 z-10 flex items-center gap-3 bg-brand-600 px-4 py-3 text-white">
         {voltarPara && (
           <button
             onClick={() => navigate(voltarPara)}
             aria-label="Voltar"
-            className="rounded-lg px-2 py-1 text-lg hover:bg-slate-700"
+            className="rounded-lg px-2 py-1 text-lg hover:bg-brand-700"
           >
             ←
           </button>
         )}
         <div className="flex-1">
           <p className="text-sm font-semibold leading-tight">{titulo}</p>
-          <p className="text-xs text-slate-300">{usuario?.username}</p>
+          <p className="text-xs text-brand-100">{usuario?.username}</p>
         </div>
         {acao}
         <button
           onClick={() => logout()}
-          className="rounded-lg bg-slate-700 px-3 py-1.5 text-sm hover:bg-slate-600"
+          className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm hover:bg-brand-800"
         >
           Sair
         </button>

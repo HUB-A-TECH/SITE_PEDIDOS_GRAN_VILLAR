@@ -55,7 +55,7 @@ export function AdminProdutosPage() {
       acao={
         <button
           onClick={abrirNovo}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium hover:bg-emerald-500"
+          className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium hover:bg-brand-500"
         >
           + Novo
         </button>
@@ -259,7 +259,7 @@ function ProdutoForm({
       <button
         type="submit"
         disabled={salvando}
-        className="w-full rounded-lg bg-slate-800 py-2.5 font-medium text-white hover:bg-slate-900 disabled:opacity-60"
+        className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
       >
         {salvando ? 'Salvando…' : 'Salvar'}
       </button>
