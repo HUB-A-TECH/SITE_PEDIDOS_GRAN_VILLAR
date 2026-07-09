@@ -53,15 +53,29 @@ const DIREITA = 545;
 export function desenharPedidoPdf(doc: PDFKit.PDFDocument, p: PedidoExport): void {
   const data = p.confirmadoEm ?? p.criadoEm;
 
+  const ehRascunho = p.status === 'RASCUNHO';
+  const statusLabel = ehRascunho
+    ? 'Provisório'
+    : p.status === 'CANCELADO'
+      ? 'Cancelado'
+      : 'Confirmado';
+
   // Cabeçalho
   doc.fillColor(ESCURO).font('Helvetica-Bold').fontSize(22).text('GRAN VILLAR', 50, 50);
-  doc.font('Helvetica').fontSize(10).fillColor(CINZA).text('Pedido de Venda', 50, 76);
+  doc
+    .font('Helvetica')
+    .fontSize(10)
+    .fillColor(CINZA)
+    .text(ehRascunho ? 'Proposta de Pedido' : 'Pedido de Venda', 50, 76);
 
   doc.font('Helvetica-Bold').fontSize(11).fillColor(ESCURO);
-  doc.text(`Pedido ${p.numeroPedido ?? '(rascunho)'}`, 300, 50, { width: 245, align: 'right' });
+  doc.text(p.numeroPedido ? `Pedido ${p.numeroPedido}` : 'Proposta', 300, 50, {
+    width: 245,
+    align: 'right',
+  });
   doc.font('Helvetica').fontSize(10).fillColor(CINZA);
   doc.text(`Data: ${dataBR(data)}`, 300, 68, { width: 245, align: 'right' });
-  doc.text(`Status: ${p.status}`, 300, 82, { width: 245, align: 'right' });
+  doc.text(`Status: ${statusLabel}`, 300, 82, { width: 245, align: 'right' });
 
   // Linha divisória
   doc.moveTo(50, 105).lineTo(DIREITA, 105).strokeColor('#cbd5e1').stroke();

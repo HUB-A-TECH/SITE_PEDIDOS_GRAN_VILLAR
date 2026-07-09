@@ -343,9 +343,9 @@ async function carregarExportavel(
       res.status(404).json({ mensagem: 'Pedido não encontrado' });
       return null;
     }
-  }
-  if (pedido.status === 'RASCUNHO') {
-    res.status(400).json({ mensagem: 'Rascunho não possui documento' });
+  } else if (pedido.status === 'RASCUNHO') {
+    // A administração só enxerga pedidos enviados (rascunho é do vendedor).
+    res.status(404).json({ mensagem: 'Pedido não encontrado' });
     return null;
   }
   return pedido;
@@ -378,7 +378,9 @@ export async function baixarTxt(req: Request, res: Response): Promise<void> {
   const pedido = await carregarExportavel(req, res);
   if (!pedido) return;
   const txt = gerarTxtPedido(dadosExport(pedido));
-  const nome = `pedido_${pedido.numeroPedido ?? pedido.id}.txt`;
+  const nome = pedido.numeroPedido
+    ? `pedido_${pedido.numeroPedido}.txt`
+    : `proposta_${pedido.id.slice(0, 8)}.txt`;
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
   res.send(txt);
@@ -387,7 +389,9 @@ export async function baixarTxt(req: Request, res: Response): Promise<void> {
 export async function baixarPdf(req: Request, res: Response): Promise<void> {
   const pedido = await carregarExportavel(req, res);
   if (!pedido) return;
-  const nome = `pedido_${pedido.numeroPedido ?? pedido.id}.pdf`;
+  const nome = pedido.numeroPedido
+    ? `pedido_${pedido.numeroPedido}.pdf`
+    : `proposta_${pedido.id.slice(0, 8)}.pdf`;
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
   const doc = new PDFDocument({ size: 'A4', margin: 50 });
