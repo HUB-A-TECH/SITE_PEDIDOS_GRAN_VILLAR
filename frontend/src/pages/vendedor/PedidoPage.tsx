@@ -112,11 +112,15 @@ export function PedidoPage() {
     if (!pedido) return;
     setAplicandoHistorico(true);
     try {
-      for (const s of sugestoes) {
-        await pedidosApi.adicionarItem(pedido.id, s.produtoId, s.quantidadeUltima);
-      }
-      const atualizado = await pedidosApi.obterRascunho();
-      if (atualizado) aplicarPedido(atualizado);
+      // Uma única requisição adiciona todos os itens (bem mais rápido).
+      const atualizado = await pedidosApi.adicionarItensLote(
+        pedido.id,
+        sugestoes.map((s) => ({
+          produtoId: s.produtoId,
+          quantidade: s.quantidadeUltima,
+        })),
+      );
+      aplicarPedido(atualizado);
       setPopupHistorico(false);
     } finally {
       setAplicandoHistorico(false);

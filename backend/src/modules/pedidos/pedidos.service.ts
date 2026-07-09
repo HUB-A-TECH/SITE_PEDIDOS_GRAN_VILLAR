@@ -99,6 +99,65 @@ export async function definirItem(
   }
 }
 
+/**
+ * Adiciona/atualiza vários itens de uma vez (usado ao aplicar o histórico).
+ * Uma única transação + um recálculo, em vez de N requisições. Ignora produtos
+ * fora do mix ativo ou inativos. Retorna quantos itens foram aplicados.
+ */
+export async function definirItensEmLote(
+  pedidoId: string,
+  clienteId: string,
+  entradas: { produtoId: string; quantidade: number }[],
+): Promise<number> {
+  const produtoIds = [...new Set(entradas.map((e) => e.produtoId))];
+  const validos = await prisma.produto.findMany({
+    where: {
+      id: { in: produtoIds },
+      ativo: true,
+      clienteProdutos: { some: { clienteId, ativo: true } },
+    },
+  });
+  const porId = new Map(validos.map((p) => [p.id, p]));
+
+  const existentes = await prisma.itemPedido.findMany({
+    where: { pedidoId },
+    select: { id: true, produtoId: true },
+  });
+  const idPorProduto = new Map(existentes.map((i) => [i.produtoId, i.id]));
+
+  const ops = [];
+  const jaTratados = new Set<string>();
+  for (const e of entradas) {
+    if (jaTratados.has(e.produtoId)) continue;
+    const produto = porId.get(e.produtoId);
+    if (!produto) continue;
+    jaTratados.add(e.produtoId);
+    const preco = Number(produto.preco);
+    const subtotal = calcularSubtotal(e.quantidade, preco);
+    const existenteId = idPorProduto.get(e.produtoId);
+    if (existenteId) {
+      ops.push(
+        prisma.itemPedido.update({
+          where: { id: existenteId },
+          data: { quantidade: e.quantidade, precoUnitario: preco, subtotal },
+        }),
+      );
+    } else {
+      ops.push(
+        prisma.itemPedido.create({
+          data: { pedidoId, produtoId: produto.id, quantidade: e.quantidade, precoUnitario: preco, subtotal },
+        }),
+      );
+    }
+  }
+
+  if (ops.length > 0) {
+    await prisma.$transaction(ops);
+    await recomputarTotais(pedidoId);
+  }
+  return ops.length;
+}
+
 export async function atualizarQuantidadeItem(
   item: ItemPedido,
   quantidade: number,
