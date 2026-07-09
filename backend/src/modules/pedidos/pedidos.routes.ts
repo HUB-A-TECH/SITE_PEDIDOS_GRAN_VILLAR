@@ -14,6 +14,7 @@ pedidosRoutes.post('/', asyncHandler(controller.criar));
 pedidosRoutes.delete('/:id', asyncHandler(controller.excluir));
 
 pedidosRoutes.post('/:id/itens', asyncHandler(controller.adicionarItem));
+pedidosRoutes.post('/:id/itens/lote', asyncHandler(controller.adicionarItensLote));
 pedidosRoutes.put('/:id/itens/:itemId', asyncHandler(controller.atualizarItem));
 pedidosRoutes.delete('/:id/itens/:itemId', asyncHandler(controller.removerItem));
 
