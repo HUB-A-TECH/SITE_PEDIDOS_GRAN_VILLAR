@@ -106,7 +106,7 @@ export function SelecionarClientePage() {
                 setConflito(null);
                 navigate('/pedido');
               }}
-              className="w-full rounded-lg bg-slate-800 py-2.5 font-medium text-white hover:bg-slate-900"
+              className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-700"
             >
               Continuar rascunho de {conflito.rascunho.cliente.nome}
             </button>

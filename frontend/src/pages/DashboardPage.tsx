@@ -43,7 +43,7 @@ export function DashboardPage() {
             <Link
               key={item.titulo}
               to={item.to}
-              className="rounded-xl bg-white p-4 shadow-sm transition hover:shadow-md"
+              className="rounded-xl border-l-4 border-brand-500 bg-white p-4 shadow-sm transition hover:shadow-md"
             >
               <p className="font-semibold text-slate-800">{item.titulo}</p>
               <p className="text-sm text-slate-500">{item.desc}</p>

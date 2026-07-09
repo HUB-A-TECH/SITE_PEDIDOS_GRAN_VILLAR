@@ -33,7 +33,7 @@ export function HistoricoClientePage() {
             onClick={() => setPeriodo(p)}
             className={`flex-1 rounded-lg py-2 text-sm font-medium ${
               periodo === p
-                ? 'bg-slate-800 text-white'
+                ? 'bg-brand-600 text-white'
                 : 'bg-white text-slate-600 hover:bg-slate-200'
             }`}
           >

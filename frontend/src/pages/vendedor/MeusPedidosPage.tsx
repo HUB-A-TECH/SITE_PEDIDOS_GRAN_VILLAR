@@ -64,7 +64,7 @@ export function MeusPedidosPage() {
             onClick={() => setPeriodo(p)}
             className={`flex-1 rounded-lg py-2 text-sm font-medium ${
               periodo === p
-                ? 'bg-slate-800 text-white'
+                ? 'bg-brand-600 text-white'
                 : 'bg-white text-slate-600 hover:bg-slate-200'
             }`}
           >
@@ -97,7 +97,7 @@ export function MeusPedidosPage() {
                     <p className="font-semibold text-slate-800">{brl(p.total)}</p>
                     <span
                       className={`text-xs font-medium ${
-                        p.status === 'CANCELADO' ? 'text-red-500' : 'text-emerald-600'
+                        p.status === 'CANCELADO' ? 'text-red-500' : 'text-brand-600'
                       }`}
                     >
                       {p.status === 'CANCELADO' ? 'Cancelado' : 'Confirmado'}
@@ -109,7 +109,7 @@ export function MeusPedidosPage() {
                     href={pedidosApi.pdfHref(p.pedidoId)}
                     target="_blank"
                     rel="noopener"
-                    className="flex-1 rounded-lg bg-emerald-600 py-2 text-center text-sm font-medium text-white hover:bg-emerald-500"
+                    className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500"
                   >
                     Baixar PDF
                   </a>
