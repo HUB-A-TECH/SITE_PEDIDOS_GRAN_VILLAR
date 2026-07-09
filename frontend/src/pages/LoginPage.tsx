@@ -32,10 +32,10 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4">
       <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-lg">
-        {/* Faixa tricolor da marca */}
+        {/* Faixa tricolor na mesma ordem da logo: amarelo, verde, vermelho */}
         <div className="flex h-1.5 w-full">
-          <div className="flex-1 bg-brand-500" />
           <div className="flex-1 bg-brandYellow-400" />
+          <div className="flex-1 bg-brand-500" />
           <div className="flex-1 bg-brandRed-500" />
         </div>
 
