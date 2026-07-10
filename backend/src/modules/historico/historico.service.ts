@@ -105,6 +105,30 @@ export async function produtosFrequentes(clienteId: string, meses: number) {
     }));
 }
 
+/**
+ * Histórico por produto do cliente: para cada produto comprado, a lista de
+ * { data, quantidade } dos pedidos confirmados (mais recentes primeiro).
+ * Uma consulta só, usada na tela de pedido.
+ */
+export async function historicoPorProduto(
+  clienteId: string,
+  meses: number,
+  maxPorProduto = 12,
+): Promise<Record<string, { data: Date; quantidade: number }[]>> {
+  const pedidos = await pedidosConfirmadosDoCliente(clienteId, meses);
+  const mapa: Record<string, { data: Date; quantidade: number }[]> = {};
+  for (const p of pedidos) {
+    const data = p.confirmadoEm ?? p.criadoEm;
+    for (const it of p.itens) {
+      const lista = (mapa[it.produtoId] ??= []);
+      if (lista.length < maxPorProduto) {
+        lista.push({ data, quantidade: Number(it.quantidade) });
+      }
+    }
+  }
+  return mapa;
+}
+
 /** Pedidos confirmados/cancelados do próprio vendedor no período. */
 export function meusPedidos(vendedorId: string, meses: number) {
   return prisma.pedido.findMany({

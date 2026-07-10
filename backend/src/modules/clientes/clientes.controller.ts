@@ -96,6 +96,17 @@ export async function produtosHistoricoCliente(
   res.json({ periodo, produtos });
 }
 
+export async function historicoItensCliente(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const cliente = await clienteAcessivel(req, res);
+  if (!cliente) return;
+  // Últimos 12 meses de histórico por produto (para a tela de pedido).
+  const historicoItens = await historico.historicoPorProduto(cliente.id, 12);
+  res.json({ historico: historicoItens });
+}
+
 // ---- Admin ----
 
 const clienteCreateSchema = z.object({

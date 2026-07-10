@@ -6,7 +6,7 @@ import * as pedidosApi from '../../lib/pedidosApi';
 import type { Pedido } from '../../lib/pedidosApi';
 import * as produtosApi from '../../lib/produtosApi';
 import * as historicoApi from '../../lib/historicoApi';
-import type { ProdutoHistorico } from '../../lib/historicoApi';
+import type { ProdutoHistorico, ItemHistoricoProduto } from '../../lib/historicoApi';
 import {
   CATEGORIAS,
   CATEGORIA_LABEL,
@@ -18,6 +18,12 @@ const CACHE_KEY = 'gv_rascunho';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+function diaMes(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, '0')}/${MESES_ABREV[d.getMonth()]}`;
+}
 
 export function PedidoPage() {
   const navigate = useNavigate();
@@ -34,12 +40,23 @@ export function PedidoPage() {
   const [aplicandoHistorico, setAplicandoHistorico] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [confirmado, setConfirmado] = useState<{ numero: string; pedidoId: string } | null>(null);
+  const [histProdutos, setHistProdutos] = useState<Record<string, ItemHistoricoProduto[]>>({});
+  const [histFechado, setHistFechado] = useState<Set<string>>(new Set());
 
   function aplicarPedido(p: Pedido) {
     setPedido(p);
     localStorage.setItem(CACHE_KEY, JSON.stringify(p));
     setSalvo(true);
     window.setTimeout(() => setSalvo(false), 1500);
+  }
+
+  function toggleHistorico(produtoId: string) {
+    setHistFechado((s) => {
+      const n = new Set(s);
+      if (n.has(produtoId)) n.delete(produtoId);
+      else n.add(produtoId);
+      return n;
+    });
   }
 
   useEffect(() => {
@@ -52,8 +69,13 @@ export function PedidoPage() {
         }
         setPedido(p);
         setObs(p.observacoes ?? '');
-        const mix = await produtosApi.listarPorMix(p.clienteId);
+        // Mix e histórico por produto em paralelo (mais rápido).
+        const [mix, hist] = await Promise.all([
+          produtosApi.listarPorMix(p.clienteId),
+          historicoApi.historicoItens(p.clienteId),
+        ]);
         setProdutos(mix);
+        setHistProdutos(hist);
         // Rascunho novo/vazio: oferece preencher pelo histórico.
         if (p.itens.length === 0) {
           const freq = await historicoApi.produtosHistorico(p.clienteId, 6);
@@ -297,6 +319,36 @@ export function PedidoPage() {
                     </button>
                   )}
                 </div>
+
+                {histProdutos[p.id]?.length > 0 && (
+                  <div className="mt-3 border-t border-slate-100 pt-2">
+                    <button
+                      onClick={() => toggleHistorico(p.id)}
+                      className="flex w-full items-center justify-between text-xs font-semibold text-brand-700"
+                    >
+                      <span>Histórico do produto</span>
+                      <span className="text-slate-400">
+                        {histFechado.has(p.id)
+                          ? `▸ ver (${histProdutos[p.id].length})`
+                          : '▾ ocultar'}
+                      </span>
+                    </button>
+                    {!histFechado.has(p.id) && (
+                      <div className="mt-2 grid grid-cols-4 gap-x-2 gap-y-1 sm:grid-cols-6">
+                        {histProdutos[p.id].map((e, i) => (
+                          <div key={i} className="text-center">
+                            <p className="text-[11px] font-semibold leading-tight text-slate-800">
+                              {diaMes(e.data)}
+                            </p>
+                            <p className="text-sm font-bold leading-tight text-red-600">
+                              {e.quantidade}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </li>
             );
           })}
