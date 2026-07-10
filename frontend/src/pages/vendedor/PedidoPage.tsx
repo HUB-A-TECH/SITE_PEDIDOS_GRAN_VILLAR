@@ -59,6 +59,14 @@ export function PedidoPage() {
     });
   }
 
+  function irParaProduto(produtoId: string) {
+    const el = document.getElementById(`prod-${produtoId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('ring-2', 'ring-brand-500');
+    window.setTimeout(() => el.classList.remove('ring-2', 'ring-brand-500'), 1600);
+  }
+
   useEffect(() => {
     pedidosApi
       .obterRascunho()
@@ -283,7 +291,8 @@ export function PedidoPage() {
             return (
               <li
                 key={p.id}
-                className={`rounded-xl bg-white p-4 shadow-sm ${
+                id={`prod-${p.id}`}
+                className={`scroll-mt-20 rounded-xl bg-white p-4 shadow-sm transition ${
                   qtd > 0 ? 'ring-1 ring-brand-300' : ''
                 }`}
               >
@@ -353,6 +362,62 @@ export function PedidoPage() {
             );
           })}
         </ul>
+
+        {pedido.itens.length > 0 && (
+          <div className="mt-6">
+            <h3 className="mb-2 text-sm font-bold text-slate-700">
+              Resumo do pedido
+            </h3>
+            <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+              {[...pedido.itens]
+                .sort((a, b) => a.produto.nome.localeCompare(b.produto.nome))
+                .map((it, idx) => (
+                  <div
+                    key={it.id}
+                    className={`flex items-center gap-3 px-3 py-2.5 ${
+                      idx > 0 ? 'border-t border-slate-100' : ''
+                    }`}
+                  >
+                    <button
+                      onClick={() => irParaProduto(it.produtoId)}
+                      aria-label={`Ir para ${it.produto.nome}`}
+                      className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="h-4 w-4"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-800">
+                        {it.produto.nome}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {it.quantidade} {it.produto.unidadeMedida}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold text-slate-700">
+                      {brl(it.subtotal)}
+                    </p>
+                  </div>
+                ))}
+              <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-3 py-3">
+                <p className="text-sm font-bold text-slate-700">Total</p>
+                <p className="text-base font-bold text-brand-700">
+                  {brl(pedido.total)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-5">
           <label className="mb-1 block text-sm font-medium text-slate-700">
