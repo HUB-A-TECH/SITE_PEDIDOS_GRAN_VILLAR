@@ -337,10 +337,10 @@ export function PedidoPage() {
                       <div className="mt-2 grid grid-cols-4 gap-x-2 gap-y-1 sm:grid-cols-6">
                         {histProdutos[p.id].map((e, i) => (
                           <div key={i} className="text-center">
-                            <p className="text-[11px] font-semibold leading-tight text-slate-800">
+                            <p className="text-[11px] font-medium leading-tight text-slate-500">
                               {diaMes(e.data)}
                             </p>
-                            <p className="text-sm font-bold leading-tight text-red-600">
+                            <p className="text-sm font-bold leading-tight text-brand-700">
                               {e.quantidade}
                             </p>
                           </div>
