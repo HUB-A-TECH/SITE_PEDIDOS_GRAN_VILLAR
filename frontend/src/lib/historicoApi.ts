@@ -62,6 +62,21 @@ export async function historicoCliente(
   return res.data.historico;
 }
 
+export interface ItemHistoricoProduto {
+  data: string;
+  quantidade: number;
+}
+
+/** Histórico por produto do cliente (últimos 12 meses), indexado por produtoId. */
+export async function historicoItens(
+  clienteId: string,
+): Promise<Record<string, ItemHistoricoProduto[]>> {
+  const res = await api.get<{ historico: Record<string, ItemHistoricoProduto[]> }>(
+    `/clientes/${clienteId}/historico-itens`,
+  );
+  return res.data.historico;
+}
+
 export async function meuHistorico(periodo: Periodo = 6): Promise<MeuPedido[]> {
   const res = await api.get<{ pedidos: MeuPedido[] }>('/pedidos/historico', {
     params: { periodo },

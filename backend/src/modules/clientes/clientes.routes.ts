@@ -13,3 +13,7 @@ clientesRoutes.get(
   '/:id/produtos-historico',
   asyncHandler(controller.produtosHistoricoCliente),
 );
+clientesRoutes.get(
+  '/:id/historico-itens',
+  asyncHandler(controller.historicoItensCliente),
+);
