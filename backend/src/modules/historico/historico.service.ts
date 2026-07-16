@@ -1,16 +1,15 @@
 import { prisma } from '../../lib/prisma';
 
-const PERIODOS_VALIDOS = [3, 6, 12];
-
-export function normalizarPeriodo(valor: unknown): number {
+/**
+ * Interpreta o parâmetro de limite: "tudo" -> undefined (sem limite);
+ * um número válido (1..500) -> aquele número; caso contrário, padrão 12.
+ * Assim o histórico se adapta à frequência de cada cliente.
+ */
+export function parseLimite(valor: unknown): number | undefined {
+  if (valor === 'tudo' || valor === 'all') return undefined;
   const n = Number(valor);
-  return PERIODOS_VALIDOS.includes(n) ? n : 6;
-}
-
-function desdeMeses(meses: number): Date {
-  const d = new Date();
-  d.setMonth(d.getMonth() - meses);
-  return d;
+  if (Number.isInteger(n) && n > 0 && n <= 500) return n;
+  return 12;
 }
 
 const itemInclude = {
@@ -29,16 +28,16 @@ const itemInclude = {
   },
 } as const;
 
-/** Pedidos confirmados de um cliente no período (mais recentes primeiro). */
-export function pedidosConfirmadosDoCliente(clienteId: string, meses: number) {
+/**
+ * Pedidos confirmados de um cliente, mais recentes primeiro.
+ * `limite` = quantos pedidos trazer (undefined = todos).
+ */
+export function pedidosConfirmadosDoCliente(clienteId: string, limite?: number) {
   return prisma.pedido.findMany({
-    where: {
-      clienteId,
-      status: 'CONFIRMADO',
-      confirmadoEm: { gte: desdeMeses(meses) },
-    },
+    where: { clienteId, status: 'CONFIRMADO' },
     include: itemInclude,
     orderBy: { confirmadoEm: 'desc' },
+    ...(limite ? { take: limite } : {}),
   });
 }
 
@@ -46,9 +45,9 @@ export function pedidosConfirmadosDoCliente(clienteId: string, meses: number) {
  * Produtos frequentes do cliente com quantidades sugeridas.
  * Só inclui produtos que AINDA estão no mix ativo (RN-11).
  */
-export async function produtosFrequentes(clienteId: string, meses: number) {
+export async function produtosFrequentes(clienteId: string, limite = 12) {
   const [pedidos, mix] = await Promise.all([
-    pedidosConfirmadosDoCliente(clienteId, meses),
+    pedidosConfirmadosDoCliente(clienteId, limite),
     prisma.clienteProduto.findMany({
       where: { clienteId, ativo: true },
       select: { produtoId: true },
@@ -112,10 +111,10 @@ export async function produtosFrequentes(clienteId: string, meses: number) {
  */
 export async function historicoPorProduto(
   clienteId: string,
-  meses: number,
   maxPorProduto = 12,
 ): Promise<Record<string, { data: Date; quantidade: number }[]>> {
-  const pedidos = await pedidosConfirmadosDoCliente(clienteId, meses);
+  // Últimos 60 pedidos garantem 12 compras de cada produto mesmo em mix grande.
+  const pedidos = await pedidosConfirmadosDoCliente(clienteId, 60);
   const mapa: Record<string, { data: Date; quantidade: number }[]> = {};
   for (const p of pedidos) {
     const data = p.confirmadoEm ?? p.criadoEm;
@@ -129,18 +128,18 @@ export async function historicoPorProduto(
   return mapa;
 }
 
-/** Pedidos confirmados/cancelados do próprio vendedor no período. */
-export function meusPedidos(vendedorId: string, meses: number) {
+/** Pedidos confirmados/cancelados do próprio vendedor (mais recentes primeiro). */
+export function meusPedidos(vendedorId: string, limite?: number) {
   return prisma.pedido.findMany({
     where: {
       vendedorId,
       status: { in: ['CONFIRMADO', 'CANCELADO'] },
-      confirmadoEm: { gte: desdeMeses(meses) },
     },
     include: {
       cliente: { select: { id: true, codigo: true, nome: true } },
       _count: { select: { itens: true } },
     },
     orderBy: { confirmadoEm: 'desc' },
+    ...(limite ? { take: limite } : {}),
   });
 }

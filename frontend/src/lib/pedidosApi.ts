@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { api } from './api';
-import type { Categoria } from './types';
+import type { Categoria, Limite } from './types';
 
 export interface ItemPedido {
   id: string;
@@ -145,10 +145,14 @@ export interface PedidoAdmin {
 }
 
 export async function adminListarPedidos(
-  periodo: 3 | 6 | 12 = 6,
+  limite: Limite = 12,
+  clienteId?: string,
 ): Promise<PedidoAdmin[]> {
   const res = await api.get<{ pedidos: PedidoAdmin[] }>('/admin/pedidos', {
-    params: { periodo },
+    params: {
+      limite: String(limite),
+      ...(clienteId ? { cliente_id: clienteId } : {}),
+    },
   });
   return res.data.pedidos;
 }

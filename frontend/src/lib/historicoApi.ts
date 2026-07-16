@@ -1,7 +1,9 @@
 import { api } from './api';
-import type { Categoria } from './types';
+import type { Categoria, Limite } from './types';
 
-export type Periodo = 3 | 6 | 12;
+function limiteParam(l: Limite) {
+  return { limite: String(l) };
+}
 
 export interface ProdutoHistorico {
   produtoId: string;
@@ -42,22 +44,20 @@ export interface MeuPedido {
 
 export async function produtosHistorico(
   clienteId: string,
-  periodo: Periodo = 6,
 ): Promise<ProdutoHistorico[]> {
   const res = await api.get<{ produtos: ProdutoHistorico[] }>(
     `/clientes/${clienteId}/produtos-historico`,
-    { params: { periodo } },
   );
   return res.data.produtos;
 }
 
 export async function historicoCliente(
   clienteId: string,
-  periodo: Periodo = 6,
+  limite: Limite = 12,
 ): Promise<PedidoHistorico[]> {
   const res = await api.get<{ historico: PedidoHistorico[] }>(
     `/clientes/${clienteId}/historico`,
-    { params: { periodo } },
+    { params: limiteParam(limite) },
   );
   return res.data.historico;
 }
@@ -77,9 +77,9 @@ export async function historicoItens(
   return res.data.historico;
 }
 
-export async function meuHistorico(periodo: Periodo = 6): Promise<MeuPedido[]> {
+export async function meuHistorico(limite: Limite = 12): Promise<MeuPedido[]> {
   const res = await api.get<{ pedidos: MeuPedido[] }>('/pedidos/historico', {
-    params: { periodo },
+    params: limiteParam(limite),
   });
   return res.data.pedidos;
 }

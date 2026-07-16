@@ -34,13 +34,16 @@ export async function listar(req: Request, res: Response): Promise<void> {
 
   const isVendedor = req.user!.type === 'VENDEDOR';
   const localId = isVendedor ? req.user!.localId : parsed.data.local_id;
-  if (!localId) {
+  if (isVendedor && !localId) {
     res.status(400).json({ mensagem: 'local_id é obrigatório para este usuário' });
     return;
   }
 
   const apenasAtivos = parsed.data.ativos !== 'false';
-  const clientes = await service.listByLocal(localId, apenasAtivos);
+  // Admin sem filial informada: lista todos os clientes (todas as filiais).
+  const clientes = localId
+    ? await service.listByLocal(localId, apenasAtivos)
+    : await service.listTodos(apenasAtivos);
   res.json({ clientes: clientes.map(serialize) });
 }
 
@@ -66,10 +69,9 @@ async function clienteAcessivel(
 export async function historicoCliente(req: Request, res: Response): Promise<void> {
   const cliente = await clienteAcessivel(req, res);
   if (!cliente) return;
-  const periodo = historico.normalizarPeriodo(req.query.periodo);
-  const pedidos = await historico.pedidosConfirmadosDoCliente(cliente.id, periodo);
+  const limite = historico.parseLimite(req.query.limite);
+  const pedidos = await historico.pedidosConfirmadosDoCliente(cliente.id, limite);
   res.json({
-    periodo,
     historico: pedidos.map((p) => ({
       pedidoId: p.id,
       numeroPedido: p.numeroPedido,
@@ -91,9 +93,8 @@ export async function produtosHistoricoCliente(
 ): Promise<void> {
   const cliente = await clienteAcessivel(req, res);
   if (!cliente) return;
-  const periodo = historico.normalizarPeriodo(req.query.periodo);
-  const produtos = await historico.produtosFrequentes(cliente.id, periodo);
-  res.json({ periodo, produtos });
+  const produtos = await historico.produtosFrequentes(cliente.id);
+  res.json({ produtos });
 }
 
 export async function historicoItensCliente(
@@ -102,8 +103,8 @@ export async function historicoItensCliente(
 ): Promise<void> {
   const cliente = await clienteAcessivel(req, res);
   if (!cliente) return;
-  // Últimos 12 meses de histórico por produto (para a tela de pedido).
-  const historicoItens = await historico.historicoPorProduto(cliente.id, 12);
+  // Histórico por produto (últimas compras) para a tela de pedido.
+  const historicoItens = await historico.historicoPorProduto(cliente.id);
   res.json({ historico: historicoItens });
 }
 

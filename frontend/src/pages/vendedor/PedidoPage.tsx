@@ -86,7 +86,7 @@ export function PedidoPage() {
         setHistProdutos(hist);
         // Rascunho novo/vazio: oferece preencher pelo histórico.
         if (p.itens.length === 0) {
-          const freq = await historicoApi.produtosHistorico(p.clienteId, 6);
+          const freq = await historicoApi.produtosHistorico(p.clienteId);
           if (freq.length > 0) {
             setSugestoes(freq);
             setPopupHistorico(true);
