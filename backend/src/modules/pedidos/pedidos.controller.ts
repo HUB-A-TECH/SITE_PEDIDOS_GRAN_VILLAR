@@ -91,10 +91,9 @@ async function responderPedidoAtualizado(
 export async function meuHistorico(req: Request, res: Response): Promise<void> {
   const vendedor = await exigirVendedor(req, res);
   if (!vendedor) return;
-  const periodo = historico.normalizarPeriodo(req.query.periodo);
-  const pedidos = await historico.meusPedidos(vendedor.id, periodo);
+  const limite = historico.parseLimite(req.query.limite);
+  const pedidos = await historico.meusPedidos(vendedor.id, limite);
   res.json({
-    periodo,
     pedidos: pedidos.map((p) => ({
       pedidoId: p.id,
       numeroPedido: p.numeroPedido,
@@ -434,7 +433,7 @@ export async function baixarPdf(req: Request, res: Response): Promise<void> {
 
 export async function adminListar(req: Request, res: Response): Promise<void> {
   const schema = z.object({
-    periodo: z.string().optional(),
+    limite: z.string().optional(),
     vendedor_id: z.string().uuid().optional(),
     cliente_id: z.string().uuid().optional(),
   });
@@ -444,7 +443,7 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
     return;
   }
   const pedidos = await service.listarPedidosAdmin({
-    meses: historico.normalizarPeriodo(parsed.data.periodo),
+    limite: historico.parseLimite(parsed.data.limite),
     vendedorId: parsed.data.vendedor_id,
     clienteId: parsed.data.cliente_id,
   });

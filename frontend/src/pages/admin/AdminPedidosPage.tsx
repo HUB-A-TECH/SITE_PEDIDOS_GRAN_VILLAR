@@ -2,40 +2,60 @@ import { useEffect, useState } from 'react';
 import { AppLayout } from '../../components/AppLayout';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { PedidoAdmin } from '../../lib/pedidosApi';
+import * as clientesApi from '../../lib/clientesApi';
+import { LIMITE_OPCOES, type Limite } from '../../lib/types';
+import type { Cliente } from '../../lib/types';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
 
-const PERIODOS: (3 | 6 | 12)[] = [3, 6, 12];
-
 export function AdminPedidosPage() {
-  const [periodo, setPeriodo] = useState<3 | 6 | 12>(6);
+  const [limite, setLimite] = useState<Limite>(12);
+  const [clienteId, setClienteId] = useState<string>('');
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [pedidos, setPedidos] = useState<PedidoAdmin[]>([]);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
+    clientesApi.listar().then(setClientes).catch(() => setClientes([]));
+  }, []);
+
+  useEffect(() => {
     setCarregando(true);
     pedidosApi
-      .adminListarPedidos(periodo)
+      .adminListarPedidos(limite, clienteId || undefined)
       .then(setPedidos)
       .finally(() => setCarregando(false));
-  }, [periodo]);
+  }, [limite, clienteId]);
 
   return (
     <AppLayout titulo="Pedidos" voltarPara="/">
+      <select
+        value={clienteId}
+        onChange={(e) => setClienteId(e.target.value)}
+        className="mb-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none focus:border-brand-500"
+      >
+        <option value="">Todas as empresas</option>
+        {clientes.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.nome}
+          </option>
+        ))}
+      </select>
+
       <div className="mb-4 flex gap-2">
-        {PERIODOS.map((p) => (
+        {LIMITE_OPCOES.map((o) => (
           <button
-            key={p}
-            onClick={() => setPeriodo(p)}
+            key={o.valor}
+            onClick={() => setLimite(o.valor)}
             className={`flex-1 rounded-lg py-2 text-sm font-medium ${
-              periodo === p
+              limite === o.valor
                 ? 'bg-brand-600 text-white'
                 : 'bg-white text-slate-600 hover:bg-slate-200'
             }`}
           >
-            {p} meses
+            {o.label}
           </button>
         ))}
       </div>
@@ -44,7 +64,7 @@ export function AdminPedidosPage() {
         <p className="text-center text-slate-500">Carregando…</p>
       ) : pedidos.length === 0 ? (
         <p className="text-center text-slate-500">
-          Nenhum pedido neste período.
+          Nenhum pedido encontrado.
         </p>
       ) : (
         <ul className="space-y-2">

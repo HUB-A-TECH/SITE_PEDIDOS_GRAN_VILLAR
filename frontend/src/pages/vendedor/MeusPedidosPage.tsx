@@ -3,13 +3,13 @@ import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import * as historicoApi from '../../lib/historicoApi';
 import * as pedidosApi from '../../lib/pedidosApi';
-import type { MeuPedido, Periodo } from '../../lib/historicoApi';
+import type { MeuPedido } from '../../lib/historicoApi';
+import { LIMITE_OPCOES, type Limite } from '../../lib/types';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
 
-const PERIODOS: Periodo[] = [3, 6, 12];
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
 
 /** Vendedor pode cancelar sozinho até 1 dia após confirmar (RN-08). */
@@ -18,7 +18,7 @@ function dentroDaJanela(iso: string): boolean {
 }
 
 export function MeusPedidosPage() {
-  const [periodo, setPeriodo] = useState<Periodo>(6);
+  const [limite, setLimite] = useState<Limite>(12);
   const [pedidos, setPedidos] = useState<MeuPedido[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [processando, setProcessando] = useState<string | null>(null);
@@ -26,10 +26,10 @@ export function MeusPedidosPage() {
   const carregar = useCallback(() => {
     setCarregando(true);
     historicoApi
-      .meuHistorico(periodo)
+      .meuHistorico(limite)
       .then(setPedidos)
       .finally(() => setCarregando(false));
-  }, [periodo]);
+  }, [limite]);
 
   useEffect(() => {
     carregar();
@@ -58,17 +58,17 @@ export function MeusPedidosPage() {
   return (
     <AppLayout titulo="Meus Pedidos" voltarPara="/">
       <div className="mb-4 flex gap-2">
-        {PERIODOS.map((p) => (
+        {LIMITE_OPCOES.map((o) => (
           <button
-            key={p}
-            onClick={() => setPeriodo(p)}
+            key={o.valor}
+            onClick={() => setLimite(o.valor)}
             className={`flex-1 rounded-lg py-2 text-sm font-medium ${
-              periodo === p
+              limite === o.valor
                 ? 'bg-brand-600 text-white'
                 : 'bg-white text-slate-600 hover:bg-slate-200'
             }`}
           >
-            {p} meses
+            {o.label}
           </button>
         ))}
       </div>

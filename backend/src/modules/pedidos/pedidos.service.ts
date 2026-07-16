@@ -253,18 +253,15 @@ export function getPedidoCompleto(id: string) {
 }
 
 export interface FiltroAdminPedidos {
-  meses: number;
+  limite?: number;
   vendedorId?: string;
   clienteId?: string;
 }
 
 export function listarPedidosAdmin(filtro: FiltroAdminPedidos) {
-  const desde = new Date();
-  desde.setMonth(desde.getMonth() - filtro.meses);
   return prisma.pedido.findMany({
     where: {
       status: { in: ['CONFIRMADO', 'CANCELADO'] },
-      confirmadoEm: { gte: desde },
       ...(filtro.vendedorId ? { vendedorId: filtro.vendedorId } : {}),
       ...(filtro.clienteId ? { clienteId: filtro.clienteId } : {}),
     },
@@ -274,5 +271,6 @@ export function listarPedidosAdmin(filtro: FiltroAdminPedidos) {
       _count: { select: { itens: true } },
     },
     orderBy: { confirmadoEm: 'desc' },
+    ...(filtro.limite ? { take: filtro.limite } : {}),
   });
 }

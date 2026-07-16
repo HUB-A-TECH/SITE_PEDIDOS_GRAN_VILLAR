@@ -1,5 +1,13 @@
 export type UserType = 'VENDEDOR' | 'ADMIN_COMERCIAL' | 'ADMIN_TI';
 
+// Filtro de histórico por quantidade de pedidos (adapta à frequência do cliente).
+export type Limite = 6 | 12 | 'tudo';
+export const LIMITE_OPCOES: { valor: Limite; label: string }[] = [
+  { valor: 6, label: 'Últimos 6' },
+  { valor: 12, label: 'Últimos 12' },
+  { valor: 'tudo', label: 'Tudo' },
+];
+
 export type Categoria =
   | 'ALHOS'
   | 'PIMENTAS'

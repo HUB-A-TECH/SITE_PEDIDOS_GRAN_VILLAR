@@ -11,6 +11,13 @@ export function listByLocal(
   });
 }
 
+export function listTodos(apenasAtivos: boolean): Promise<Cliente[]> {
+  return prisma.cliente.findMany({
+    where: apenasAtivos ? { ativo: true } : {},
+    orderBy: { nome: 'asc' },
+  });
+}
+
 export function getById(id: string): Promise<Cliente | null> {
   return prisma.cliente.findUnique({ where: { id } });
 }
