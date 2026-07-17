@@ -158,3 +158,47 @@ export async function adminListarPedidos(
   });
   return res.data.pedidos;
 }
+
+export interface PedidoAdminDetalhe {
+  id: string;
+  numeroPedido: string | null;
+  status: 'RASCUNHO' | 'CONFIRMADO' | 'CANCELADO';
+  observacoes: string | null;
+  subtotal: number;
+  total: number;
+  data: string;
+  cliente: { id: string; codigo: string; nome: string };
+  vendedor: { id: string; nomeCompleto: string };
+  editadoPor: { username: string } | null;
+  editadoEm: string | null;
+  itens: ItemPedido[];
+}
+
+export async function adminObterPedido(pedidoId: string): Promise<PedidoAdminDetalhe> {
+  const res = await api.get<{ pedido: PedidoAdminDetalhe }>(`/admin/pedidos/${pedidoId}`);
+  return res.data.pedido;
+}
+
+export async function adminAtualizarQuantidade(
+  pedidoId: string,
+  itemId: string,
+  quantidade: number,
+): Promise<PedidoAdminDetalhe> {
+  const res = await api.put<{ pedido: PedidoAdminDetalhe }>(
+    `/admin/pedidos/${pedidoId}/itens/${itemId}`,
+    { quantidade },
+  );
+  return res.data.pedido;
+}
+
+export async function adminAtualizarPreco(
+  pedidoId: string,
+  itemId: string,
+  precoUnitario: number,
+): Promise<PedidoAdminDetalhe> {
+  const res = await api.put<{ pedido: PedidoAdminDetalhe }>(
+    `/admin/pedidos/${pedidoId}/itens/${itemId}/preco`,
+    { preco_unitario: precoUnitario },
+  );
+  return res.data.pedido;
+}

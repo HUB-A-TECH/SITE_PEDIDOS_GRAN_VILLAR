@@ -64,8 +64,9 @@ model User {
   atualizadoEm DateTime  @updatedAt @map("atualizado_em")
   ultimoAcesso DateTime? @map("ultimo_acesso")
 
-  local    Local?    @relation(fields: [localId], references: [id])
-  vendedor Vendedor?
+  local           Local?    @relation(fields: [localId], references: [id])
+  vendedor        Vendedor?
+  pedidosEditados Pedido[]  @relation("PedidoEditadoPor")
 
   @@map("usuarios")
 }
@@ -181,11 +182,14 @@ model Pedido {
   confirmadoEm       DateTime?    @map("confirmado_em")
   canceladoEm        DateTime?    @map("cancelado_em")
   motivoCancelamento String?      @map("motivo_cancelamento")
+  editadoPorId       String?      @map("editado_por_id")
+  editadoEm          DateTime?    @map("editado_em")
 
-  vendedor Vendedor     @relation(fields: [vendedorId], references: [id])
-  cliente  Cliente      @relation(fields: [clienteId], references: [id])
-  local    Local        @relation(fields: [localId], references: [id])
-  itens    ItemPedido[]
+  vendedor   Vendedor     @relation(fields: [vendedorId], references: [id])
+  cliente    Cliente      @relation(fields: [clienteId], references: [id])
+  local      Local        @relation(fields: [localId], references: [id])
+  itens      ItemPedido[]
+  editadoPor User?        @relation("PedidoEditadoPor", fields: [editadoPorId], references: [id])
 
   @@map("pedidos")
 }

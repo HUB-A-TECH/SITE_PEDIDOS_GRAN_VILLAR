@@ -452,3 +452,123 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
     })),
   });
 }
+
+type PedidoAdminComItens = NonNullable<
+  Awaited<ReturnType<typeof service.getPedidoParaAdmin>>
+>;
+
+function serializeAdmin(p: PedidoAdminComItens) {
+  return {
+    id: p.id,
+    numeroPedido: p.numeroPedido,
+    status: p.status,
+    observacoes: p.observacoes,
+    subtotal: Number(p.subtotal),
+    total: Number(p.total),
+    data: p.confirmadoEm ?? p.criadoEm,
+    cliente: { id: p.cliente.id, codigo: p.cliente.codigo, nome: p.cliente.nome },
+    vendedor: { id: p.vendedor.id, nomeCompleto: p.vendedor.nomeCompleto },
+    editadoPor: p.editadoPor ? { username: p.editadoPor.username } : null,
+    editadoEm: p.editadoEm,
+    itens: p.itens.map((i) => ({
+      id: i.id,
+      produtoId: i.produtoId,
+      produto: {
+        codigo: i.produto.codigo,
+        nome: i.produto.nome,
+        categoria: i.produto.categoria,
+        unidadeMedida: i.produto.unidadeMedida,
+      },
+      quantidade: Number(i.quantidade),
+      precoUnitario: Number(i.precoUnitario),
+      subtotal: Number(i.subtotal),
+    })),
+  };
+}
+
+/** Carrega um pedido CONFIRMADO para edição pelo admin (comercial/TI). */
+async function carregarPedidoAdminEditavel(
+  pedidoId: string,
+  res: Response,
+): Promise<PedidoAdminComItens | null> {
+  const pedido = await service.getPedidoParaAdmin(pedidoId);
+  if (!pedido) {
+    res.status(404).json({ mensagem: 'Pedido não encontrado' });
+    return null;
+  }
+  if (pedido.status !== 'CONFIRMADO') {
+    res.status(409).json({ mensagem: 'Apenas pedidos confirmados podem ser editados' });
+    return null;
+  }
+  return pedido;
+}
+
+async function responderPedidoAdminAtualizado(
+  pedidoId: string,
+  usuarioId: string,
+  res: Response,
+): Promise<void> {
+  await service.recomputarTotais(pedidoId);
+  await service.registrarEdicaoAdmin(pedidoId, usuarioId);
+  const atualizado = await service.getPedidoParaAdmin(pedidoId);
+  res.json({ pedido: atualizado ? serializeAdmin(atualizado) : null });
+}
+
+export async function adminObterPedido(req: Request, res: Response): Promise<void> {
+  const pedido = await service.getPedidoParaAdmin(req.params.id);
+  if (!pedido) {
+    res.status(404).json({ mensagem: 'Pedido não encontrado' });
+    return;
+  }
+  res.json({ pedido: serializeAdmin(pedido) });
+}
+
+export async function adminAtualizarItem(req: Request, res: Response): Promise<void> {
+  const pedido = await carregarPedidoAdminEditavel(req.params.id, res);
+  if (!pedido) return;
+
+  const parsed = z.object({ quantidade: z.number().nonnegative() }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'quantidade (>= 0) é obrigatória' });
+    return;
+  }
+
+  const item = await service.getItem(req.params.itemId);
+  if (!item || item.pedidoId !== pedido.id) {
+    res.status(404).json({ mensagem: 'Item não encontrado no pedido' });
+    return;
+  }
+
+  if (parsed.data.quantidade <= 0) {
+    if (pedido.itens.length <= 1) {
+      res.status(400).json({ mensagem: 'O pedido deve ter ao menos 1 item' });
+      return;
+    }
+    await service.excluirItem(item.id);
+  } else {
+    await service.atualizarQuantidadeItem(item, parsed.data.quantidade);
+  }
+  await responderPedidoAdminAtualizado(pedido.id, req.user!.sub, res);
+}
+
+export async function adminAtualizarPreco(req: Request, res: Response): Promise<void> {
+  const pedido = await carregarPedidoAdminEditavel(req.params.id, res);
+  if (!pedido) return;
+
+  const parsed = z
+    .object({ preco_unitario: z.number().positive() })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'preco_unitario (> 0) é obrigatório' });
+    return;
+  }
+
+  const item = await service.getItem(req.params.itemId);
+  if (!item || item.pedidoId !== pedido.id) {
+    res.status(404).json({ mensagem: 'Item não encontrado no pedido' });
+    return;
+  }
+
+  await service.atualizarPrecoItem(item, parsed.data.preco_unitario);
+  await responderPedidoAdminAtualizado(pedido.id, req.user!.sub, res);
+}
