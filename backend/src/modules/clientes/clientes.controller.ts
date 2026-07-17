@@ -87,16 +87,6 @@ export async function historicoCliente(req: Request, res: Response): Promise<voi
   });
 }
 
-export async function produtosHistoricoCliente(
-  req: Request,
-  res: Response,
-): Promise<void> {
-  const cliente = await clienteAcessivel(req, res);
-  if (!cliente) return;
-  const produtos = await historico.produtosFrequentes(cliente.id);
-  res.json({ produtos });
-}
-
 export async function historicoItensCliente(
   req: Request,
   res: Response,
