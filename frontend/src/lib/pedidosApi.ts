@@ -99,16 +99,6 @@ export async function atualizarObservacoes(
   return res.data.pedido;
 }
 
-export async function adicionarItensLote(
-  pedidoId: string,
-  itens: { produtoId: string; quantidade: number }[],
-): Promise<Pedido> {
-  const res = await api.post<{ pedido: Pedido }>(`/pedidos/${pedidoId}/itens/lote`, {
-    itens: itens.map((i) => ({ produto_id: i.produtoId, quantidade: i.quantidade })),
-  });
-  return res.data.pedido;
-}
-
 export async function confirmar(
   pedidoId: string,
 ): Promise<{ numeroPedido: string }> {

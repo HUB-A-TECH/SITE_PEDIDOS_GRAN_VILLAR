@@ -10,10 +10,6 @@ clientesRoutes.use(asyncHandler(authenticate));
 clientesRoutes.get('/', asyncHandler(controller.listar));
 clientesRoutes.get('/:id/historico', asyncHandler(controller.historicoCliente));
 clientesRoutes.get(
-  '/:id/produtos-historico',
-  asyncHandler(controller.produtosHistoricoCliente),
-);
-clientesRoutes.get(
   '/:id/historico-itens',
   asyncHandler(controller.historicoItensCliente),
 );

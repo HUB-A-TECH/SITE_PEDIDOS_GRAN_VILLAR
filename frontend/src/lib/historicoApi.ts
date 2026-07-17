@@ -1,20 +1,8 @@
 import { api } from './api';
-import type { Categoria, Limite } from './types';
+import type { Limite } from './types';
 
 function limiteParam(l: Limite) {
   return { limite: String(l) };
-}
-
-export interface ProdutoHistorico {
-  produtoId: string;
-  codigo: string;
-  nome: string;
-  categoria: Categoria;
-  unidadeMedida: string;
-  quantidadeUltima: number;
-  quantidadeMedia: number;
-  quantidadeTotal: number;
-  numeroCompras: number;
 }
 
 export interface ItemHistorico {
@@ -40,15 +28,6 @@ export interface MeuPedido {
   total: number;
   status: 'CONFIRMADO' | 'CANCELADO';
   itensCount: number;
-}
-
-export async function produtosHistorico(
-  clienteId: string,
-): Promise<ProdutoHistorico[]> {
-  const res = await api.get<{ produtos: ProdutoHistorico[] }>(
-    `/clientes/${clienteId}/produtos-historico`,
-  );
-  return res.data.produtos;
 }
 
 export async function historicoCliente(

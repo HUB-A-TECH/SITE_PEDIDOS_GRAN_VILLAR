@@ -6,7 +6,7 @@ import * as pedidosApi from '../../lib/pedidosApi';
 import type { Pedido } from '../../lib/pedidosApi';
 import * as produtosApi from '../../lib/produtosApi';
 import * as historicoApi from '../../lib/historicoApi';
-import type { ProdutoHistorico, ItemHistoricoProduto } from '../../lib/historicoApi';
+import type { ItemHistoricoProduto } from '../../lib/historicoApi';
 import {
   CATEGORIAS,
   CATEGORIA_LABEL,
@@ -35,9 +35,6 @@ export function PedidoPage() {
   const [processando, setProcessando] = useState<Set<string>>(new Set());
   const [obs, setObs] = useState('');
   const [salvo, setSalvo] = useState(false);
-  const [sugestoes, setSugestoes] = useState<ProdutoHistorico[]>([]);
-  const [popupHistorico, setPopupHistorico] = useState(false);
-  const [aplicandoHistorico, setAplicandoHistorico] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [confirmado, setConfirmado] = useState<{ numero: string; pedidoId: string } | null>(null);
   const [histProdutos, setHistProdutos] = useState<Record<string, ItemHistoricoProduto[]>>({});
@@ -84,14 +81,6 @@ export function PedidoPage() {
         ]);
         setProdutos(mix);
         setHistProdutos(hist);
-        // Rascunho novo/vazio: oferece preencher pelo histórico.
-        if (p.itens.length === 0) {
-          const freq = await historicoApi.produtosHistorico(p.clienteId);
-          if (freq.length > 0) {
-            setSugestoes(freq);
-            setPopupHistorico(true);
-          }
-        }
       })
       .finally(() => setCarregando(false));
   }, [navigate]);
@@ -135,25 +124,6 @@ export function PedidoPage() {
         n.delete(produtoId);
         return n;
       });
-    }
-  }
-
-  async function usarHistorico() {
-    if (!pedido) return;
-    setAplicandoHistorico(true);
-    try {
-      // Uma única requisição adiciona todos os itens (bem mais rápido).
-      const atualizado = await pedidosApi.adicionarItensLote(
-        pedido.id,
-        sugestoes.map((s) => ({
-          produtoId: s.produtoId,
-          quantidade: s.quantidadeUltima,
-        })),
-      );
-      aplicarPedido(atualizado);
-      setPopupHistorico(false);
-    } finally {
-      setAplicandoHistorico(false);
     }
   }
 
@@ -221,47 +191,6 @@ export function PedidoPage() {
         </div>
       }
     >
-      <Modal
-        titulo="Usar histórico?"
-        aberto={popupHistorico}
-        onFechar={() => setPopupHistorico(false)}
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600">
-            Este cliente costuma comprar estes produtos. Quer preencher o pedido
-            com as <strong>últimas quantidades</strong>? Você pode ajustar depois.
-          </p>
-          <ul className="max-h-52 space-y-1 overflow-y-auto text-sm">
-            {sugestoes.map((s) => (
-              <li key={s.produtoId} className="flex justify-between">
-                <span className="text-slate-700">{s.nome}</span>
-                <span className="font-medium text-slate-800">
-                  {s.quantidadeUltima} {s.unidadeMedida}
-                  <span className="ml-1 text-xs text-slate-400">
-                    ({s.numeroCompras}x)
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-          <button
-            onClick={usarHistorico}
-            disabled={aplicandoHistorico}
-            className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
-          >
-            {aplicandoHistorico
-              ? 'Preenchendo…'
-              : `Usar histórico (${sugestoes.length} itens)`}
-          </button>
-          <button
-            onClick={() => setPopupHistorico(false)}
-            className="w-full rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            Começar vazio
-          </button>
-        </div>
-      </Modal>
-
       <div className="pb-52">
         <input
           type="search"
@@ -311,22 +240,12 @@ export function PedidoPage() {
                 </div>
 
                 <div className="mt-3">
-                  {qtd > 0 ? (
-                    <ControleQuantidade
-                      valor={qtd}
-                      unidade={p.unidadeMedida}
-                      desabilitado={ocupado}
-                      onChange={(v) => definirQuantidade(p.id, v)}
-                    />
-                  ) : (
-                    <button
-                      onClick={() => definirQuantidade(p.id, 1)}
-                      disabled={ocupado}
-                      className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-50"
-                    >
-                      Adicionar
-                    </button>
-                  )}
+                  <CampoQuantidade
+                    valor={qtd}
+                    unidade={p.unidadeMedida}
+                    desabilitado={ocupado}
+                    onChange={(v) => definirQuantidade(p.id, v)}
+                  />
                 </div>
 
                 {histProdutos[p.id]?.length > 0 && (
@@ -513,7 +432,11 @@ export function PedidoPage() {
   );
 }
 
-function ControleQuantidade({
+/**
+ * Campo de quantidade sempre visível (sem botões Adicionar/Remover).
+ * Vazio ou 0 = produto não entra no pedido.
+ */
+function CampoQuantidade({
   valor,
   unidade,
   desabilitado,
@@ -524,54 +447,36 @@ function ControleQuantidade({
   desabilitado: boolean;
   onChange: (v: number) => void;
 }) {
-  const [texto, setTexto] = useState(String(valor));
-  useEffect(() => setTexto(String(valor)), [valor]);
+  const [texto, setTexto] = useState(valor > 0 ? String(valor) : '');
+  useEffect(() => setTexto(valor > 0 ? String(valor) : ''), [valor]);
 
   function commit() {
-    const n = Number(texto.replace(',', '.'));
-    if (!Number.isNaN(n) && n !== valor) onChange(n);
-    else setTexto(String(valor));
+    const bruto = texto.trim();
+    if (bruto === '') {
+      if (valor !== 0) onChange(0);
+      return;
+    }
+    const n = Number(bruto.replace(',', '.'));
+    if (Number.isNaN(n) || n < 0) {
+      setTexto(valor > 0 ? String(valor) : '');
+      return;
+    }
+    if (n !== valor) onChange(n);
   }
-
-  const btn =
-    'h-9 w-9 rounded-lg bg-slate-100 text-lg font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-50';
 
   return (
     <div className="flex items-center gap-2">
-      <button
-        type="button"
-        disabled={desabilitado}
-        onClick={() => onChange(Math.max(0, Math.round((valor - 1) * 1000) / 1000))}
-        className={btn}
-      >
-        −
-      </button>
       <input
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
         inputMode="decimal"
+        placeholder="0"
         disabled={desabilitado}
-        className="h-9 w-16 rounded-lg border border-slate-300 text-center outline-none focus:border-slate-500"
+        className="h-10 w-20 rounded-lg border border-slate-300 text-center outline-none focus:border-brand-500"
       />
-      <button
-        type="button"
-        disabled={desabilitado}
-        onClick={() => onChange(valor + 1)}
-        className={btn}
-      >
-        +
-      </button>
       <span className="text-xs text-slate-400">{unidade}</span>
-      <button
-        type="button"
-        disabled={desabilitado}
-        onClick={() => onChange(0)}
-        className="ml-auto text-sm text-red-500 hover:underline disabled:opacity-50"
-      >
-        remover
-      </button>
     </div>
   );
 }

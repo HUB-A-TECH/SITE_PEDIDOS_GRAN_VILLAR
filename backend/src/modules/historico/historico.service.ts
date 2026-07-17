@@ -42,69 +42,6 @@ export function pedidosConfirmadosDoCliente(clienteId: string, limite?: number) 
 }
 
 /**
- * Produtos frequentes do cliente com quantidades sugeridas.
- * Só inclui produtos que AINDA estão no mix ativo (RN-11).
- */
-export async function produtosFrequentes(clienteId: string, limite = 12) {
-  const [pedidos, mix] = await Promise.all([
-    pedidosConfirmadosDoCliente(clienteId, limite),
-    prisma.clienteProduto.findMany({
-      where: { clienteId, ativo: true },
-      select: { produtoId: true },
-    }),
-  ]);
-  const noMix = new Set(mix.map((m) => m.produtoId));
-
-  interface Agg {
-    produto: { id: string; codigo: string; nome: string; categoria: string; unidadeMedida: string };
-    total: number;
-    compras: number;
-    ultimaData: Date;
-    ultimaQtd: number;
-  }
-  const agg = new Map<string, Agg>();
-
-  for (const p of pedidos) {
-    const data = p.confirmadoEm ?? p.criadoEm;
-    for (const it of p.itens) {
-      if (!noMix.has(it.produtoId)) continue;
-      const q = Number(it.quantidade);
-      const cur = agg.get(it.produtoId);
-      if (cur) {
-        cur.total += q;
-        cur.compras += 1;
-        if (data > cur.ultimaData) {
-          cur.ultimaData = data;
-          cur.ultimaQtd = q;
-        }
-      } else {
-        agg.set(it.produtoId, {
-          produto: it.produto,
-          total: q,
-          compras: 1,
-          ultimaData: data,
-          ultimaQtd: q,
-        });
-      }
-    }
-  }
-
-  return [...agg.values()]
-    .sort((a, b) => b.compras - a.compras || b.total - a.total)
-    .map((a) => ({
-      produtoId: a.produto.id,
-      codigo: a.produto.codigo,
-      nome: a.produto.nome,
-      categoria: a.produto.categoria,
-      unidadeMedida: a.produto.unidadeMedida,
-      quantidadeUltima: a.ultimaQtd,
-      quantidadeMedia: Math.round((a.total / a.compras) * 1000) / 1000,
-      quantidadeTotal: a.total,
-      numeroCompras: a.compras,
-    }));
-}
-
-/**
  * Histórico por produto do cliente: para cada produto comprado, a lista de
  * { data, quantidade } dos pedidos confirmados (mais recentes primeiro).
  * Uma consulta só, usada na tela de pedido.

@@ -207,38 +207,6 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
   await responderPedidoAtualizado(pedido.id, vendedor.id, res);
 }
 
-const loteSchema = z.object({
-  itens: z
-    .array(
-      z.object({
-        produto_id: z.string().uuid(),
-        quantidade: z.number().positive(),
-      }),
-    )
-    .min(1)
-    .max(300),
-});
-
-export async function adicionarItensLote(req: Request, res: Response): Promise<void> {
-  const vendedor = await exigirVendedor(req, res);
-  if (!vendedor) return;
-  const pedido = await carregarRascunho(req.params.id, vendedor.id, res);
-  if (!pedido) return;
-
-  const parsed = loteSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ mensagem: 'Lista de itens inválida' });
-    return;
-  }
-
-  await service.definirItensEmLote(
-    pedido.id,
-    pedido.clienteId,
-    parsed.data.itens.map((i) => ({ produtoId: i.produto_id, quantidade: i.quantidade })),
-  );
-  await responderPedidoAtualizado(pedido.id, vendedor.id, res);
-}
-
 export async function atualizarItem(req: Request, res: Response): Promise<void> {
   const vendedor = await exigirVendedor(req, res);
   if (!vendedor) return;
