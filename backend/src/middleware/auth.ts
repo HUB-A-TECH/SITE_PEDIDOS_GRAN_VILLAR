@@ -26,11 +26,17 @@ export async function authenticate(
 
   try {
     const payload = verifyToken(token);
-    const revogado = await prisma.tokenRevogado.findUnique({
-      where: { jti: payload.jti },
-    });
+    const [revogado, usuario] = await Promise.all([
+      prisma.tokenRevogado.findUnique({ where: { jti: payload.jti } }),
+      prisma.user.findUnique({ where: { id: payload.sub }, select: { ativo: true } }),
+    ]);
     if (revogado) {
       res.status(401).json({ mensagem: 'Sessão encerrada' });
+      return;
+    }
+    // Conta desativada pelo Admin TI: derruba a sessão mesmo antes do token expirar.
+    if (!usuario || !usuario.ativo) {
+      res.status(401).json({ mensagem: 'Conta desativada' });
       return;
     }
     req.user = payload;
