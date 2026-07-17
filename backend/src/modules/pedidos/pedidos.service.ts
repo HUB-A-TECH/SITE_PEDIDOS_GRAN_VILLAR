@@ -110,6 +110,21 @@ export async function atualizarQuantidadeItem(
   });
 }
 
+/**
+ * Altera o preço unitário do item apenas neste pedido (não afeta o catálogo).
+ * Usado quando o vendedor negocia um desconto/valor especial para o cliente.
+ */
+export async function atualizarPrecoItem(
+  item: ItemPedido,
+  precoUnitario: number,
+): Promise<void> {
+  const subtotal = calcularSubtotal(Number(item.quantidade), precoUnitario);
+  await prisma.itemPedido.update({
+    where: { id: item.id },
+    data: { precoUnitario, subtotal },
+  });
+}
+
 export function excluirItem(itemId: string): Promise<unknown> {
   return prisma.itemPedido.delete({ where: { id: itemId } });
 }

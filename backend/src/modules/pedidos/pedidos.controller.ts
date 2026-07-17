@@ -231,6 +231,30 @@ export async function atualizarItem(req: Request, res: Response): Promise<void> 
   await responderPedidoAtualizado(pedido.id, vendedor.id, res);
 }
 
+export async function atualizarPreco(req: Request, res: Response): Promise<void> {
+  const vendedor = await exigirVendedor(req, res);
+  if (!vendedor) return;
+  const pedido = await carregarRascunho(req.params.id, vendedor.id, res);
+  if (!pedido) return;
+
+  const parsed = z
+    .object({ preco_unitario: z.number().positive() })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'preco_unitario (> 0) é obrigatório' });
+    return;
+  }
+
+  const item = await service.getItem(req.params.itemId);
+  if (!item || item.pedidoId !== pedido.id) {
+    res.status(404).json({ mensagem: 'Item não encontrado no pedido' });
+    return;
+  }
+
+  await service.atualizarPrecoItem(item, parsed.data.preco_unitario);
+  await responderPedidoAtualizado(pedido.id, vendedor.id, res);
+}
+
 export async function removerItem(req: Request, res: Response): Promise<void> {
   const vendedor = await exigirVendedor(req, res);
   if (!vendedor) return;
