@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
@@ -18,6 +18,7 @@ export function AdminProdutosPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [filtro, setFiltro] = useState<Categoria | 'TODAS'>('TODAS');
+  const [busca, setBusca] = useState('');
   const [editando, setEditando] = useState<Produto | null>(null);
   const [modalAberto, setModalAberto] = useState(false);
 
@@ -34,6 +35,16 @@ export function AdminProdutosPage() {
     carregar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtro]);
+
+  const visiveis = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    if (!termo) return produtos;
+    return produtos.filter(
+      (p) =>
+        p.nome.toLowerCase().includes(termo) ||
+        p.codigo.toLowerCase().includes(termo),
+    );
+  }, [produtos, busca]);
 
   function abrirNovo() {
     setEditando(null);
@@ -61,6 +72,14 @@ export function AdminProdutosPage() {
         </button>
       }
     >
+      <input
+        type="search"
+        placeholder="Buscar por nome ou código…"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        className={`${inputCls} mb-3`}
+      />
+
       <select
         value={filtro}
         onChange={(e) => setFiltro(e.target.value as Categoria | 'TODAS')}
@@ -76,11 +95,11 @@ export function AdminProdutosPage() {
 
       {carregando ? (
         <p className="text-center text-slate-500">Carregando…</p>
-      ) : produtos.length === 0 ? (
-        <p className="text-center text-slate-500">Nenhum produto.</p>
+      ) : visiveis.length === 0 ? (
+        <p className="text-center text-slate-500">Nenhum produto encontrado.</p>
       ) : (
         <ul className="space-y-2">
-          {produtos.map((p) => (
+          {visiveis.map((p) => (
             <li
               key={p.id}
               className="flex items-center justify-between rounded-xl bg-white p-4 shadow-sm"
