@@ -127,6 +127,23 @@ export function PedidoPage() {
     }
   }
 
+  async function definirPreco(produtoId: string, precoUnitario: number) {
+    if (!pedido) return;
+    const item = itemPorProduto.get(produtoId);
+    if (!item) return;
+    setProcessando((s) => new Set(s).add(produtoId));
+    try {
+      const atualizado = await pedidosApi.atualizarPrecoItem(pedido.id, item.id, precoUnitario);
+      aplicarPedido(atualizado);
+    } finally {
+      setProcessando((s) => {
+        const n = new Set(s);
+        n.delete(produtoId);
+        return n;
+      });
+    }
+  }
+
   async function salvarObs() {
     if (!pedido || obs === (pedido.observacoes ?? '')) return;
     const atualizado = await pedidosApi.atualizarObservacoes(pedido.id, obs);
@@ -228,9 +245,19 @@ export function PedidoPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-semibold text-slate-800">{p.nome}</p>
-                    <p className="text-xs text-slate-500">
-                      {brl(p.preco)} / {p.unidadeMedida}
-                    </p>
+                    {qtd > 0 && item ? (
+                      <PrecoItem
+                        precoCatalogo={p.preco}
+                        precoAtual={item.precoUnitario}
+                        unidade={p.unidadeMedida}
+                        desabilitado={ocupado}
+                        onChange={(v) => definirPreco(p.id, v)}
+                      />
+                    ) : (
+                      <p className="text-xs text-slate-500">
+                        {brl(p.preco)} / {p.unidadeMedida}
+                      </p>
+                    )}
                   </div>
                   {qtd > 0 && (
                     <p className="text-sm font-semibold text-slate-700">
@@ -429,6 +456,79 @@ export function PedidoPage() {
         )}
       </Modal>
     </AppLayout>
+  );
+}
+
+/**
+ * Preço unitário do item — editável (ex.: desconto negociado com o cliente).
+ * A alteração vale só para este pedido; o catálogo não é afetado. Quando o
+ * preço é diferente do catálogo, aparece destacado em dourado.
+ */
+function PrecoItem({
+  precoCatalogo,
+  precoAtual,
+  unidade,
+  desabilitado,
+  onChange,
+}: {
+  precoCatalogo: number;
+  precoAtual: number;
+  unidade: string;
+  desabilitado: boolean;
+  onChange: (v: number) => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [texto, setTexto] = useState(String(precoAtual));
+  useEffect(() => setTexto(String(precoAtual)), [precoAtual]);
+
+  const alterado = Math.abs(precoAtual - precoCatalogo) > 0.001;
+
+  function commit() {
+    const n = Number(texto.trim().replace(',', '.'));
+    if (!Number.isNaN(n) && n > 0 && n !== precoAtual) onChange(n);
+    else setTexto(String(precoAtual));
+    setEditando(false);
+  }
+
+  if (editando) {
+    return (
+      <div className="mt-0.5 flex items-center gap-1">
+        <span className="text-xs text-slate-400">R$</span>
+        <input
+          autoFocus
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          inputMode="decimal"
+          disabled={desabilitado}
+          className="h-7 w-20 rounded-md border border-brandYellow-300 bg-brandYellow-50 px-1 text-sm text-brandYellow-800 outline-none focus:border-brandYellow-500"
+        />
+        <span className="text-xs text-slate-400">/ {unidade}</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditando(true)}
+      disabled={desabilitado}
+      className="mt-0.5 flex items-center gap-1.5"
+    >
+      {alterado ? (
+        <span className="rounded-md bg-brandYellow-50 px-1.5 py-0.5 text-xs font-bold text-brandYellow-800 ring-1 ring-inset ring-brandYellow-300">
+          {brl(precoAtual)} / {unidade}
+        </span>
+      ) : (
+        <span className="text-xs text-slate-500">
+          {brl(precoAtual)} / {unidade}
+        </span>
+      )}
+      <span className="text-xs text-slate-400 underline decoration-dotted">
+        {alterado ? 'editar' : 'alterar preço'}
+      </span>
+    </button>
   );
 }
 

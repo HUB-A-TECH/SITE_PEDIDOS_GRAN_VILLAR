@@ -78,6 +78,18 @@ export async function atualizarItem(
   return res.data.pedido;
 }
 
+export async function atualizarPrecoItem(
+  pedidoId: string,
+  itemId: string,
+  precoUnitario: number,
+): Promise<Pedido> {
+  const res = await api.put<{ pedido: Pedido }>(
+    `/pedidos/${pedidoId}/itens/${itemId}/preco`,
+    { preco_unitario: precoUnitario },
+  );
+  return res.data.pedido;
+}
+
 export async function removerItem(
   pedidoId: string,
   itemId: string,

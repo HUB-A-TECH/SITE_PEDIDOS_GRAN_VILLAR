@@ -18,8 +18,12 @@ export default {
           900: '#0f4620',
         },
         brandYellow: {
+          50: '#fdf8e6', // fundo claro (etiqueta de preço alterado)
+          300: '#f0d466',
           400: '#ffd21a',
           500: '#f4c400',
+          700: '#8a6d00', // texto legível sobre fundo claro
+          800: '#6b5400',
         },
         brandRed: {
           500: '#e02718',
