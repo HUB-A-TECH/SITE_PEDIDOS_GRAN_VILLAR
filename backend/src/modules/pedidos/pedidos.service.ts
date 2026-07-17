@@ -39,6 +39,28 @@ export function getPedidoDoVendedor(id: string, vendedorId: string) {
   });
 }
 
+const pedidoAdminInclude = {
+  ...pedidoInclude,
+  vendedor: { select: { id: true, nomeCompleto: true } },
+  editadoPor: { select: { username: true } },
+} as const;
+
+/** Pedido completo para a tela de detalhe do admin (qualquer vendedor/cliente). */
+export function getPedidoParaAdmin(id: string) {
+  return prisma.pedido.findUnique({
+    where: { id },
+    include: pedidoAdminInclude,
+  });
+}
+
+/** Registra quem foi o último a editar o pedido (auditoria simples). */
+export function registrarEdicaoAdmin(pedidoId: string, usuarioId: string) {
+  return prisma.pedido.update({
+    where: { id: pedidoId },
+    data: { editadoPorId: usuarioId, editadoEm: new Date() },
+  });
+}
+
 export function criarRascunho(
   vendedorId: string,
   localId: string,

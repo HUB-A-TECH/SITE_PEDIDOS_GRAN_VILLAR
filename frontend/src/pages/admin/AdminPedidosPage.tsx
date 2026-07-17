@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { PedidoAdmin } from '../../lib/pedidosApi';
@@ -70,9 +71,14 @@ export function AdminPedidosPage() {
         <ul className="space-y-2">
           {pedidos.map((p) => (
             <li key={p.pedidoId} className="rounded-xl bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
+              <Link
+                to={`/admin/pedidos/${p.pedidoId}`}
+                className="flex items-center justify-between"
+              >
                 <div>
-                  <p className="font-semibold text-slate-800">{p.cliente.nome}</p>
+                  <p className="font-semibold text-slate-800 hover:underline">
+                    {p.cliente.nome}
+                  </p>
                   <p className="text-xs text-slate-500">
                     {p.numeroPedido ?? '—'} · {dataBR(p.data)} ·{' '}
                     {p.vendedor.nomeCompleto}
@@ -88,7 +94,7 @@ export function AdminPedidosPage() {
                     {p.status === 'CANCELADO' ? 'Cancelado' : 'Confirmado'}
                   </span>
                 </div>
-              </div>
+              </Link>
               <div className="mt-3 flex gap-2">
                 <a
                   href={pedidosApi.pdfHref(p.pedidoId)}
