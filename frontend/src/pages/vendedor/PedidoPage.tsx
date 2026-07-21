@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
 import { CampoQuantidade, PrecoItem } from '../../components/ItemEditors';
@@ -15,8 +15,6 @@ import {
   type Produto,
 } from '../../lib/types';
 
-const CACHE_KEY = 'gv_rascunho';
-
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -27,6 +25,7 @@ function diaMes(iso: string): string {
 }
 
 export function PedidoPage() {
+  const { id = '' } = useParams();
   const navigate = useNavigate();
   const [pedido, setPedido] = useState<Pedido | null>(null);
   const [produtos, setProdutos] = useState<Produto[]>([]);
@@ -43,7 +42,6 @@ export function PedidoPage() {
 
   function aplicarPedido(p: Pedido) {
     setPedido(p);
-    localStorage.setItem(CACHE_KEY, JSON.stringify(p));
     setSalvo(true);
     window.setTimeout(() => setSalvo(false), 1500);
   }
@@ -66,11 +64,16 @@ export function PedidoPage() {
   }
 
   useEffect(() => {
+    if (!id) {
+      navigate('/meus-pedidos', { replace: true });
+      return;
+    }
     pedidosApi
-      .obterRascunho()
+      .obterPedido(id)
       .then(async (p) => {
-        if (!p) {
-          navigate('/clientes', { replace: true });
+        if (!p || p.status !== 'RASCUNHO') {
+          // Não encontrado, ou já enviado/cancelado: não é mais editável aqui.
+          navigate('/meus-pedidos', { replace: true });
           return;
         }
         setPedido(p);
@@ -84,7 +87,7 @@ export function PedidoPage() {
         setHistProdutos(hist);
       })
       .finally(() => setCarregando(false));
-  }, [navigate]);
+  }, [id, navigate]);
 
   const itemPorProduto = useMemo(() => {
     const m = new Map<string, Pedido['itens'][number]>();
@@ -156,7 +159,6 @@ export function PedidoPage() {
     setEnviando(true);
     try {
       const { numeroPedido } = await pedidosApi.confirmar(pedido.id);
-      localStorage.removeItem(CACHE_KEY);
       setConfirmado({ numero: numeroPedido, pedidoId: pedido.id });
     } catch {
       alert('Não foi possível enviar o pedido. Tente novamente.');
@@ -177,15 +179,14 @@ export function PedidoPage() {
 
   async function descartar() {
     if (!pedido) return;
-    if (!confirm('Descartar este rascunho? Esta ação não pode ser desfeita.')) return;
+    if (!confirm('Descartar este pedido salvo? Esta ação não pode ser desfeita.')) return;
     await pedidosApi.descartar(pedido.id);
-    localStorage.removeItem(CACHE_KEY);
-    navigate('/clientes', { replace: true });
+    navigate('/meus-pedidos', { replace: true });
   }
 
   if (carregando || !pedido) {
     return (
-      <AppLayout titulo="Pedido" voltarPara="/clientes">
+      <AppLayout titulo="Pedido" voltarPara="/meus-pedidos">
         <p className="text-center text-slate-500">Carregando…</p>
       </AppLayout>
     );
@@ -196,7 +197,7 @@ export function PedidoPage() {
   return (
     <AppLayout
       titulo={`Pedido · ${pedido.cliente.nome}`}
-      voltarPara="/clientes"
+      voltarPara="/meus-pedidos"
       acao={
         <div className="flex items-center gap-2">
           {salvo && <span className="text-xs text-brand-100">Salvo ✓</span>}
@@ -390,7 +391,7 @@ export function PedidoPage() {
           onClick={descartar}
           className="mt-4 w-full rounded-lg border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
         >
-          Descartar rascunho
+          Descartar pedido
         </button>
       </div>
 

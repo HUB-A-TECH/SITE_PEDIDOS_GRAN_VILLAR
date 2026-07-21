@@ -17,6 +17,9 @@ export function AdminPedidoDetalhePage() {
   const [pedido, setPedido] = useState<PedidoAdminDetalhe | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [processando, setProcessando] = useState<Set<string>>(new Set());
+  const [historicoVisivel, setHistoricoVisivel] = useState(false);
+  const [aprovando, setAprovando] = useState(false);
+  const [aprovado, setAprovado] = useState(false);
 
   useEffect(() => {
     setCarregando(true);
@@ -47,6 +50,25 @@ export function AdminPedidoDetalhePage() {
     }
   }
 
+  async function aprovar() {
+    if (!pedido) return;
+    setAprovando(true);
+    try {
+      const atualizado = await pedidosApi.adminAprovar(pedido.id);
+      setPedido(atualizado);
+      setAprovado(true);
+      window.setTimeout(() => setAprovado(false), 2000);
+    } catch (e) {
+      alert(
+        axios.isAxiosError(e) && e.response?.data?.mensagem
+          ? e.response.data.mensagem
+          : 'Não foi possível aprovar.',
+      );
+    } finally {
+      setAprovando(false);
+    }
+  }
+
   if (carregando || !pedido) {
     return (
       <AppLayout titulo="Pedido" voltarPara="/admin/pedidos">
@@ -67,13 +89,32 @@ export function AdminPedidoDetalhePage() {
         <p className="text-xs text-slate-500">
           {pedido.vendedor.nomeCompleto} · {dataBR(pedido.data)}
         </p>
-        {pedido.editadoPor && (
+        <button
+          onClick={() => setHistoricoVisivel((v) => !v)}
+          className="mt-1 text-xs font-medium text-slate-400 underline decoration-dotted"
+        >
+          Histórico
+        </button>
+        {historicoVisivel && (
           <p className="mt-1 text-[11px] text-slate-400">
-            Editado por {pedido.editadoPor.username}
-            {pedido.editadoEm ? ` em ${dataHoraBR(pedido.editadoEm)}` : ''}
+            {pedido.editadoPor
+              ? `Última alteração por ${pedido.editadoPor.username}${
+                  pedido.editadoEm ? ` em ${dataHoraBR(pedido.editadoEm)}` : ''
+                }`
+              : 'Ainda não revisado.'}
           </p>
         )}
       </div>
+
+      {podeEditar && (
+        <button
+          onClick={aprovar}
+          disabled={aprovando}
+          className="mb-4 w-full rounded-lg border border-brand-600 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-60"
+        >
+          {aprovado ? 'Aprovado ✓' : aprovando ? 'Aprovando…' : 'Aprovar (sem alterações)'}
+        </button>
+      )}
 
       {!podeEditar && (
         <p className="mb-4 text-center text-xs text-slate-400">

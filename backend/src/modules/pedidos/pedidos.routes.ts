@@ -9,8 +9,8 @@ export const pedidosRoutes = Router();
 pedidosRoutes.use(asyncHandler(authenticate));
 
 pedidosRoutes.get('/historico', asyncHandler(controller.meuHistorico));
-pedidosRoutes.get('/rascunho', asyncHandler(controller.obterRascunho));
 pedidosRoutes.post('/', asyncHandler(controller.criar));
+pedidosRoutes.get('/:id', asyncHandler(controller.obterPedido));
 pedidosRoutes.delete('/:id', asyncHandler(controller.excluir));
 
 pedidosRoutes.post('/:id/itens', asyncHandler(controller.adicionarItem));

@@ -37,7 +37,7 @@ export const router = createBrowserRouter([
     ),
   },
   {
-    path: '/pedido',
+    path: '/pedido/:id',
     element: (
       <ProtectedRoute>
         <PedidoPage />

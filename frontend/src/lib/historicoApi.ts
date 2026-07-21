@@ -26,8 +26,10 @@ export interface MeuPedido {
   cliente: { id: string; codigo: string; nome: string };
   data: string;
   total: number;
-  status: 'CONFIRMADO' | 'CANCELADO';
+  status: 'RASCUNHO' | 'CONFIRMADO' | 'CANCELADO';
   itensCount: number;
+  editadoPor: { username: string } | null;
+  editadoEm: string | null;
 }
 
 export async function historicoCliente(

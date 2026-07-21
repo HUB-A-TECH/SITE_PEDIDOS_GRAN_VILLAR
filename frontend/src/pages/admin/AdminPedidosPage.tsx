@@ -10,6 +10,8 @@ import type { Cliente } from '../../lib/types';
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
+const dataHoraBR = (iso: string) =>
+  new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 export function AdminPedidosPage() {
   const [limite, setLimite] = useState<Limite>(12);
@@ -17,6 +19,16 @@ export function AdminPedidosPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [pedidos, setPedidos] = useState<PedidoAdmin[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [historicoAberto, setHistoricoAberto] = useState<Set<string>>(new Set());
+
+  function toggleHistorico(pedidoId: string) {
+    setHistoricoAberto((s) => {
+      const n = new Set(s);
+      if (n.has(pedidoId)) n.delete(pedidoId);
+      else n.add(pedidoId);
+      return n;
+    });
+  }
 
   useEffect(() => {
     clientesApi.listar().then(setClientes).catch(() => setClientes([]));
@@ -70,14 +82,24 @@ export function AdminPedidosPage() {
       ) : (
         <ul className="space-y-2">
           {pedidos.map((p) => (
-            <li key={p.pedidoId} className="rounded-xl bg-white p-4 shadow-sm">
+            <li
+              key={p.pedidoId}
+              className={`rounded-xl bg-white p-4 shadow-sm ${
+                p.pendente ? 'ring-1 ring-brandYellow-300' : ''
+              }`}
+            >
               <Link
                 to={`/admin/pedidos/${p.pedidoId}`}
                 className="flex items-center justify-between"
               >
                 <div>
-                  <p className="font-semibold text-slate-800 hover:underline">
+                  <p className="flex items-center gap-2 font-semibold text-slate-800 hover:underline">
                     {p.cliente.nome}
+                    {p.pendente && (
+                      <span className="rounded-md bg-brandYellow-50 px-1.5 py-0.5 text-[10px] font-bold text-brandYellow-800 ring-1 ring-inset ring-brandYellow-300">
+                        Novo
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-slate-500">
                     {p.numeroPedido ?? '—'} · {dataBR(p.data)} ·{' '}
@@ -95,6 +117,25 @@ export function AdminPedidosPage() {
                   </span>
                 </div>
               </Link>
+
+              <div className="mt-2">
+                <button
+                  onClick={() => toggleHistorico(p.pedidoId)}
+                  className="text-xs font-medium text-slate-400 underline decoration-dotted"
+                >
+                  Histórico
+                </button>
+                {historicoAberto.has(p.pedidoId) && (
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {p.editadoPor
+                      ? `Última alteração por ${p.editadoPor.username}${
+                          p.editadoEm ? ` em ${dataHoraBR(p.editadoEm)}` : ''
+                        }`
+                      : 'Ainda não revisado.'}
+                  </p>
+                )}
+              </div>
+
               <div className="mt-3 flex gap-2">
                 <a
                   href={pedidosApi.pdfHref(p.pedidoId)}
