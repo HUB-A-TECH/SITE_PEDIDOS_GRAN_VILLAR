@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
-import { Modal } from '../../components/Modal';
 import * as clientesApi from '../../lib/clientesApi';
 import * as pedidosApi from '../../lib/pedidosApi';
-import type { Pedido } from '../../lib/pedidosApi';
 import type { Cliente } from '../../lib/types';
 
 export function SelecionarClientePage() {
@@ -13,10 +11,6 @@ export function SelecionarClientePage() {
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState('');
   const [iniciando, setIniciando] = useState<string | null>(null);
-  const [conflito, setConflito] = useState<{
-    rascunho: Pedido;
-    clienteAlvo: Cliente;
-  } | null>(null);
 
   useEffect(() => {
     clientesApi
@@ -28,23 +22,12 @@ export function SelecionarClientePage() {
   async function iniciarPedido(cliente: Cliente) {
     setIniciando(cliente.id);
     try {
-      const r = await pedidosApi.criar(cliente.id);
-      if (r.tipo === 'criado') {
-        navigate('/pedido');
-      } else {
-        setConflito({ rascunho: r.rascunho, clienteAlvo: cliente });
-      }
+      // Retoma o pedido salvo desse cliente, se houver, ou cria um novo.
+      const pedido = await pedidosApi.criar(cliente.id);
+      navigate(`/pedido/${pedido.id}`);
     } finally {
       setIniciando(null);
     }
-  }
-
-  async function descartarEIniciar() {
-    if (!conflito) return;
-    await pedidosApi.descartar(conflito.rascunho.id);
-    const alvo = conflito.clienteAlvo;
-    setConflito(null);
-    await iniciarPedido(alvo);
   }
 
   const filtrados = clientes.filter((c) =>
@@ -87,38 +70,6 @@ export function SelecionarClientePage() {
           ))}
         </ul>
       )}
-
-      <Modal
-        titulo="Rascunho em andamento"
-        aberto={conflito !== null}
-        onFechar={() => setConflito(null)}
-      >
-        {conflito && (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-600">
-              Você já tem um rascunho para{' '}
-              <strong>{conflito.rascunho.cliente.nome}</strong> (
-              {conflito.rascunho.itens.length} item(ns)). Só é possível ter um
-              rascunho por vez.
-            </p>
-            <button
-              onClick={() => {
-                setConflito(null);
-                navigate('/pedido');
-              }}
-              className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-700"
-            >
-              Continuar rascunho de {conflito.rascunho.cliente.nome}
-            </button>
-            <button
-              onClick={descartarEIniciar}
-              className="w-full rounded-lg border border-red-200 py-2.5 font-medium text-red-600 hover:bg-red-50"
-            >
-              Descartar e iniciar para {conflito.clienteAlvo.nome}
-            </button>
-          </div>
-        )}
-      </Modal>
     </AppLayout>
   );
 }

@@ -14,6 +14,7 @@ pedidosAdminRoutes.get('/', asyncHandler(controller.adminListar));
 pedidosAdminRoutes.get('/:id/txt', asyncHandler(controller.baixarTxt));
 pedidosAdminRoutes.get('/:id/pdf', asyncHandler(controller.baixarPdf));
 pedidosAdminRoutes.get('/:id', asyncHandler(controller.adminObterPedido));
+pedidosAdminRoutes.post('/:id/aprovar', asyncHandler(controller.adminAprovar));
 pedidosAdminRoutes.put('/:id/itens/:itemId', asyncHandler(controller.adminAtualizarItem));
 pedidosAdminRoutes.put(
   '/:id/itens/:itemId/preco',

@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { api } from './api';
 import type { Categoria, Limite } from './types';
 
@@ -27,27 +26,21 @@ export interface Pedido {
   itens: ItemPedido[];
 }
 
-export type CriarResultado =
-  | { tipo: 'criado'; pedido: Pedido }
-  | { tipo: 'conflito'; rascunho: Pedido };
-
-export async function obterRascunho(): Promise<Pedido | null> {
-  const res = await api.get<{ pedido: Pedido | null }>('/pedidos/rascunho');
+/** Obtém um pedido específico do vendedor (qualquer status). */
+export async function obterPedido(pedidoId: string): Promise<Pedido | null> {
+  const res = await api.get<{ pedido: Pedido | null }>(`/pedidos/${pedidoId}`);
   return res.data.pedido;
 }
 
-export async function criar(clienteId: string): Promise<CriarResultado> {
-  try {
-    const res = await api.post<{ pedido: Pedido }>('/pedidos', {
-      cliente_id: clienteId,
-    });
-    return { tipo: 'criado', pedido: res.data.pedido };
-  } catch (e) {
-    if (axios.isAxiosError(e) && e.response?.status === 409) {
-      return { tipo: 'conflito', rascunho: e.response.data.rascunho };
-    }
-    throw e;
-  }
+/**
+ * Cria um pedido salvo para o cliente ou retoma o que já existir (o vendedor
+ * pode ter vários pedidos salvos ao mesmo tempo, um por cliente).
+ */
+export async function criar(clienteId: string): Promise<Pedido> {
+  const res = await api.post<{ pedido: Pedido }>('/pedidos', {
+    cliente_id: clienteId,
+  });
+  return res.data.pedido;
 }
 
 export async function descartar(pedidoId: string): Promise<void> {
@@ -144,6 +137,9 @@ export interface PedidoAdmin {
   total: number;
   status: 'CONFIRMADO' | 'CANCELADO';
   itensCount: number;
+  editadoPor: { username: string } | null;
+  editadoEm: string | null;
+  pendente: boolean;
 }
 
 export async function adminListarPedidos(
@@ -187,6 +183,15 @@ export async function adminAtualizarQuantidade(
   const res = await api.put<{ pedido: PedidoAdminDetalhe }>(
     `/admin/pedidos/${pedidoId}/itens/${itemId}`,
     { quantidade },
+  );
+  return res.data.pedido;
+}
+
+/** Aprova o pedido sem alterar nada — registra quem aprovou. */
+export async function adminAprovar(pedidoId: string): Promise<PedidoAdminDetalhe> {
+  const res = await api.post<{ pedido: PedidoAdminDetalhe }>(
+    `/admin/pedidos/${pedidoId}/aprovar`,
+    {},
   );
   return res.data.pedido;
 }

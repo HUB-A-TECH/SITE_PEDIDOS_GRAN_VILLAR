@@ -65,18 +65,20 @@ export async function historicoPorProduto(
   return mapa;
 }
 
-/** Pedidos confirmados/cancelados do próprio vendedor (mais recentes primeiro). */
+/**
+ * Todos os pedidos do vendedor (salvos ainda não enviados, enviados e
+ * cancelados), mais recentes primeiro. Ordena por criadoEm pois rascunhos
+ * ainda não têm confirmadoEm.
+ */
 export function meusPedidos(vendedorId: string, limite?: number) {
   return prisma.pedido.findMany({
-    where: {
-      vendedorId,
-      status: { in: ['CONFIRMADO', 'CANCELADO'] },
-    },
+    where: { vendedorId },
     include: {
       cliente: { select: { id: true, codigo: true, nome: true } },
+      editadoPor: { select: { username: true } },
       _count: { select: { itens: true } },
     },
-    orderBy: { confirmadoEm: 'desc' },
+    orderBy: { criadoEm: 'desc' },
     ...(limite ? { take: limite } : {}),
   });
 }

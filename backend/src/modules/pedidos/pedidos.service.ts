@@ -24,9 +24,10 @@ const pedidoInclude = {
   },
 } as const;
 
-export function getRascunhoAtual(vendedorId: string) {
+/** Pedido salvo (não enviado) do vendedor para um cliente específico, se houver. */
+export function getRascunhoPorCliente(vendedorId: string, clienteId: string) {
   return prisma.pedido.findFirst({
-    where: { vendedorId, status: 'RASCUNHO' },
+    where: { vendedorId, clienteId, status: 'RASCUNHO' },
     orderBy: { criadoEm: 'desc' },
     include: pedidoInclude,
   });
@@ -246,6 +247,7 @@ export function listarPedidosAdmin(filtro: FiltroAdminPedidos) {
     include: {
       cliente: { select: { id: true, codigo: true, nome: true } },
       vendedor: { select: { id: true, nomeCompleto: true } },
+      editadoPor: { select: { username: true } },
       _count: { select: { itens: true } },
     },
     orderBy: { confirmadoEm: 'desc' },

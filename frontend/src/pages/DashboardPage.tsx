@@ -39,8 +39,7 @@ export function DashboardPage() {
       ]
     : [
         { titulo: 'Novo Pedido', desc: 'Começa selecionando o cliente', to: '/clientes' },
-        { titulo: 'Continuar Pedido', desc: 'Editar o pedido em aberto', to: '/pedido' },
-        { titulo: 'Meus Pedidos', desc: 'Histórico de pedidos enviados', to: '/meus-pedidos' },
+        { titulo: 'Meus Pedidos', desc: 'Pedidos salvos, enviados e cancelados', to: '/meus-pedidos' },
         { titulo: 'Minha Conta', desc: 'Dados e configurações (em breve)' },
       ];
 

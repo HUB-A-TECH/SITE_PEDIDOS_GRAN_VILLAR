@@ -11,7 +11,7 @@ import { desenharPedidoPdf } from '../../utils/gerar-pdf';
 const JANELA_CANCELAMENTO_MS = 24 * 60 * 60 * 1000; // 1 dia (RN-08)
 
 type PedidoComItens = NonNullable<
-  Awaited<ReturnType<typeof service.getRascunhoAtual>>
+  Awaited<ReturnType<typeof service.getPedidoDoVendedor>>
 >;
 
 function serialize(p: PedidoComItens) {
@@ -102,15 +102,21 @@ export async function meuHistorico(req: Request, res: Response): Promise<void> {
       total: Number(p.total),
       status: p.status,
       itensCount: p._count.itens,
+      editadoPor: p.editadoPor ? { username: p.editadoPor.username } : null,
+      editadoEm: p.editadoEm,
     })),
   });
 }
 
-export async function obterRascunho(req: Request, res: Response): Promise<void> {
+export async function obterPedido(req: Request, res: Response): Promise<void> {
   const vendedor = await exigirVendedor(req, res);
   if (!vendedor) return;
-  const rascunho = await service.getRascunhoAtual(vendedor.id);
-  res.json({ pedido: rascunho ? serialize(rascunho) : null });
+  const pedido = await service.getPedidoDoVendedor(req.params.id, vendedor.id);
+  if (!pedido) {
+    res.status(404).json({ mensagem: 'Pedido não encontrado' });
+    return;
+  }
+  res.json({ pedido: serialize(pedido) });
 }
 
 export async function criar(req: Request, res: Response): Promise<void> {
@@ -125,16 +131,6 @@ export async function criar(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // Um rascunho por vendedor (RN-04).
-  const existente = await service.getRascunhoAtual(vendedor.id);
-  if (existente) {
-    res.status(409).json({
-      mensagem: 'Já existe um rascunho em andamento',
-      rascunho: serialize(existente),
-    });
-    return;
-  }
-
   const cliente = await service.getCliente(parsed.data.cliente_id);
   if (!cliente || !cliente.ativo) {
     res.status(404).json({ mensagem: 'Cliente não encontrado' });
@@ -142,6 +138,14 @@ export async function criar(req: Request, res: Response): Promise<void> {
   }
   if (cliente.localId !== vendedor.localId) {
     res.status(403).json({ mensagem: 'Cliente pertence a outro local' });
+    return;
+  }
+
+  // Retoma o pedido salvo (ainda não enviado) para este cliente, se existir —
+  // o vendedor pode ter vários pedidos salvos ao mesmo tempo, um por cliente.
+  const existente = await service.getRascunhoPorCliente(vendedor.id, cliente.id);
+  if (existente) {
+    res.status(200).json({ pedido: serialize(existente) });
     return;
   }
 
@@ -153,13 +157,10 @@ export async function criar(req: Request, res: Response): Promise<void> {
     );
     res.status(201).json({ pedido: serialize(pedido) });
   } catch (e) {
-    // Corrida: a restrição única do banco barrou um segundo rascunho.
+    // Corrida: outra requisição criou ao mesmo tempo para o mesmo cliente.
     if (isUniqueConstraintError(e)) {
-      const atual = await service.getRascunhoAtual(vendedor.id);
-      res.status(409).json({
-        mensagem: 'Já existe um rascunho em andamento',
-        rascunho: atual ? serialize(atual) : null,
-      });
+      const jaExiste = await service.getRascunhoPorCliente(vendedor.id, cliente.id);
+      res.status(200).json({ pedido: jaExiste ? serialize(jaExiste) : null });
       return;
     }
     throw e;
@@ -439,8 +440,15 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
     vendedorId: parsed.data.vendedor_id,
     clienteId: parsed.data.cliente_id,
   });
+  // Pendentes (confirmados e ainda não revisados) sobem para o topo da fila;
+  // dentro de cada grupo, mantém a ordem por data (sort é estável).
+  const pendente = (p: (typeof pedidos)[number]) =>
+    p.status === 'CONFIRMADO' && !p.editadoPorId;
+  const ordenados = [...pedidos].sort(
+    (a, b) => Number(pendente(b)) - Number(pendente(a)),
+  );
   res.json({
-    pedidos: pedidos.map((p) => ({
+    pedidos: ordenados.map((p) => ({
       pedidoId: p.id,
       numeroPedido: p.numeroPedido,
       cliente: p.cliente,
@@ -449,6 +457,9 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
       total: Number(p.total),
       status: p.status,
       itensCount: p._count.itens,
+      editadoPor: p.editadoPor ? { username: p.editadoPor.username } : null,
+      editadoEm: p.editadoEm,
+      pendente: pendente(p),
     })),
   });
 }
@@ -521,6 +532,18 @@ export async function adminObterPedido(req: Request, res: Response): Promise<voi
     return;
   }
   res.json({ pedido: serializeAdmin(pedido) });
+}
+
+/**
+ * Aprova o pedido sem alterar nada — usado quando o comercial conferiu e
+ * está tudo certo. Registra quem aprovou (mesmo campo usado nas edições).
+ */
+export async function adminAprovar(req: Request, res: Response): Promise<void> {
+  const pedido = await carregarPedidoAdminEditavel(req.params.id, res);
+  if (!pedido) return;
+  await service.registrarEdicaoAdmin(pedido.id, req.user!.sub);
+  const atualizado = await service.getPedidoParaAdmin(pedido.id);
+  res.json({ pedido: atualizado ? serializeAdmin(atualizado) : null });
 }
 
 export async function adminAtualizarItem(req: Request, res: Response): Promise<void> {
