@@ -5,18 +5,23 @@ const brl = (v: number) =>
 
 /**
  * Campo de quantidade sempre visível (sem botões Adicionar/Remover).
- * Vazio ou 0 = produto não entra no pedido.
+ * Vazio ou 0 = produto não entra no pedido. Enter confirma e pula pro
+ * próximo campo (`onEnter`), como preencher uma planilha.
  */
 export function CampoQuantidade({
   valor,
   unidade,
   desabilitado,
   onChange,
+  id,
+  onEnter,
 }: {
   valor: number;
   unidade: string;
   desabilitado: boolean;
   onChange: (v: number) => void;
+  id?: string;
+  onEnter?: () => void;
 }) {
   const [texto, setTexto] = useState(valor > 0 ? String(valor) : '');
   useEffect(() => setTexto(valor > 0 ? String(valor) : ''), [valor]);
@@ -38,10 +43,16 @@ export function CampoQuantidade({
   return (
     <div className="flex items-center gap-2">
       <input
+        id={id}
         value={texto}
         onChange={(e) => setTexto(e.target.value)}
         onBlur={commit}
-        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          e.currentTarget.blur();
+          onEnter?.();
+        }}
         inputMode="decimal"
         placeholder="0"
         disabled={desabilitado}

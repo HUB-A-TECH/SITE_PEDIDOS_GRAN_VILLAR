@@ -107,6 +107,16 @@ export function PedidoPage() {
     });
   }, [produtos, categoria, busca]);
 
+  /** Enter no campo de quantidade pula pro próximo produto da lista visível. */
+  function focarProximoProduto(produtoId: string) {
+    const indice = visiveis.findIndex((p) => p.id === produtoId);
+    const proximo = visiveis[indice + 1];
+    if (!proximo) return;
+    const input = document.getElementById(`qtd-${proximo.id}`) as HTMLInputElement | null;
+    input?.focus();
+    input?.select();
+  }
+
   async function definirQuantidade(produtoId: string, quantidade: number) {
     if (!pedido) return;
     setProcessando((s) => new Set(s).add(produtoId));
@@ -270,10 +280,12 @@ export function PedidoPage() {
 
                 <div className="mt-3">
                   <CampoQuantidade
+                    id={`qtd-${p.id}`}
                     valor={qtd}
                     unidade={p.unidadeMedida}
                     desabilitado={ocupado}
                     onChange={(v) => definirQuantidade(p.id, v)}
+                    onEnter={() => focarProximoProduto(p.id)}
                   />
                 </div>
 
