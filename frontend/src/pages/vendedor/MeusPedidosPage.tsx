@@ -154,22 +154,32 @@ export function MeusPedidosPage() {
                     Continuar editando
                   </Link>
                 ) : (
-                  <div className="mt-3 flex gap-2">
-                    <a
-                      href={pedidosApi.pdfHref(p.pedidoId)}
-                      target="_blank"
-                      rel="noopener"
-                      className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500"
-                    >
-                      Baixar PDF
-                    </a>
-                    <a
-                      href={pedidosApi.txtHref(p.pedidoId)}
-                      className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
-                    >
-                      Baixar TXT
-                    </a>
-                  </div>
+                  <>
+                    <div className="mt-3 flex gap-2">
+                      <a
+                        href={pedidosApi.pdfHref(p.pedidoId)}
+                        target="_blank"
+                        rel="noopener"
+                        className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500"
+                      >
+                        Baixar PDF
+                      </a>
+                      <a
+                        href={pedidosApi.txtHref(p.pedidoId)}
+                        className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
+                      >
+                        Baixar TXT
+                      </a>
+                    </div>
+                    {p.status === 'CONFIRMADO' && (
+                      <Link
+                        to={`/pedido/${p.pedidoId}`}
+                        className="mt-2 block rounded-lg border border-brand-600 py-2 text-center text-sm font-medium text-brand-700 hover:bg-brand-50"
+                      >
+                        Editar pedido
+                      </Link>
+                    )}
+                  </>
                 )}
                 {podeCancelar && (
                   <button

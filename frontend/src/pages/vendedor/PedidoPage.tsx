@@ -71,8 +71,9 @@ export function PedidoPage() {
     pedidosApi
       .obterPedido(id)
       .then(async (p) => {
-        if (!p || p.status !== 'RASCUNHO') {
-          // Não encontrado, ou já enviado/cancelado: não é mais editável aqui.
+        if (!p || p.status === 'CANCELADO') {
+          // Não encontrado ou cancelado: não é editável. Rascunho e pedido já
+          // enviado (CONFIRMADO) podem ser abertos e editados.
           navigate('/meus-pedidos', { replace: true });
           return;
         }
@@ -193,10 +194,15 @@ export function PedidoPage() {
   }
 
   const totalItens = pedido.itens.length;
+  const jaEnviado = pedido.status === 'CONFIRMADO';
 
   return (
     <AppLayout
-      titulo={`Pedido · ${pedido.cliente.nome}`}
+      titulo={
+        jaEnviado && pedido.numeroPedido
+          ? `Pedido ${pedido.numeroPedido}`
+          : `Pedido · ${pedido.cliente.nome}`
+      }
       voltarPara="/meus-pedidos"
       acao={
         <div className="flex items-center gap-2">
@@ -383,18 +389,27 @@ export function PedidoPage() {
           />
         </div>
 
-        <div className="mt-4 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
-          💡 O pedido é salvo automaticamente. Toque em <strong>Baixar PDF</strong>{' '}
-          para o cliente conferir. Quando ele aprovar, use{' '}
-          <strong>Salvar e Enviar</strong> para mandar à administração.
-        </div>
+        {jaEnviado ? (
+          <div className="mt-4 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
+            💡 Este pedido já foi enviado à administração. As alterações que você
+            fizer aqui são salvas automaticamente.
+          </div>
+        ) : (
+          <div className="mt-4 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
+            💡 O pedido é salvo automaticamente. Toque em <strong>Baixar PDF</strong>{' '}
+            para o cliente conferir. Quando ele aprovar, use{' '}
+            <strong>Salvar e Enviar</strong> para mandar à administração.
+          </div>
+        )}
 
-        <button
-          onClick={descartar}
-          className="mt-4 w-full rounded-lg border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-        >
-          Descartar pedido
-        </button>
+        {!jaEnviado && (
+          <button
+            onClick={descartar}
+            className="mt-4 w-full rounded-lg border border-red-200 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+          >
+            Descartar pedido
+          </button>
+        )}
       </div>
 
       {/* Barra fixa de ações */}
@@ -408,13 +423,22 @@ export function PedidoPage() {
               <p className="text-lg font-bold text-slate-800">{brl(pedido.total)}</p>
             </div>
           </div>
-          <button
-            onClick={enviarPedido}
-            disabled={enviando || totalItens === 0}
-            className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-          >
-            {enviando ? 'Enviando…' : 'Salvar e Enviar'}
-          </button>
+          {jaEnviado ? (
+            <button
+              onClick={() => navigate('/meus-pedidos')}
+              className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-500"
+            >
+              Concluir
+            </button>
+          ) : (
+            <button
+              onClick={enviarPedido}
+              disabled={enviando || totalItens === 0}
+              className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {enviando ? 'Enviando…' : 'Salvar e Enviar'}
+            </button>
+          )}
         </div>
       </div>
 
