@@ -17,6 +17,7 @@ type PedidoComItens = NonNullable<
 function serialize(p: PedidoComItens) {
   return {
     id: p.id,
+    numeroPedido: p.numeroPedido,
     clienteId: p.clienteId,
     status: p.status,
     observacoes: p.observacoes,
@@ -73,6 +74,28 @@ async function carregarRascunho(
   }
   if (pedido.status !== 'RASCUNHO') {
     res.status(409).json({ mensagem: 'O pedido não é mais um rascunho' });
+    return null;
+  }
+  return pedido;
+}
+
+/**
+ * Carrega o pedido do vendedor permitindo edição de um RASCUNHO ou de um pedido
+ * já enviado (CONFIRMADO). Um pedido cancelado não pode ser editado. É sempre o
+ * mesmo registro — a edição nunca cria um pedido novo.
+ */
+async function carregarEditavel(
+  pedidoId: string,
+  vendedorId: string,
+  res: Response,
+): Promise<PedidoComItens | null> {
+  const pedido = await service.getPedidoDoVendedor(pedidoId, vendedorId);
+  if (!pedido) {
+    res.status(404).json({ mensagem: 'Pedido não encontrado' });
+    return null;
+  }
+  if (pedido.status === 'CANCELADO') {
+    res.status(409).json({ mensagem: 'Pedido cancelado não pode ser editado' });
     return null;
   }
   return pedido;
@@ -179,7 +202,7 @@ export async function excluir(req: Request, res: Response): Promise<void> {
 export async function adicionarItem(req: Request, res: Response): Promise<void> {
   const vendedor = await exigirVendedor(req, res);
   if (!vendedor) return;
-  const pedido = await carregarRascunho(req.params.id, vendedor.id, res);
+  const pedido = await carregarEditavel(req.params.id, vendedor.id, res);
   if (!pedido) return;
 
   const parsed = z
@@ -211,7 +234,7 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
 export async function atualizarItem(req: Request, res: Response): Promise<void> {
   const vendedor = await exigirVendedor(req, res);
   if (!vendedor) return;
-  const pedido = await carregarRascunho(req.params.id, vendedor.id, res);
+  const pedido = await carregarEditavel(req.params.id, vendedor.id, res);
   if (!pedido) return;
 
   const parsed = z
@@ -235,7 +258,7 @@ export async function atualizarItem(req: Request, res: Response): Promise<void> 
 export async function atualizarPreco(req: Request, res: Response): Promise<void> {
   const vendedor = await exigirVendedor(req, res);
   if (!vendedor) return;
-  const pedido = await carregarRascunho(req.params.id, vendedor.id, res);
+  const pedido = await carregarEditavel(req.params.id, vendedor.id, res);
   if (!pedido) return;
 
   const parsed = z
@@ -259,12 +282,18 @@ export async function atualizarPreco(req: Request, res: Response): Promise<void>
 export async function removerItem(req: Request, res: Response): Promise<void> {
   const vendedor = await exigirVendedor(req, res);
   if (!vendedor) return;
-  const pedido = await carregarRascunho(req.params.id, vendedor.id, res);
+  const pedido = await carregarEditavel(req.params.id, vendedor.id, res);
   if (!pedido) return;
 
   const item = await service.getItem(req.params.itemId);
   if (!item || item.pedidoId !== pedido.id) {
     res.status(404).json({ mensagem: 'Item não encontrado no pedido' });
+    return;
+  }
+
+  // Um pedido já enviado não pode ficar sem itens.
+  if (pedido.status === 'CONFIRMADO' && pedido.itens.length <= 1) {
+    res.status(400).json({ mensagem: 'O pedido enviado deve ter ao menos 1 item' });
     return;
   }
 
@@ -278,7 +307,7 @@ export async function atualizarObservacoes(
 ): Promise<void> {
   const vendedor = await exigirVendedor(req, res);
   if (!vendedor) return;
-  const pedido = await carregarRascunho(req.params.id, vendedor.id, res);
+  const pedido = await carregarEditavel(req.params.id, vendedor.id, res);
   if (!pedido) return;
 
   const parsed = z

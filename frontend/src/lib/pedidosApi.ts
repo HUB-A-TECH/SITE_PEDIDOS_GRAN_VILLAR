@@ -17,6 +17,7 @@ export interface ItemPedido {
 
 export interface Pedido {
   id: string;
+  numeroPedido: string | null;
   clienteId: string;
   status: 'RASCUNHO' | 'CONFIRMADO' | 'CANCELADO';
   observacoes: string | null;
