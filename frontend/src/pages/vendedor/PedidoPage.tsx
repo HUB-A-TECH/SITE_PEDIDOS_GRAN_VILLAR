@@ -177,16 +177,6 @@ export function PedidoPage() {
     }
   }
 
-  async function baixarProposta() {
-    if (!pedido || pedido.itens.length === 0) return;
-    await salvarObs(); // garante que as observações estejam salvas no PDF
-    const a = document.createElement('a');
-    a.href = pedidosApi.pdfHref(pedido.id);
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }
-
   async function descartar() {
     if (!pedido) return;
     if (!confirm('Descartar este pedido salvo? Esta ação não pode ser desfeita.')) return;
@@ -417,20 +407,13 @@ export function PedidoPage() {
               </p>
               <p className="text-lg font-bold text-slate-800">{brl(pedido.total)}</p>
             </div>
-            <button
-              onClick={baixarProposta}
-              disabled={totalItens === 0}
-              className="rounded-lg border border-brand-600 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-40"
-            >
-              Baixar PDF
-            </button>
           </div>
           <button
             onClick={enviarPedido}
             disabled={enviando || totalItens === 0}
             className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            {enviando ? 'Enviando…' : 'Salvar e Enviar (para a administração)'}
+            {enviando ? 'Enviando…' : 'Salvar e Enviar'}
           </button>
         </div>
       </div>
