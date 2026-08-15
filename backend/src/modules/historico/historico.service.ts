@@ -76,6 +76,7 @@ export function meusPedidos(vendedorId: string, limite?: number) {
     include: {
       cliente: { select: { id: true, codigo: true, nome: true } },
       editadoPor: { select: { username: true } },
+      ultimaAlteracaoPor: { select: { username: true } },
       _count: { select: { itens: true } },
     },
     orderBy: { criadoEm: 'desc' },

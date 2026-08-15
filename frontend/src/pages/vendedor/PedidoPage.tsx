@@ -396,9 +396,9 @@ export function PedidoPage() {
           </div>
         ) : (
           <div className="mt-4 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
-            💡 O pedido é salvo automaticamente. Toque em <strong>Baixar PDF</strong>{' '}
-            para o cliente conferir. Quando ele aprovar, use{' '}
-            <strong>Salvar e Enviar</strong> para mandar à administração.
+            💡 O pedido é salvo automaticamente. Quando terminar, use{' '}
+            <strong>Salvar e Enviar</strong> para mandar à administração. O PDF
+            fica disponível em <strong>Meus Pedidos</strong> depois do envio.
           </div>
         )}
 
@@ -451,25 +451,15 @@ export function PedidoPage() {
           <div className="space-y-4 text-center">
             <div className="text-5xl">✅</div>
             <p className="text-slate-700">
-              Pedido <strong>{confirmado.numero}</strong> confirmado com sucesso.
+              Pedido <strong>{confirmado.numero}</strong> enviado com sucesso à
+              administração.
             </p>
-            <a
-              href={pedidosApi.pdfHref(confirmado.pedidoId)}
-              target="_blank"
-              rel="noopener"
-              className="block w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-500"
-            >
-              Baixar PDF (entregar ao cliente)
-            </a>
-            <a
-              href={pedidosApi.txtHref(confirmado.pedidoId)}
-              className="block w-full rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
-            >
-              Baixar TXT
-            </a>
+            <p className="text-sm text-slate-500">
+              O PDF para entregar ao cliente fica em <strong>Meus Pedidos</strong>.
+            </p>
             <button
               onClick={() => navigate('/meus-pedidos', { replace: true })}
-              className="w-full rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-500"
             >
               Concluir
             </button>
