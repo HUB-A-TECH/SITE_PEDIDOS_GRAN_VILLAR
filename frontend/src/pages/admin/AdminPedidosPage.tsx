@@ -6,6 +6,7 @@ import type { PedidoAdmin } from '../../lib/pedidosApi';
 import * as clientesApi from '../../lib/clientesApi';
 import { LIMITE_OPCOES, type Limite } from '../../lib/types';
 import type { Cliente } from '../../lib/types';
+import { estiloStatus } from '../../lib/statusPedido';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -81,12 +82,12 @@ export function AdminPedidosPage() {
         </p>
       ) : (
         <ul className="space-y-2">
-          {pedidos.map((p) => (
+          {pedidos.map((p) => {
+            const est = estiloStatus(p.status, p.revisao);
+            return (
             <li
               key={p.pedidoId}
-              className={`rounded-xl bg-white p-4 shadow-sm ${
-                p.pendente ? 'ring-1 ring-brandYellow-300' : ''
-              }`}
+              className={`rounded-xl border-l-4 bg-white p-4 shadow-sm ${est.borderClass}`}
             >
               <Link
                 to={`/admin/pedidos/${p.pedidoId}`}
@@ -95,9 +96,9 @@ export function AdminPedidosPage() {
                 <div>
                   <p className="flex items-center gap-2 font-semibold text-slate-800 hover:underline">
                     {p.cliente.nome}
-                    {p.pendente && (
+                    {est.badge && (
                       <span className="rounded-md bg-brandYellow-50 px-1.5 py-0.5 text-[10px] font-bold text-brandYellow-800 ring-1 ring-inset ring-brandYellow-300">
-                        Novo
+                        {est.badge}
                       </span>
                     )}
                   </p>
@@ -108,12 +109,8 @@ export function AdminPedidosPage() {
                 </div>
                 <div className="text-right">
                   <p className="font-semibold text-slate-800">{brl(p.total)}</p>
-                  <span
-                    className={`text-xs font-medium ${
-                      p.status === 'CANCELADO' ? 'text-red-500' : 'text-brand-600'
-                    }`}
-                  >
-                    {p.status === 'CANCELADO' ? 'Cancelado' : 'Confirmado'}
+                  <span className={`text-xs font-medium ${est.textClass}`}>
+                    {est.label}
                   </span>
                 </div>
               </Link>
@@ -155,7 +152,8 @@ export function AdminPedidosPage() {
                 </a>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </AppLayout>

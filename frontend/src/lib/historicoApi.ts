@@ -1,5 +1,6 @@
 import { api } from './api';
 import type { Limite } from './types';
+import type { Revisao } from './statusPedido';
 
 function limiteParam(l: Limite) {
   return { limite: String(l) };
@@ -32,6 +33,7 @@ export interface MeuPedido {
   editadoEm: string | null;
   ultimaAlteracaoPor: { username: string } | null;
   ultimaAlteracaoEm: string | null;
+  revisao: Revisao;
 }
 
 export async function historicoCliente(

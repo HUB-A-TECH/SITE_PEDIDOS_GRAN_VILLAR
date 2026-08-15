@@ -5,6 +5,7 @@ import { AppLayout } from '../../components/AppLayout';
 import { CampoQuantidade, PrecoItem } from '../../components/ItemEditors';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { PedidoAdminDetalhe } from '../../lib/pedidosApi';
+import { estiloStatus } from '../../lib/statusPedido';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -78,14 +79,18 @@ export function AdminPedidoDetalhePage() {
   }
 
   const podeEditar = pedido.status === 'CONFIRMADO';
+  const est = estiloStatus(pedido.status, pedido.revisao);
 
   return (
     <AppLayout
       titulo={pedido.numeroPedido ? `Pedido ${pedido.numeroPedido}` : 'Pedido'}
       voltarPara="/admin/pedidos"
     >
-      <div className="mb-4 rounded-xl bg-white p-4 shadow-sm">
-        <p className="font-semibold text-slate-800">{pedido.cliente.nome}</p>
+      <div className={`mb-4 rounded-xl border-l-4 bg-white p-4 shadow-sm ${est.borderClass}`}>
+        <div className="flex items-start justify-between">
+          <p className="font-semibold text-slate-800">{pedido.cliente.nome}</p>
+          <span className={`text-xs font-medium ${est.textClass}`}>{est.label}</span>
+        </div>
         <p className="text-xs text-slate-500">
           {pedido.vendedor.nomeCompleto} · {dataBR(pedido.data)}
         </p>

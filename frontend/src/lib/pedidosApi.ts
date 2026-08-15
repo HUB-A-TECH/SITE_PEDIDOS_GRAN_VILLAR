@@ -1,5 +1,6 @@
 import { api } from './api';
 import type { Categoria, Limite } from './types';
+import type { Revisao } from './statusPedido';
 
 export interface ItemPedido {
   id: string;
@@ -142,7 +143,7 @@ export interface PedidoAdmin {
   editadoEm: string | null;
   ultimaAlteracaoPor: { username: string } | null;
   ultimaAlteracaoEm: string | null;
-  pendente: boolean;
+  revisao: Revisao;
 }
 
 export async function adminListarPedidos(
@@ -172,6 +173,7 @@ export interface PedidoAdminDetalhe {
   editadoEm: string | null;
   ultimaAlteracaoPor: { username: string } | null;
   ultimaAlteracaoEm: string | null;
+  revisao: Revisao;
   itens: ItemPedido[];
 }
 
