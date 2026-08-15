@@ -137,6 +137,7 @@ export async function meuHistorico(req: Request, res: Response): Promise<void> {
         ? { username: p.ultimaAlteracaoPor.username }
         : null,
       ultimaAlteracaoEm: p.ultimaAlteracaoEm,
+      revisao: calcularRevisao(p),
     })),
   });
 }
@@ -466,6 +467,30 @@ export async function baixarPdf(req: Request, res: Response): Promise<void> {
   doc.end();
 }
 
+export type Revisao = 'PENDENTE' | 'ALTERADO' | 'REVISADO' | null;
+
+/**
+ * Estado de revisão de um pedido enviado, do ponto de vista do comercial:
+ * - PENDENTE: enviado e ainda não revisado/aprovado;
+ * - ALTERADO: já foi revisado, mas alterado depois (precisa NOVA revisão);
+ * - REVISADO: revisado/aprovado e sem alterações posteriores;
+ * - null: não é um pedido enviado (rascunho ou cancelado).
+ */
+function calcularRevisao(p: {
+  status: string;
+  editadoEm: Date | null;
+  ultimaAlteracaoEm: Date | null;
+}): Revisao {
+  if (p.status !== 'CONFIRMADO') return null;
+  if (!p.editadoEm) return 'PENDENTE';
+  if (p.ultimaAlteracaoEm && p.ultimaAlteracaoEm.getTime() > p.editadoEm.getTime()) {
+    return 'ALTERADO';
+  }
+  return 'REVISADO';
+}
+
+const precisaRevisao = (r: Revisao) => r === 'PENDENTE' || r === 'ALTERADO';
+
 export async function adminListar(req: Request, res: Response): Promise<void> {
   const schema = z.object({
     limite: z.string().optional(),
@@ -482,12 +507,12 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
     vendedorId: parsed.data.vendedor_id,
     clienteId: parsed.data.cliente_id,
   });
-  // Pendentes (confirmados e ainda não revisados) sobem para o topo da fila;
-  // dentro de cada grupo, mantém a ordem por data (sort é estável).
-  const pendente = (p: (typeof pedidos)[number]) =>
-    p.status === 'CONFIRMADO' && !p.editadoPorId;
+  // Pedidos que precisam de revisão (novos ou alterados após revisão) sobem
+  // para o topo da fila; dentro de cada grupo mantém a ordem por data.
   const ordenados = [...pedidos].sort(
-    (a, b) => Number(pendente(b)) - Number(pendente(a)),
+    (a, b) =>
+      Number(precisaRevisao(calcularRevisao(b))) -
+      Number(precisaRevisao(calcularRevisao(a))),
   );
   res.json({
     pedidos: ordenados.map((p) => ({
@@ -505,7 +530,7 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
         ? { username: p.ultimaAlteracaoPor.username }
         : null,
       ultimaAlteracaoEm: p.ultimaAlteracaoEm,
-      pendente: pendente(p),
+      revisao: calcularRevisao(p),
     })),
   });
 }
@@ -531,6 +556,7 @@ function serializeAdmin(p: PedidoAdminComItens) {
       ? { username: p.ultimaAlteracaoPor.username }
       : null,
     ultimaAlteracaoEm: p.ultimaAlteracaoEm,
+    revisao: calcularRevisao(p),
     itens: p.itens.map((i) => ({
       id: i.id,
       produtoId: i.produtoId,
