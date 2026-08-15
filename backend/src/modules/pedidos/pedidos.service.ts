@@ -44,6 +44,7 @@ const pedidoAdminInclude = {
   ...pedidoInclude,
   vendedor: { select: { id: true, nomeCompleto: true } },
   editadoPor: { select: { username: true } },
+  ultimaAlteracaoPor: { select: { username: true } },
 } as const;
 
 /** Pedido completo para a tela de detalhe do admin (qualquer vendedor/cliente). */
@@ -54,11 +55,32 @@ export function getPedidoParaAdmin(id: string) {
   });
 }
 
-/** Registra quem foi o último a editar o pedido (auditoria simples). */
+/**
+ * Edição/aprovação pelo comercial: marca a revisão da administração
+ * (editadoPor, que controla o "Novo"/pendente) E a última alteração.
+ */
 export function registrarEdicaoAdmin(pedidoId: string, usuarioId: string) {
+  const agora = new Date();
   return prisma.pedido.update({
     where: { id: pedidoId },
-    data: { editadoPorId: usuarioId, editadoEm: new Date() },
+    data: {
+      editadoPorId: usuarioId,
+      editadoEm: agora,
+      ultimaAlteracaoPorId: usuarioId,
+      ultimaAlteracaoEm: agora,
+    },
+  });
+}
+
+/**
+ * Registra apenas a última alteração (usado quando o vendedor edita um pedido
+ * já enviado). NÃO mexe em editadoPor, para não marcar como "revisado" pelo
+ * comercial.
+ */
+export function registrarUltimaAlteracao(pedidoId: string, usuarioId: string) {
+  return prisma.pedido.update({
+    where: { id: pedidoId },
+    data: { ultimaAlteracaoPorId: usuarioId, ultimaAlteracaoEm: new Date() },
   });
 }
 
@@ -248,6 +270,7 @@ export function listarPedidosAdmin(filtro: FiltroAdminPedidos) {
       cliente: { select: { id: true, codigo: true, nome: true } },
       vendedor: { select: { id: true, nomeCompleto: true } },
       editadoPor: { select: { username: true } },
+      ultimaAlteracaoPor: { select: { username: true } },
       _count: { select: { itens: true } },
     },
     orderBy: { confirmadoEm: 'desc' },

@@ -30,6 +30,8 @@ export interface MeuPedido {
   itensCount: number;
   editadoPor: { username: string } | null;
   editadoEm: string | null;
+  ultimaAlteracaoPor: { username: string } | null;
+  ultimaAlteracaoEm: string | null;
 }
 
 export async function historicoCliente(

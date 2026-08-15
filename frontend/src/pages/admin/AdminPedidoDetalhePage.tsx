@@ -97,11 +97,13 @@ export function AdminPedidoDetalhePage() {
         </button>
         {historicoVisivel && (
           <p className="mt-1 text-[11px] text-slate-400">
-            {pedido.editadoPor
-              ? `Última alteração por ${pedido.editadoPor.username}${
-                  pedido.editadoEm ? ` em ${dataHoraBR(pedido.editadoEm)}` : ''
+            {pedido.ultimaAlteracaoPor
+              ? `Última alteração por ${pedido.ultimaAlteracaoPor.username}${
+                  pedido.ultimaAlteracaoEm
+                    ? ` em ${dataHoraBR(pedido.ultimaAlteracaoEm)}`
+                    : ''
                 }`
-              : 'Ainda não revisado.'}
+              : 'Sem alterações após o envio.'}
           </p>
         )}
       </div>

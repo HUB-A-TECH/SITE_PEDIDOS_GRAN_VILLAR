@@ -104,10 +104,16 @@ async function carregarEditavel(
 async function responderPedidoAtualizado(
   pedidoId: string,
   vendedorId: string,
+  usuarioId: string,
   res: Response,
 ): Promise<void> {
   await service.recomputarTotais(pedidoId);
   const atualizado = await service.getPedidoDoVendedor(pedidoId, vendedorId);
+  // Se o vendedor está editando um pedido já enviado, registra a última
+  // alteração (sem tocar no marcador de revisão do comercial).
+  if (atualizado && atualizado.status === 'CONFIRMADO') {
+    await service.registrarUltimaAlteracao(pedidoId, usuarioId);
+  }
   res.json({ pedido: atualizado ? serialize(atualizado) : null });
 }
 
@@ -127,6 +133,10 @@ export async function meuHistorico(req: Request, res: Response): Promise<void> {
       itensCount: p._count.itens,
       editadoPor: p.editadoPor ? { username: p.editadoPor.username } : null,
       editadoEm: p.editadoEm,
+      ultimaAlteracaoPor: p.ultimaAlteracaoPor
+        ? { username: p.ultimaAlteracaoPor.username }
+        : null,
+      ultimaAlteracaoEm: p.ultimaAlteracaoEm,
     })),
   });
 }
@@ -228,7 +238,7 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
   }
 
   await service.definirItem(pedido.id, produto, parsed.data.quantidade);
-  await responderPedidoAtualizado(pedido.id, vendedor.id, res);
+  await responderPedidoAtualizado(pedido.id, vendedor.id, req.user!.sub, res);
 }
 
 export async function atualizarItem(req: Request, res: Response): Promise<void> {
@@ -252,7 +262,7 @@ export async function atualizarItem(req: Request, res: Response): Promise<void> 
   }
 
   await service.atualizarQuantidadeItem(item, parsed.data.quantidade);
-  await responderPedidoAtualizado(pedido.id, vendedor.id, res);
+  await responderPedidoAtualizado(pedido.id, vendedor.id, req.user!.sub, res);
 }
 
 export async function atualizarPreco(req: Request, res: Response): Promise<void> {
@@ -276,7 +286,7 @@ export async function atualizarPreco(req: Request, res: Response): Promise<void>
   }
 
   await service.atualizarPrecoItem(item, parsed.data.preco_unitario);
-  await responderPedidoAtualizado(pedido.id, vendedor.id, res);
+  await responderPedidoAtualizado(pedido.id, vendedor.id, req.user!.sub, res);
 }
 
 export async function removerItem(req: Request, res: Response): Promise<void> {
@@ -298,7 +308,7 @@ export async function removerItem(req: Request, res: Response): Promise<void> {
   }
 
   await service.excluirItem(item.id);
-  await responderPedidoAtualizado(pedido.id, vendedor.id, res);
+  await responderPedidoAtualizado(pedido.id, vendedor.id, req.user!.sub, res);
 }
 
 export async function atualizarObservacoes(
@@ -319,6 +329,9 @@ export async function atualizarObservacoes(
   }
 
   await service.atualizarObservacoes(pedido.id, parsed.data.observacoes);
+  if (pedido.status === 'CONFIRMADO') {
+    await service.registrarUltimaAlteracao(pedido.id, req.user!.sub);
+  }
   const atualizado = await service.getPedidoDoVendedor(pedido.id, vendedor.id);
   res.json({ pedido: atualizado ? serialize(atualizado) : null });
 }
@@ -488,6 +501,10 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
       itensCount: p._count.itens,
       editadoPor: p.editadoPor ? { username: p.editadoPor.username } : null,
       editadoEm: p.editadoEm,
+      ultimaAlteracaoPor: p.ultimaAlteracaoPor
+        ? { username: p.ultimaAlteracaoPor.username }
+        : null,
+      ultimaAlteracaoEm: p.ultimaAlteracaoEm,
       pendente: pendente(p),
     })),
   });
@@ -510,6 +527,10 @@ function serializeAdmin(p: PedidoAdminComItens) {
     vendedor: { id: p.vendedor.id, nomeCompleto: p.vendedor.nomeCompleto },
     editadoPor: p.editadoPor ? { username: p.editadoPor.username } : null,
     editadoEm: p.editadoEm,
+    ultimaAlteracaoPor: p.ultimaAlteracaoPor
+      ? { username: p.ultimaAlteracaoPor.username }
+      : null,
+    ultimaAlteracaoEm: p.ultimaAlteracaoEm,
     itens: p.itens.map((i) => ({
       id: i.id,
       produtoId: i.produtoId,

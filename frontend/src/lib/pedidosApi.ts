@@ -140,6 +140,8 @@ export interface PedidoAdmin {
   itensCount: number;
   editadoPor: { username: string } | null;
   editadoEm: string | null;
+  ultimaAlteracaoPor: { username: string } | null;
+  ultimaAlteracaoEm: string | null;
   pendente: boolean;
 }
 
@@ -168,6 +170,8 @@ export interface PedidoAdminDetalhe {
   vendedor: { id: string; nomeCompleto: string };
   editadoPor: { username: string } | null;
   editadoEm: string | null;
+  ultimaAlteracaoPor: { username: string } | null;
+  ultimaAlteracaoEm: string | null;
   itens: ItemPedido[];
 }
 

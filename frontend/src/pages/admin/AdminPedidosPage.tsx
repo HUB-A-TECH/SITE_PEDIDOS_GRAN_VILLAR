@@ -127,11 +127,13 @@ export function AdminPedidosPage() {
                 </button>
                 {historicoAberto.has(p.pedidoId) && (
                   <p className="mt-1 text-[11px] text-slate-400">
-                    {p.editadoPor
-                      ? `Última alteração por ${p.editadoPor.username}${
-                          p.editadoEm ? ` em ${dataHoraBR(p.editadoEm)}` : ''
+                    {p.ultimaAlteracaoPor
+                      ? `Última alteração por ${p.ultimaAlteracaoPor.username}${
+                          p.ultimaAlteracaoEm
+                            ? ` em ${dataHoraBR(p.ultimaAlteracaoEm)}`
+                            : ''
                         }`
-                      : 'Ainda não revisado.'}
+                      : 'Sem alterações após o envio.'}
                   </p>
                 )}
               </div>
