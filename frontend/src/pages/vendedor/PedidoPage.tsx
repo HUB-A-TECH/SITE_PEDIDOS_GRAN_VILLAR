@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
-import { Modal } from '../../components/Modal';
 import { CampoQuantidade, PrecoItem } from '../../components/ItemEditors';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { Pedido } from '../../lib/pedidosApi';
@@ -35,8 +34,6 @@ export function PedidoPage() {
   const [processando, setProcessando] = useState<Set<string>>(new Set());
   const [obs, setObs] = useState('');
   const [salvo, setSalvo] = useState(false);
-  const [enviando, setEnviando] = useState(false);
-  const [confirmado, setConfirmado] = useState<{ numero: string; pedidoId: string } | null>(null);
   const [histProdutos, setHistProdutos] = useState<Record<string, ItemHistoricoProduto[]>>({});
   const [histFechado, setHistFechado] = useState<Set<string>>(new Set());
 
@@ -224,19 +221,6 @@ export function PedidoPage() {
     if (!pedido || obs === (pedido.observacoes ?? '')) return;
     const atualizado = await pedidosApi.atualizarObservacoes(pedido.id, obs);
     aplicarPedido(atualizado);
-  }
-
-  async function enviarPedido() {
-    if (!pedido || pedido.itens.length === 0) return;
-    setEnviando(true);
-    try {
-      const { numeroPedido } = await pedidosApi.confirmar(pedido.id);
-      setConfirmado({ numero: numeroPedido, pedidoId: pedido.id });
-    } catch {
-      alert('Não foi possível enviar o pedido. Tente novamente.');
-    } finally {
-      setEnviando(false);
-    }
   }
 
   async function descartar() {
@@ -457,9 +441,10 @@ export function PedidoPage() {
           </div>
         ) : (
           <div className="mt-4 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
-            💡 O pedido é salvo automaticamente. Quando terminar, use{' '}
-            <strong>Salvar e Enviar</strong> para mandar à administração. O PDF
-            fica disponível em <strong>Meus Pedidos</strong> depois do envio.
+            💡 O pedido é salvo automaticamente e ainda <strong>não</strong> foi
+            para a administração. Ele fica em <strong>Meus Pedidos</strong>, na
+            seção <strong>A confirmar</strong> — é de lá que você envia quando
+            terminar a visita.
           </div>
         )}
 
@@ -493,40 +478,16 @@ export function PedidoPage() {
             </button>
           ) : (
             <button
-              onClick={enviarPedido}
-              disabled={enviando || totalItens === 0}
+              onClick={() => navigate('/meus-pedidos')}
+              disabled={totalItens === 0}
               className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              {enviando ? 'Enviando…' : 'Salvar e Enviar'}
+              Salvar e sair
             </button>
           )}
         </div>
       </div>
 
-      <Modal
-        titulo="Pedido enviado!"
-        aberto={confirmado !== null}
-        onFechar={() => navigate('/meus-pedidos', { replace: true })}
-      >
-        {confirmado && (
-          <div className="space-y-4 text-center">
-            <div className="text-5xl">✅</div>
-            <p className="text-slate-700">
-              Pedido <strong>{confirmado.numero}</strong> enviado com sucesso à
-              administração.
-            </p>
-            <p className="text-sm text-slate-500">
-              O PDF para entregar ao cliente fica em <strong>Meus Pedidos</strong>.
-            </p>
-            <button
-              onClick={() => navigate('/meus-pedidos', { replace: true })}
-              className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-500"
-            >
-              Concluir
-            </button>
-          </div>
-        )}
-      </Modal>
     </AppLayout>
   );
 }
