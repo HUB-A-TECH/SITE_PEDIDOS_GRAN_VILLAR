@@ -13,6 +13,7 @@ import { locaisRoutes } from './modules/locais/locais.routes';
 import { pedidosRoutes } from './modules/pedidos/pedidos.routes';
 import { pedidosAdminRoutes } from './modules/pedidos/pedidos.admin.routes';
 import { usuariosRoutes } from './modules/usuarios/usuarios.routes';
+import { tabelasAdminRoutes } from './modules/tabelas/tabelas.admin.routes';
 
 export const app = express();
 
@@ -33,6 +34,7 @@ app.use('/api/admin/produtos', produtosAdminRoutes);
 app.use('/api/admin/clientes', clientesAdminRoutes);
 app.use('/api/admin/pedidos', pedidosAdminRoutes);
 app.use('/api/admin/usuarios', usuariosRoutes);
+app.use('/api/admin/tabelas', tabelasAdminRoutes);
 app.use('/api/locais', locaisRoutes);
 
 // Em produção, o mesmo serviço serve o site (React já buildado) — mesmo domínio

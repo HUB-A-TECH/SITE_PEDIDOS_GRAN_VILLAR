@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { Vendedor } from '@prisma/client';
 import * as service from './pedidos.service';
 import * as historico from '../historico/historico.service';
+import * as precos from '../precos/precos.service';
+import * as carteira from '../../lib/carteira';
 import { isUniqueConstraintError } from '../../utils/prisma-errors';
 import PDFDocument from 'pdfkit';
 import { gerarTxtPedido } from '../../utils/gerar-txt';
@@ -170,8 +172,9 @@ export async function criar(req: Request, res: Response): Promise<void> {
     res.status(404).json({ mensagem: 'Cliente não encontrado' });
     return;
   }
-  if (cliente.localId !== vendedor.localId) {
-    res.status(403).json({ mensagem: 'Cliente pertence a outro local' });
+  const atende = await carteira.vendedorAtendeCliente(req.user!.sub, cliente.id);
+  if (!atende) {
+    res.status(403).json({ mensagem: 'Cliente não está na sua carteira' });
     return;
   }
 
@@ -238,7 +241,9 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
     return;
   }
 
-  await service.definirItem(pedido.id, produto, parsed.data.quantidade);
+  // Preço da tabela do cliente (cai no catálogo se a tabela não tiver o item).
+  const preco = await precos.precoDoProdutoParaCliente(pedido.clienteId, produto);
+  await service.definirItem(pedido.id, produto, parsed.data.quantidade, preco);
   await responderPedidoAtualizado(pedido.id, vendedor.id, req.user!.sub, res);
 }
 

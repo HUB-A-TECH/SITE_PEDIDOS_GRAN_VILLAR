@@ -1,5 +1,11 @@
 import { api } from './api';
-import type { Cliente, Local, MixProduto } from './types';
+import type {
+  Cliente,
+  ClienteCompleto,
+  Local,
+  MixProduto,
+  VendedorOpcao,
+} from './types';
 
 export interface ClienteInput {
   codigo: string;
@@ -9,7 +15,12 @@ export interface ClienteInput {
   email?: string;
   telefone?: string;
   endereco?: string;
+  nomeComprador?: string;
+  telefoneComprador?: string;
   localId: string;
+  tabelaPrecoId?: string;
+  /** Carteira: vendedores responsáveis por este cliente. */
+  vendedorIds?: string[];
 }
 
 // Vendedor: clientes do próprio local.
@@ -20,33 +31,47 @@ export async function listar(): Promise<Cliente[]> {
 
 // ---- Admin ----
 
-export async function adminListar(localId: string): Promise<Cliente[]> {
-  const res = await api.get<{ clientes: Cliente[] }>('/admin/clientes', {
+export async function adminListar(localId: string): Promise<ClienteCompleto[]> {
+  const res = await api.get<{ clientes: ClienteCompleto[] }>('/admin/clientes', {
     params: { local_id: localId },
   });
   return res.data.clientes;
 }
 
-export async function adminCriar(data: ClienteInput): Promise<Cliente> {
-  const res = await api.post<Cliente>('/admin/clientes', data);
+export async function adminCriar(data: ClienteInput): Promise<ClienteCompleto> {
+  const res = await api.post<ClienteCompleto>('/admin/clientes', data);
   return res.data;
 }
 
 export async function adminAtualizar(
   id: string,
   data: Partial<ClienteInput> & { ativo?: boolean },
-): Promise<Cliente> {
-  const res = await api.put<Cliente>(`/admin/clientes/${id}`, data);
+): Promise<ClienteCompleto> {
+  const res = await api.put<ClienteCompleto>(`/admin/clientes/${id}`, data);
   return res.data;
+}
+
+/** Vendedores ativos da filial — opções da carteira no cadastro do cliente. */
+export async function adminListarVendedores(
+  localId: string,
+): Promise<VendedorOpcao[]> {
+  const res = await api.get<{ vendedores: VendedorOpcao[] }>(
+    '/admin/clientes/vendedores',
+    { params: { local_id: localId } },
+  );
+  return res.data.vendedores;
 }
 
 // ---- Mix do cliente (admin) ----
 
-export async function listarMix(clienteId: string): Promise<MixProduto[]> {
-  const res = await api.get<{ produtos: MixProduto[] }>(
-    `/admin/clientes/${clienteId}/produtos`,
-  );
-  return res.data.produtos;
+export interface MixResposta {
+  tabelaPreco: { id: string; nome: string } | null;
+  produtos: MixProduto[];
+}
+
+export async function listarMix(clienteId: string): Promise<MixResposta> {
+  const res = await api.get<MixResposta>(`/admin/clientes/${clienteId}/produtos`);
+  return res.data;
 }
 
 export async function adicionarAoMix(

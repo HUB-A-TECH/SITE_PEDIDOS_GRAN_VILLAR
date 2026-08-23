@@ -1,6 +1,7 @@
 // Schema do Sistema de Pedidos Gran Villar.
 // Fase 1: User, Local, Vendedor, TokenRevogado.
-// Fase 2: Cliente, Produto, ProdutoLocal, ClienteProduto, Pedido, ItemPedido.
+// Fase 2: Cliente, Produto, ClienteProduto, Pedido, ItemPedido.
+// Tabelas de preco: TabelaPreco, TabelaPrecoItem, ClienteVendedor (carteira).
 
 generator client {
   provider = "prisma-client-js"
@@ -43,11 +44,10 @@ model Local {
   ativo       Boolean  @default(true)
   criadoEm    DateTime @default(now()) @map("criado_em")
 
-  usuarios      User[]
-  vendedores    Vendedor[]
-  clientes      Cliente[]
-  produtoLocais ProdutoLocal[]
-  pedidos       Pedido[]
+  usuarios   User[]
+  vendedores Vendedor[]
+  clientes   Cliente[]
+  pedidos    Pedido[]
 
   @@map("locais")
 }
@@ -81,9 +81,10 @@ model Vendedor {
   localId            String  @map("local_id")
   ativo              Boolean @default(true)
 
-  usuario User     @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  local   Local    @relation(fields: [localId], references: [id])
-  pedidos Pedido[]
+  usuario  User              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  local    Local             @relation(fields: [localId], references: [id])
+  pedidos  Pedido[]
+  clientes ClienteVendedor[]
 
   @@map("vendedores")
 }
@@ -99,21 +100,28 @@ model TokenRevogado {
 }
 
 model Cliente {
-  id           String   @id @default(uuid())
-  codigo       String   @unique
-  nome         String
-  nomeFantasia String?  @map("nome_fantasia")
-  cnpj         String?
-  email        String?
-  telefone     String?
-  endereco     String?
-  localId      String   @map("local_id")
-  ativo        Boolean  @default(true)
-  criadoEm     DateTime @default(now()) @map("criado_em")
-  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+  id                String   @id @default(uuid())
+  codigo            String   @unique
+  nome              String
+  nomeFantasia      String?  @map("nome_fantasia")
+  cnpj              String?
+  email             String?
+  telefone          String?
+  endereco          String?
+  // Contato de quem faz a compra (pode ser diferente do telefone da empresa).
+  nomeComprador     String?  @map("nome_comprador")
+  telefoneComprador String?  @map("telefone_comprador")
+  localId           String   @map("local_id")
+  // Tabela de preco do cliente. Opcional: sem tabela, vale o preco do catalogo.
+  tabelaPrecoId     String?  @map("tabela_preco_id")
+  ativo             Boolean  @default(true)
+  criadoEm          DateTime @default(now()) @map("criado_em")
+  atualizadoEm      DateTime @updatedAt @map("atualizado_em")
 
-  local           Local            @relation(fields: [localId], references: [id])
+  local           Local             @relation(fields: [localId], references: [id])
+  tabelaPreco     TabelaPreco?      @relation(fields: [tabelaPrecoId], references: [id])
   clienteProdutos ClienteProduto[]
+  vendedores      ClienteVendedor[]
   pedidos         Pedido[]
 
   @@map("clientes")
@@ -131,26 +139,11 @@ model Produto {
   criadoEm      DateTime  @default(now()) @map("criado_em")
   atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
 
-  produtoLocais   ProdutoLocal[]
-  clienteProdutos ClienteProduto[]
-  itensPedido     ItemPedido[]
+  clienteProdutos  ClienteProduto[]
+  tabelaPrecoItens TabelaPrecoItem[]
+  itensPedido      ItemPedido[]
 
   @@map("produtos")
-}
-
-// Associação produto <-> local (disponibilidade; preco_local para uso futuro).
-model ProdutoLocal {
-  id         String   @id @default(uuid())
-  produtoId  String   @map("produto_id")
-  localId    String   @map("local_id")
-  precoLocal Decimal? @map("preco_local") @db.Decimal(10, 2)
-  ativo      Boolean  @default(true)
-
-  produto Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
-  local   Local   @relation(fields: [localId], references: [id])
-
-  @@unique([produtoId, localId])
-  @@map("produtos_locais")
 }
 
 // "Mix do cliente" (RN-10): quais produtos cada cliente compra. Gerenciado pelo admin.
@@ -168,34 +161,78 @@ model ClienteProduto {
   @@map("clientes_produtos")
 }
 
+// Tabela de preco: um mesmo produto pode ter valores diferentes por grupo de
+// clientes (atacado, rede X, padrao...). Cada cliente pertence a uma tabela.
+model TabelaPreco {
+  id           String   @id @default(uuid())
+  nome         String   @unique
+  descricao    String?
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  itens    TabelaPrecoItem[]
+  clientes Cliente[]
+
+  @@map("tabelas_preco")
+}
+
+// Preco de um produto dentro de uma tabela. Sem linha aqui, vale Produto.preco.
+model TabelaPrecoItem {
+  id        String  @id @default(uuid())
+  tabelaId  String  @map("tabela_id")
+  produtoId String  @map("produto_id")
+  preco     Decimal @db.Decimal(10, 2)
+
+  tabela  TabelaPreco @relation(fields: [tabelaId], references: [id], onDelete: Cascade)
+  produto Produto     @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+
+  @@unique([tabelaId, produtoId])
+  @@map("tabelas_preco_itens")
+}
+
+// Carteira: quais vendedores atendem o cliente. Vendedor so ve os seus.
+model ClienteVendedor {
+  id          String   @id @default(uuid())
+  clienteId   String   @map("cliente_id")
+  vendedorId  String   @map("vendedor_id")
+  associadoEm DateTime @default(now()) @map("associado_em")
+
+  cliente  Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  vendedor Vendedor @relation(fields: [vendedorId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteId, vendedorId])
+  @@map("clientes_vendedores")
+}
+
 model Pedido {
-  id                 String       @id @default(uuid())
-  numeroPedido       String?      @unique @map("numero_pedido")
-  vendedorId         String       @map("vendedor_id")
-  clienteId          String       @map("cliente_id")
-  localId            String       @map("local_id")
-  dataPedido         DateTime     @default(now()) @map("data_pedido") @db.Date
-  status             StatusPedido @default(RASCUNHO)
-  observacoes        String?
-  subtotal           Decimal      @default(0) @db.Decimal(10, 2)
-  total              Decimal      @default(0) @db.Decimal(10, 2)
-  criadoEm           DateTime     @default(now()) @map("criado_em")
-  confirmadoEm       DateTime?    @map("confirmado_em")
-  canceladoEm        DateTime?    @map("cancelado_em")
-  motivoCancelamento String?      @map("motivo_cancelamento")
-  editadoPorId       String?      @map("editado_por_id")
-  editadoEm          DateTime?    @map("editado_em")
+  id                   String       @id @default(uuid())
+  numeroPedido         String?      @unique @map("numero_pedido")
+  vendedorId           String       @map("vendedor_id")
+  clienteId            String       @map("cliente_id")
+  localId              String       @map("local_id")
+  dataPedido           DateTime     @default(now()) @map("data_pedido") @db.Date
+  status               StatusPedido @default(RASCUNHO)
+  observacoes          String?
+  subtotal             Decimal      @default(0) @db.Decimal(10, 2)
+  total                Decimal      @default(0) @db.Decimal(10, 2)
+  criadoEm             DateTime     @default(now()) @map("criado_em")
+  confirmadoEm         DateTime?    @map("confirmado_em")
+  canceladoEm          DateTime?    @map("cancelado_em")
+  motivoCancelamento   String?      @map("motivo_cancelamento")
+  editadoPorId         String?      @map("editado_por_id")
+  editadoEm            DateTime?    @map("editado_em")
   // Última alteração por qualquer perfil (vendedor ou comercial) após o envio.
   // Separado de editadoPor (que é o marcador de revisão do comercial / "Novo").
-  ultimaAlteracaoPorId String?    @map("ultima_alteracao_por_id")
-  ultimaAlteracaoEm    DateTime?  @map("ultima_alteracao_em")
+  ultimaAlteracaoPorId String?      @map("ultima_alteracao_por_id")
+  ultimaAlteracaoEm    DateTime?    @map("ultima_alteracao_em")
 
-  vendedor         Vendedor     @relation(fields: [vendedorId], references: [id])
-  cliente          Cliente      @relation(fields: [clienteId], references: [id])
-  local            Local        @relation(fields: [localId], references: [id])
-  itens            ItemPedido[]
-  editadoPor       User?        @relation("PedidoEditadoPor", fields: [editadoPorId], references: [id])
-  ultimaAlteracaoPor User?      @relation("PedidoUltimaAlteracao", fields: [ultimaAlteracaoPorId], references: [id])
+  vendedor           Vendedor     @relation(fields: [vendedorId], references: [id])
+  cliente            Cliente      @relation(fields: [clienteId], references: [id])
+  local              Local        @relation(fields: [localId], references: [id])
+  itens              ItemPedido[]
+  editadoPor         User?        @relation("PedidoEditadoPor", fields: [editadoPorId], references: [id])
+  ultimaAlteracaoPor User?        @relation("PedidoUltimaAlteracao", fields: [ultimaAlteracaoPorId], references: [id])
 
   @@map("pedidos")
 }

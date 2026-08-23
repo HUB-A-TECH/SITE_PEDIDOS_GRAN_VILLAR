@@ -10,6 +10,9 @@ import {
   type Produto,
 } from '../../lib/types';
 
+const brl = (v: number) =>
+  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 export function AdminClienteMixPage() {
   const { id = '' } = useParams();
   const [catalogo, setCatalogo] = useState<Produto[]>([]);
@@ -18,12 +21,17 @@ export function AdminClienteMixPage() {
   const [filtro, setFiltro] = useState<Categoria | 'TODAS'>('TODAS');
   const [busca, setBusca] = useState('');
   const [processando, setProcessando] = useState<string | null>(null);
+  // Tabela do cliente + preços dela, para o admin ver o que o vendedor verá.
+  const [tabelaPreco, setTabelaPreco] = useState<{ nome: string } | null>(null);
+  const [precos, setPrecos] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     Promise.all([produtosApi.adminListar(), clientesApi.listarMix(id)])
       .then(([produtos, mix]) => {
         setCatalogo(produtos.filter((p) => p.ativo));
-        setMixIds(new Set(mix.map((m) => m.id)));
+        setMixIds(new Set(mix.produtos.map((m) => m.id)));
+        setTabelaPreco(mix.tabelaPreco);
+        setPrecos(new Map(mix.produtos.map((m) => [m.id, m.preco])));
       })
       .finally(() => setCarregando(false));
   }, [id]);
@@ -41,6 +49,9 @@ export function AdminClienteMixPage() {
       } else {
         await clientesApi.adicionarAoMix(id, produtoId);
         setMixIds((prev) => new Set(prev).add(produtoId));
+        // Busca o preço da tabela do cliente para o item recém-incluído.
+        const atualizado = await clientesApi.listarMix(id);
+        setPrecos(new Map(atualizado.produtos.map((m) => [m.id, m.preco])));
       }
     } finally {
       setProcessando(null);
@@ -64,6 +75,13 @@ export function AdminClienteMixPage() {
       <p className="mb-3 text-sm text-slate-600">
         Marque quais produtos este cliente compra. Só os do mix aparecem para o
         vendedor.
+      </p>
+
+      <p className="mb-3 rounded-lg bg-brand-50 p-3 text-sm text-brand-800">
+        Preços deste cliente:{' '}
+        <span className="font-semibold">
+          {tabelaPreco?.nome ?? 'sem tabela (preço do catálogo)'}
+        </span>
       </p>
 
       <input
@@ -104,6 +122,11 @@ export function AdminClienteMixPage() {
                   <p className="text-xs text-slate-500">
                     {p.codigo} · {CATEGORIA_LABEL[p.categoria]}
                   </p>
+                  {noMix && precos.has(p.id) && (
+                    <p className="text-xs font-medium text-brand-700">
+                      {brl(precos.get(p.id)!)}
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={() => alternar(p.id, noMix)}

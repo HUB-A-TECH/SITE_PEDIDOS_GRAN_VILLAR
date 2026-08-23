@@ -4,7 +4,13 @@ import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
 import * as clientesApi from '../../lib/clientesApi';
-import type { Cliente, Local } from '../../lib/types';
+import * as tabelasApi from '../../lib/tabelasApi';
+import type {
+  ClienteCompleto,
+  Local,
+  TabelaPreco,
+  VendedorOpcao,
+} from '../../lib/types';
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500';
@@ -13,17 +19,26 @@ export function AdminClientesPage() {
   const navigate = useNavigate();
   const [locais, setLocais] = useState<Local[]>([]);
   const [localId, setLocalId] = useState('');
-  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clientes, setClientes] = useState<ClienteCompleto[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const [editando, setEditando] = useState<Cliente | null>(null);
+  const [editando, setEditando] = useState<ClienteCompleto | null>(null);
   const [modalAberto, setModalAberto] = useState(false);
+  const [tabelas, setTabelas] = useState<TabelaPreco[]>([]);
+  const [vendedores, setVendedores] = useState<VendedorOpcao[]>([]);
 
   useEffect(() => {
     clientesApi.listarLocais().then((ls) => {
       setLocais(ls);
       if (ls.length > 0) setLocalId(ls[0].id);
     });
+    tabelasApi.listar().then(setTabelas);
   }, []);
+
+  // Vendedores do cadastro são os da filial selecionada.
+  useEffect(() => {
+    if (!localId) return;
+    clientesApi.adminListarVendedores(localId).then(setVendedores);
+  }, [localId]);
 
   async function carregar(id: string) {
     if (!id) return;
@@ -42,7 +57,7 @@ export function AdminClientesPage() {
     setEditando(null);
     setModalAberto(true);
   }
-  function abrirEdicao(c: Cliente) {
+  function abrirEdicao(c: ClienteCompleto) {
     setEditando(c);
     setModalAberto(true);
   }
@@ -99,6 +114,16 @@ export function AdminClientesPage() {
                     {c.nomeFantasia ? `${c.nomeFantasia} · ` : ''}
                     {c.codigo}
                   </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    <span className="rounded bg-brand-50 px-1.5 py-0.5 font-medium text-brand-700">
+                      {c.tabelaPreco?.nome ?? 'Sem tabela de preço'}
+                    </span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {c.vendedores.length === 0
+                      ? 'Sem vendedor responsável — ninguém vê este cliente'
+                      : `Vendedor: ${c.vendedores.map((v) => v.nomeCompleto).join(', ')}`}
+                  </p>
                 </div>
                 <button
                   onClick={() => abrirEdicao(c)}
@@ -126,6 +151,8 @@ export function AdminClientesPage() {
         <ClienteForm
           cliente={editando}
           localId={localId}
+          tabelas={tabelas}
+          vendedores={vendedores}
           onSalvar={aoSalvar}
         />
       </Modal>
@@ -136,10 +163,14 @@ export function AdminClientesPage() {
 function ClienteForm({
   cliente,
   localId,
+  tabelas,
+  vendedores,
   onSalvar,
 }: {
-  cliente: Cliente | null;
+  cliente: ClienteCompleto | null;
   localId: string;
+  tabelas: TabelaPreco[];
+  vendedores: VendedorOpcao[];
   onSalvar: () => void;
 }) {
   const [codigo, setCodigo] = useState(cliente?.codigo ?? '');
@@ -147,9 +178,25 @@ function ClienteForm({
   const [nomeFantasia, setNomeFantasia] = useState(cliente?.nomeFantasia ?? '');
   const [cnpj, setCnpj] = useState(cliente?.cnpj ?? '');
   const [telefone, setTelefone] = useState(cliente?.telefone ?? '');
+  const [nomeComprador, setNomeComprador] = useState(cliente?.nomeComprador ?? '');
+  const [telefoneComprador, setTelefoneComprador] = useState(
+    cliente?.telefoneComprador ?? '',
+  );
+  const [tabelaPrecoId, setTabelaPrecoId] = useState(
+    cliente?.tabelaPrecoId ?? tabelas[0]?.id ?? '',
+  );
+  const [vendedorIds, setVendedorIds] = useState<string[]>(
+    cliente?.vendedores.map((v) => v.id) ?? [],
+  );
   const [ativo, setAtivo] = useState(cliente?.ativo ?? true);
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
+
+  function alternarVendedor(id: string) {
+    setVendedorIds((atual) =>
+      atual.includes(id) ? atual.filter((v) => v !== id) : [...atual, id],
+    );
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -162,6 +209,10 @@ function ClienteForm({
         nomeFantasia: nomeFantasia.trim() || undefined,
         cnpj: cnpj.trim() || undefined,
         telefone: telefone.trim() || undefined,
+        nomeComprador: nomeComprador.trim() || undefined,
+        telefoneComprador: telefoneComprador.trim() || undefined,
+        tabelaPrecoId: tabelaPrecoId || undefined,
+        vendedorIds,
       };
       if (cliente) {
         await clientesApi.adminAtualizar(cliente.id, { ...dados, ativo });
@@ -221,6 +272,70 @@ function ClienteForm({
           />
         </Campo>
       </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Campo label="Nome do comprador (opcional)">
+          <input
+            value={nomeComprador}
+            onChange={(e) => setNomeComprador(e.target.value)}
+            className={inputCls}
+          />
+        </Campo>
+        <Campo label="Telefone do comprador (opcional)">
+          <input
+            value={telefoneComprador}
+            onChange={(e) => setTelefoneComprador(e.target.value)}
+            className={inputCls}
+          />
+        </Campo>
+      </div>
+
+      <Campo label="Tabela de preço">
+        <select
+          value={tabelaPrecoId}
+          onChange={(e) => setTabelaPrecoId(e.target.value)}
+          className={inputCls}
+        >
+          {tabelas.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.nome}
+            </option>
+          ))}
+          <option value="">Sem tabela (usa o preço do catálogo)</option>
+        </select>
+      </Campo>
+
+      <fieldset>
+        <legend className="mb-1 block text-sm font-medium text-slate-700">
+          Vendedores responsáveis
+        </legend>
+        {vendedores.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Nenhum vendedor cadastrado nesta filial.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {vendedores.map((v) => (
+              <label
+                key={v.id}
+                className="flex items-center gap-2 text-sm text-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={vendedorIds.includes(v.id)}
+                  onChange={() => alternarVendedor(v.id)}
+                />
+                {v.nomeCompleto}
+              </label>
+            ))}
+          </div>
+        )}
+        {vendedorIds.length === 0 && vendedores.length > 0 && (
+          <p className="mt-1 text-xs text-brandYellow-800">
+            Sem nenhum marcado, nenhum vendedor verá este cliente.
+          </p>
+        )}
+      </fieldset>
 
       {cliente && (
         <label className="flex items-center gap-2 text-sm text-slate-700">

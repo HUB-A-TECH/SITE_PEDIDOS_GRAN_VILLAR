@@ -121,13 +121,16 @@ function calcularSubtotal(quantidade: number, preco: number): number {
   return Math.round(quantidade * preco * 100) / 100;
 }
 
-/** Define a quantidade de um produto no pedido (cria ou atualiza o item). */
+/**
+ * Define a quantidade de um produto no pedido (cria ou atualiza o item).
+ * O preço vem de fora (tabela de preço do cliente), nunca do catálogo direto.
+ */
 export async function definirItem(
   pedidoId: string,
   produto: Produto,
   quantidade: number,
+  preco: number,
 ): Promise<void> {
-  const preco = Number(produto.preco);
   const subtotal = calcularSubtotal(quantidade, preco);
   const existente = await prisma.itemPedido.findFirst({
     where: { pedidoId, produtoId: produto.id },
