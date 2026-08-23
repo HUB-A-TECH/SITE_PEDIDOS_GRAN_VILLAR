@@ -70,16 +70,34 @@ export async function historicoPorProduto(
  * cancelados), mais recentes primeiro. Ordena por criadoEm pois rascunhos
  * ainda não têm confirmadoEm.
  */
-export function meusPedidos(vendedorId: string, limite?: number) {
-  return prisma.pedido.findMany({
-    where: { vendedorId },
-    include: {
-      cliente: { select: { id: true, codigo: true, nome: true } },
-      editadoPor: { select: { username: true } },
-      ultimaAlteracaoPor: { select: { username: true } },
-      _count: { select: { itens: true } },
-    },
-    orderBy: { criadoEm: 'desc' },
-    ...(limite ? { take: limite } : {}),
-  });
+const meuPedidoInclude = {
+  cliente: { select: { id: true, codigo: true, nome: true } },
+  editadoPor: { select: { username: true } },
+  ultimaAlteracaoPor: { select: { username: true } },
+  _count: { select: { itens: true } },
+} as const;
+
+/**
+ * Pedidos do vendedor para a tela "Meus Pedidos".
+ *
+ * Os ainda não enviados (RASCUNHO) vêm SEMPRE, todos, independentemente do
+ * filtro de período: são os que esperam ação do vendedor, e sumir da lista por
+ * causa do filtro é justamente como um pedido acabaria esquecido sem nunca
+ * chegar ao comercial. O limite vale só para os já resolvidos.
+ */
+export async function meusPedidos(vendedorId: string, limite?: number) {
+  const [aConfirmar, resolvidos] = await Promise.all([
+    prisma.pedido.findMany({
+      where: { vendedorId, status: 'RASCUNHO' },
+      include: meuPedidoInclude,
+      orderBy: { criadoEm: 'desc' },
+    }),
+    prisma.pedido.findMany({
+      where: { vendedorId, status: { in: ['CONFIRMADO', 'CANCELADO'] } },
+      include: meuPedidoInclude,
+      orderBy: { criadoEm: 'desc' },
+      ...(limite ? { take: limite } : {}),
+    }),
+  ]);
+  return [...aConfirmar, ...resolvidos];
 }
