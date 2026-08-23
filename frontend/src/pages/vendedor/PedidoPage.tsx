@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
@@ -108,14 +108,57 @@ export function PedidoPage() {
     });
   }, [produtos, categoria, busca]);
 
-  /** Enter no campo de quantidade pula pro próximo produto da lista visível. */
+  /** Folga entre a base do cabeçalho e o topo do card, ao pular de produto. */
+  const FOLGA_APOS_CABECALHO = 12;
+
+  /**
+   * Produto que precisa ser realinhado quando o salvamento terminar. O card
+   * recém-preenchido muda de altura quando o servidor responde (aparece o
+   * subtotal), o que empurra a lista depois de já termos rolado.
+   */
+  const realinharAoSalvar = useRef<string | null>(null);
+
+  /** Rola deixando o card do produto encostado embaixo do cabeçalho fixo. */
+  function alinharCardNoTopo(produtoId: string) {
+    const card = document.getElementById(`prod-${produtoId}`);
+    if (!card) return;
+    // Medido na hora, e não fixado em CSS, porque o cabeçalho muda de altura:
+    // com nome de cliente comprido o título quebra em duas linhas, e um recuo
+    // fixo deixaria o card escondido atrás dele.
+    const alturaCabecalho =
+      document.querySelector('header')?.getBoundingClientRect().height ?? 0;
+    const destino =
+      card.getBoundingClientRect().top +
+      window.scrollY -
+      alturaCabecalho -
+      FOLGA_APOS_CABECALHO;
+    // Instantâneo (e não 'smooth') de propósito: o vendedor dispara Enter em
+    // sequência, e uma animação interrompida pela próxima pode parar no meio
+    // do caminho. Assim o card cai sempre no mesmo lugar.
+    window.scrollTo({ top: Math.max(0, destino) });
+  }
+
+  /**
+   * Enter no campo de quantidade: pula pro próximo produto da lista visível e
+   * rola a tela deixando o card dele no TOPO, logo abaixo do cabeçalho fixo.
+   *
+   * A altura do cabeçalho é medida na hora, e não fixada em CSS, porque ela
+   * muda: com nome de cliente comprido o título quebra em duas linhas e um
+   * recuo fixo deixaria o card escondido atrás do cabeçalho.
+   */
   function focarProximoProduto(produtoId: string) {
     const indice = visiveis.findIndex((p) => p.id === produtoId);
     const proximo = visiveis[indice + 1];
     if (!proximo) return;
+
     const input = document.getElementById(`qtd-${proximo.id}`) as HTMLInputElement | null;
-    input?.focus();
+    // preventScroll: sem isso o navegador faz o scroll dele primeiro (deixando
+    // o campo rente ao teclado) e briga com o posicionamento abaixo.
+    input?.focus({ preventScroll: true });
     input?.select();
+
+    alinharCardNoTopo(proximo.id);
+    realinharAoSalvar.current = proximo.id;
   }
 
   async function definirQuantidade(produtoId: string, quantidade: number) {
@@ -139,6 +182,15 @@ export function PedidoPage() {
         n.delete(produtoId);
         return n;
       });
+      // Só realinha se o pulo veio de um Enter — editar um campo solto não
+      // deve mover a tela por conta própria.
+      const alvo = realinharAoSalvar.current;
+      if (alvo) {
+        realinharAoSalvar.current = null;
+        // setTimeout(0): espera o React aplicar o novo tamanho do card antes
+        // de medir de novo.
+        window.setTimeout(() => alinharCardNoTopo(alvo), 0);
+      }
     }
   }
 
@@ -156,6 +208,15 @@ export function PedidoPage() {
         n.delete(produtoId);
         return n;
       });
+      // Só realinha se o pulo veio de um Enter — editar um campo solto não
+      // deve mover a tela por conta própria.
+      const alvo = realinharAoSalvar.current;
+      if (alvo) {
+        realinharAoSalvar.current = null;
+        // setTimeout(0): espera o React aplicar o novo tamanho do card antes
+        // de medir de novo.
+        window.setTimeout(() => alinharCardNoTopo(alvo), 0);
+      }
     }
   }
 
@@ -246,7 +307,7 @@ export function PedidoPage() {
               <li
                 key={p.id}
                 id={`prod-${p.id}`}
-                className={`scroll-mt-20 rounded-xl bg-white p-4 shadow-sm transition ${
+                className={`rounded-xl bg-white p-4 shadow-sm transition ${
                   qtd > 0 ? 'ring-1 ring-brand-300' : ''
                 }`}
               >
