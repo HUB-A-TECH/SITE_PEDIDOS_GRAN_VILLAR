@@ -36,6 +36,47 @@ export interface MixProduto {
   nome: string;
   categoria: Categoria;
   ativo: boolean;
+  // Preço que o vendedor vê: vem da tabela de preço do cliente.
+  preco: number;
+}
+
+// ---- Tabelas de preço ----
+
+export interface TabelaPreco {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  ativo: boolean;
+  totalClientes?: number;
+}
+
+/** Produto dentro de uma tabela. `definido` = a tabela tem preço próprio. */
+export interface TabelaProduto {
+  id: string;
+  codigo: string;
+  nome: string;
+  categoria: Categoria;
+  unidadeMedida: string;
+  preco: number;
+  precoCatalogo: number;
+  definido: boolean;
+}
+
+export interface TabelaDetalhe {
+  tabela: TabelaPreco;
+  clientes: {
+    id: string;
+    codigo: string;
+    nome: string;
+    nomeFantasia: string | null;
+    ativo: boolean;
+  }[];
+  produtos: TabelaProduto[];
+}
+
+export interface VendedorOpcao {
+  id: string;
+  nomeCompleto: string;
 }
 
 export interface Cliente {
@@ -47,8 +88,17 @@ export interface Cliente {
   email: string | null;
   telefone: string | null;
   endereco: string | null;
+  nomeComprador: string | null;
+  telefoneComprador: string | null;
   localId: string;
+  tabelaPrecoId: string | null;
   ativo: boolean;
+}
+
+/** Cliente com os vínculos — só o admin recebe esta versão. */
+export interface ClienteCompleto extends Cliente {
+  tabelaPreco: { id: string; nome: string } | null;
+  vendedores: VendedorOpcao[];
 }
 
 export interface Local {

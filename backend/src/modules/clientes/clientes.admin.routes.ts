@@ -11,6 +11,8 @@ clientesAdminRoutes.use(
   authorize('ADMIN_COMERCIAL', 'ADMIN_TI'),
 );
 clientesAdminRoutes.get('/', asyncHandler(controller.adminListar));
+// Antes de qualquer rota /:id — senão 'vendedores' seria lido como um id.
+clientesAdminRoutes.get('/vendedores', asyncHandler(controller.adminVendedores));
 clientesAdminRoutes.post('/', asyncHandler(controller.adminCriar));
 clientesAdminRoutes.put('/:id', asyncHandler(controller.adminAtualizar));
 

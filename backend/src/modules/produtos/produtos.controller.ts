@@ -2,25 +2,28 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { Categoria, type Produto } from '@prisma/client';
 import * as service from './produtos.service';
+import * as precos from '../precos/precos.service';
+import * as carteira from '../../lib/carteira';
 import { isUniqueConstraintError, isNotFoundError } from '../../utils/prisma-errors';
 
 const categoriaEnum = z.nativeEnum(Categoria);
 const unidadeEnum = z.enum(['UND', 'KG', 'G', 'ML', 'L']);
 
-function serialize(p: Produto) {
+// Atenção: nunca usar `.map(serialize)` — o índice do map viraria o preço.
+function serialize(p: Produto, preco = Number(p.preco)) {
   return {
     id: p.id,
     codigo: p.codigo,
     nome: p.nome,
     categoria: p.categoria,
     descricao: p.descricao,
-    preco: Number(p.preco),
+    preco,
     unidadeMedida: p.unidadeMedida,
     ativo: p.ativo,
   };
 }
 
-/** Garante que o vendedor só acesse clientes do próprio local. */
+/** Garante que o vendedor só acesse clientes da própria carteira. */
 async function resolverClienteAcessivel(
   req: Request,
   clienteId: string,
@@ -29,8 +32,11 @@ async function resolverClienteAcessivel(
   if (!cliente || !cliente.ativo) {
     return { ok: false, status: 404, msg: 'Cliente não encontrado' };
   }
-  if (req.user!.type === 'VENDEDOR' && cliente.localId !== req.user!.localId) {
-    return { ok: false, status: 403, msg: 'Cliente pertence a outro local' };
+  if (req.user!.type === 'VENDEDOR') {
+    const atende = await carteira.vendedorAtendeCliente(req.user!.sub, cliente.id);
+    if (!atende) {
+      return { ok: false, status: 403, msg: 'Cliente não está na sua carteira' };
+    }
   }
   return { ok: true };
 }
@@ -54,7 +60,10 @@ export async function listarPorMix(req: Request, res: Response): Promise<void> {
     parsed.data.cliente_id,
     parsed.data.categoria,
   );
-  res.json({ produtos: produtos.map(serialize) });
+  const mapa = await precos.mapaPrecosDoCliente(parsed.data.cliente_id);
+  res.json({
+    produtos: produtos.map((p) => serialize(p, precos.precoEfetivo(p, mapa))),
+  });
 }
 
 export async function buscar(req: Request, res: Response): Promise<void> {
@@ -73,7 +82,10 @@ export async function buscar(req: Request, res: Response): Promise<void> {
     return;
   }
   const produtos = await service.buscarNoMix(parsed.data.cliente_id, parsed.data.termo);
-  res.json({ produtos: produtos.map(serialize) });
+  const mapa = await precos.mapaPrecosDoCliente(parsed.data.cliente_id);
+  res.json({
+    produtos: produtos.map((p) => serialize(p, precos.precoEfetivo(p, mapa))),
+  });
 }
 
 export function categorias(_req: Request, res: Response): void {
@@ -109,7 +121,7 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
     categoria: parsed.data.categoria,
     ativo: parsed.data.ativo ? parsed.data.ativo === 'true' : undefined,
   });
-  res.json({ produtos: produtos.map(serialize) });
+  res.json({ produtos: produtos.map((p) => serialize(p)) });
 }
 
 export async function adminCriar(req: Request, res: Response): Promise<void> {
