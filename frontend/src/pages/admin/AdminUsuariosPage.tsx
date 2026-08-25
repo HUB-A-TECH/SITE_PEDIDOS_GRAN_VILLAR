@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
+import { Aviso } from '../../components/Aviso';
 import * as usuariosApi from '../../lib/usuariosApi';
 import type { Usuario } from '../../lib/usuariosApi';
 import { listarLocais } from '../../lib/clientesApi';
@@ -237,7 +238,11 @@ export function AdminUsuariosPage() {
             onChange={(v) => setForm({ ...form, senha: v })}
           />
 
-          {erro && <p className="text-sm text-red-600">{erro}</p>}
+          {erro && (
+            <Aviso tom="erro" compacto>
+              {erro}
+            </Aviso>
+          )}
 
           <button
             onClick={salvar}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
+import { Aviso } from '../../components/Aviso';
 import * as historicoApi from '../../lib/historicoApi';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { MeuPedido } from '../../lib/historicoApi';
@@ -253,15 +254,17 @@ export function MeusPedidosPage() {
       </div>
 
       {totalAConfirmar > 0 && (
-        <p className="mb-4 rounded-lg bg-brandYellow-50 p-3 text-sm text-brandYellow-800 ring-1 ring-inset ring-brandYellow-300">
-          <strong>
-            {totalAConfirmar === 1
+        <Aviso
+          tom="atencao"
+          className="mb-4"
+          titulo={
+            totalAConfirmar === 1
               ? '1 pedido aguardando sua confirmação'
-              : `${totalAConfirmar} pedidos aguardando sua confirmação`}
-          </strong>
-          <br />
+              : `${totalAConfirmar} pedidos aguardando sua confirmação`
+          }
+        >
           Enquanto não confirmar, a administração não recebe.
-        </p>
+        </Aviso>
       )}
 
       {carregando ? (

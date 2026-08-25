@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
+import { Aviso } from '../../components/Aviso';
 import * as clientesApi from '../../lib/clientesApi';
 import * as produtosApi from '../../lib/produtosApi';
 import {
@@ -72,17 +73,14 @@ export function AdminClienteMixPage() {
 
   return (
     <AppLayout titulo="Mix do Cliente" voltarPara="/admin/clientes">
-      <p className="mb-3 text-sm text-slate-600">
+      <Aviso className="mb-3">
         Marque quais produtos este cliente compra. Só os do mix aparecem para o
         vendedor.
-      </p>
+      </Aviso>
 
-      <p className="mb-3 rounded-lg bg-brand-50 p-3 text-sm text-brand-800">
-        Preços deste cliente:{' '}
-        <span className="font-semibold">
-          {tabelaPreco?.nome ?? 'sem tabela (preço do catálogo)'}
-        </span>
-      </p>
+      <Aviso tom="dica" className="mb-3" titulo="Preços deste cliente">
+        {tabelaPreco?.nome ?? 'Sem tabela — usando o preço do catálogo'}
+      </Aviso>
 
       <input
         type="search"

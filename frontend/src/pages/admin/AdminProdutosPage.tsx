@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
+import { Aviso } from '../../components/Aviso';
 import * as produtosApi from '../../lib/produtosApi';
 import {
   CATEGORIAS,
@@ -273,7 +274,11 @@ function ProdutoForm({
         </label>
       )}
 
-      {erro && <p className="text-sm text-red-600">{erro}</p>}
+      {erro && (
+        <Aviso tom="erro" compacto>
+          {erro}
+        </Aviso>
+      )}
 
       <button
         type="submit"

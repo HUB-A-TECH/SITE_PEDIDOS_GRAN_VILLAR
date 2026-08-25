@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
 import { CampoQuantidade, PrecoItem } from '../../components/ItemEditors';
+import { Aviso } from '../../components/Aviso';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { Pedido } from '../../lib/pedidosApi';
 import * as produtosApi from '../../lib/produtosApi';
@@ -435,17 +436,17 @@ export function PedidoPage() {
         </div>
 
         {jaEnviado ? (
-          <div className="mt-4 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
-            💡 Este pedido já foi enviado à administração. As alterações que você
+          <Aviso tom="dica" className="mt-4">
+            Este pedido já foi enviado à administração. As alterações que você
             fizer aqui são salvas automaticamente.
-          </div>
+          </Aviso>
         ) : (
-          <div className="mt-4 rounded-lg bg-brand-50 p-3 text-xs text-brand-800">
-            💡 O pedido é salvo automaticamente e ainda <strong>não</strong> foi
-            para a administração. Ele fica em <strong>Meus Pedidos</strong>, na
-            seção <strong>A confirmar</strong> — é de lá que você envia quando
+          <Aviso tom="dica" titulo="Salvo automaticamente" className="mt-4">
+            Este pedido ainda <strong>não</strong> foi para a administração. Ele
+            fica em <strong>Meus Pedidos</strong>, na seção{' '}
+            <strong>A confirmar</strong> — é de lá que você envia quando
             terminar a visita.
-          </div>
+          </Aviso>
         )}
 
         {!jaEnviado && (
