@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
+import { Aviso } from '../../components/Aviso';
 import * as tabelasApi from '../../lib/tabelasApi';
 import {
   CATEGORIAS,
@@ -98,23 +99,29 @@ export function AdminTabelaDetalhePage() {
       }
     >
       {!dados.tabela.ativo && (
-        <p className="mb-3 rounded-lg bg-slate-200 p-3 text-sm text-slate-600">
-          Tabela desativada — não aparece para escolher no cadastro de cliente.
-          Quem já está nela continua usando estes preços.
-        </p>
+        <Aviso className="mb-3" titulo="Tabela desativada">
+          Não aparece para escolher no cadastro de cliente. Quem já está nela
+          continua usando estes preços.
+        </Aviso>
       )}
-      <button
-        onClick={() => setMostrarClientes((v) => !v)}
-        className="mb-3 w-full rounded-lg bg-brandYellow-50 p-3 text-left text-sm text-slate-700 ring-1 ring-inset ring-brandYellow-300"
+
+      <Aviso
+        tom="atencao"
+        className="mb-3"
+        titulo={`Mudar um preço aqui afeta ${
+          totalClientes === 1 ? '1 cliente' : `${totalClientes} clientes`
+        }.`}
+        acao={
+          <button
+            onClick={() => setMostrarClientes((v) => !v)}
+            className="font-medium underline decoration-dotted"
+          >
+            {mostrarClientes ? 'ocultar a lista' : 'ver quais'}
+          </button>
+        }
       >
-        <span className="font-semibold">
-          Mudar um preço aqui afeta{' '}
-          {totalClientes === 1 ? '1 cliente' : `${totalClientes} clientes`}.
-        </span>{' '}
-        <span className="text-slate-500 underline decoration-dotted">
-          {mostrarClientes ? 'ocultar' : 'ver quais'}
-        </span>
-      </button>
+        O novo preço passa a valer na hora para todos eles.
+      </Aviso>
 
       {mostrarClientes && (
         <ul className="mb-3 space-y-1 rounded-lg bg-white p-3 shadow-sm">
@@ -271,7 +278,11 @@ function TabelaEditForm({
         Ativa (aparece para escolher no cadastro de cliente)
       </label>
 
-      {erro && <p className="text-sm text-red-600">{erro}</p>}
+      {erro && (
+        <Aviso tom="erro" compacto>
+          {erro}
+        </Aviso>
+      )}
 
       <button
         type="submit"

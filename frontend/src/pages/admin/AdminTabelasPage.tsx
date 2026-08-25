@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
+import { Aviso } from '../../components/Aviso';
 import * as tabelasApi from '../../lib/tabelasApi';
 import type { TabelaPreco } from '../../lib/types';
 
@@ -47,10 +48,10 @@ export function AdminTabelasPage() {
         </button>
       }
     >
-      <p className="mb-4 rounded-lg bg-slate-100 p-3 text-sm text-slate-600">
+      <Aviso className="mb-4">
         Cada cliente usa uma tabela. Ao mudar um preço aqui, ele muda para todos
         os clientes daquela tabela.
-      </p>
+      </Aviso>
 
       {carregando ? (
         <p className="text-center text-slate-500">Carregando…</p>
@@ -186,7 +187,11 @@ function TabelaForm({
         </span>
       </label>
 
-      {erro && <p className="text-sm text-red-600">{erro}</p>}
+      {erro && (
+        <Aviso tom="erro" compacto>
+          {erro}
+        </Aviso>
+      )}
 
       <button
         type="submit"

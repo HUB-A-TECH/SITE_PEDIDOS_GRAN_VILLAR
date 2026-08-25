@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
+import { Aviso } from '../../components/Aviso';
 import * as clientesApi from '../../lib/clientesApi';
 import * as tabelasApi from '../../lib/tabelasApi';
 import type {
@@ -331,9 +332,9 @@ function ClienteForm({
           </div>
         )}
         {vendedorIds.length === 0 && vendedores.length > 0 && (
-          <p className="mt-1 text-xs text-brandYellow-800">
+          <Aviso tom="atencao" compacto className="mt-2">
             Sem nenhum marcado, nenhum vendedor verá este cliente.
-          </p>
+          </Aviso>
         )}
       </fieldset>
 
@@ -348,7 +349,11 @@ function ClienteForm({
         </label>
       )}
 
-      {erro && <p className="text-sm text-red-600">{erro}</p>}
+      {erro && (
+        <Aviso tom="erro" compacto>
+          {erro}
+        </Aviso>
+      )}
 
       <button
         type="submit"

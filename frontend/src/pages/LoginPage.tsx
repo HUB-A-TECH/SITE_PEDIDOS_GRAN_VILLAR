@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Aviso } from '../components/Aviso';
 
 export function LoginPage() {
   const { login, usuario, carregando } = useAuth();
@@ -86,7 +87,11 @@ export function LoginPage() {
             />
           </div>
 
-          {erro && <p className="text-sm text-red-600">{erro}</p>}
+          {erro && (
+            <Aviso tom="erro" compacto>
+              {erro}
+            </Aviso>
+          )}
 
           <button
             type="submit"
