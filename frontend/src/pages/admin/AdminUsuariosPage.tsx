@@ -3,6 +3,7 @@ import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
 import { Aviso } from '../../components/Aviso';
+import { useDialogo } from '../../context/DialogoContext';
 import * as usuariosApi from '../../lib/usuariosApi';
 import type { Usuario } from '../../lib/usuariosApi';
 import { listarLocais } from '../../lib/clientesApi';
@@ -31,6 +32,7 @@ const FORM_VAZIO = {
 };
 
 export function AdminUsuariosPage() {
+  const dialogo = useDialogo();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [locais, setLocais] = useState<Local[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -90,32 +92,66 @@ export function AdminUsuariosPage() {
   }
 
   async function toggleAtivo(u: Usuario) {
-    const acao = u.ativo ? 'desativar' : 'reativar';
-    if (!confirm(`Deseja ${acao} o usuário "${u.username}"?`)) return;
+    const desativando = u.ativo;
+    const ok = await dialogo.confirmar({
+      titulo: desativando ? 'Desativar usuário' : 'Reativar usuário',
+      destrutivo: desativando,
+      textoConfirmar: desativando ? 'Desativar' : 'Reativar',
+      mensagem: desativando ? (
+        <>
+          <strong>{u.username}</strong> perde o acesso na hora, mesmo se estiver
+          usando o sistema neste momento.
+        </>
+      ) : (
+        <>
+          <strong>{u.username}</strong> volta a poder entrar no sistema.
+        </>
+      ),
+    });
+    if (!ok) return;
     try {
       await usuariosApi.alterarAtivo(u.id, !u.ativo);
       carregar();
     } catch (e) {
-      alert(
-        axios.isAxiosError(e) && e.response?.data?.mensagem
-          ? e.response.data.mensagem
-          : 'Não foi possível alterar.',
-      );
+      await dialogo.avisar({
+        titulo: 'Não foi possível alterar',
+        tom: 'erro',
+        mensagem:
+          axios.isAxiosError(e) && e.response?.data?.mensagem
+            ? e.response.data.mensagem
+            : 'Tente novamente em alguns instantes.',
+      });
     }
   }
 
   async function resetarSenha(u: Usuario) {
-    const senha = prompt(`Nova senha para "${u.username}" (mín. 6 caracteres):`);
-    if (!senha) return;
-    if (senha.length < 6) {
-      alert('A senha deve ter ao menos 6 caracteres.');
-      return;
-    }
+    const senha = await dialogo.pedirTexto({
+      titulo: `Nova senha de ${u.username}`,
+      rotulo: 'Nova senha',
+      tipo: 'password',
+      mensagem:
+        'A senha é gravada criptografada — nem o sistema consegue lê-la depois. Anote antes de confirmar.',
+      validar: (v) =>
+        v.length < 6 ? 'A senha deve ter ao menos 6 caracteres.' : null,
+    });
+    if (senha === null) return;
     try {
       await usuariosApi.resetarSenha(u.id, senha);
-      alert('Senha atualizada com sucesso.');
+      await dialogo.avisar({
+        titulo: 'Senha atualizada',
+        tom: 'dica',
+        mensagem: (
+          <>
+            <strong>{u.username}</strong> já pode entrar com a senha nova.
+          </>
+        ),
+      });
     } catch {
-      alert('Não foi possível alterar a senha.');
+      await dialogo.avisar({
+        titulo: 'Não foi possível alterar a senha',
+        tom: 'erro',
+        mensagem: 'Tente novamente em alguns instantes.',
+      });
     }
   }
 
