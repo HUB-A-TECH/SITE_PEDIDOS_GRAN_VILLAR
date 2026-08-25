@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
 import { CampoQuantidade, PrecoItem } from '../../components/ItemEditors';
 import { Aviso } from '../../components/Aviso';
+import { useDialogo } from '../../context/DialogoContext';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { Pedido } from '../../lib/pedidosApi';
 import * as produtosApi from '../../lib/produtosApi';
@@ -27,6 +28,7 @@ function diaMes(iso: string): string {
 export function PedidoPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const dialogo = useDialogo();
   const [pedido, setPedido] = useState<Pedido | null>(null);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -226,7 +228,18 @@ export function PedidoPage() {
 
   async function descartar() {
     if (!pedido) return;
-    if (!confirm('Descartar este pedido salvo? Esta ação não pode ser desfeita.')) return;
+    const ok = await dialogo.confirmar({
+      titulo: 'Descartar pedido',
+      destrutivo: true,
+      textoConfirmar: 'Sim, descartar',
+      mensagem: (
+        <>
+          Todo o pedido salvo para <strong>{pedido.cliente.nome}</strong> será
+          apagado. <strong>Esta ação não pode ser desfeita.</strong>
+        </>
+      ),
+    });
+    if (!ok) return;
     await pedidosApi.descartar(pedido.id);
     navigate('/meus-pedidos', { replace: true });
   }

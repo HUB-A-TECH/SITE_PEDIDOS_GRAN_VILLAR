@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Aviso } from '../../components/Aviso';
+import { useDialogo } from '../../context/DialogoContext';
 import * as historicoApi from '../../lib/historicoApi';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { MeuPedido } from '../../lib/historicoApi';
@@ -28,6 +29,7 @@ function dentroDaJanela(iso: string): boolean {
 }
 
 export function MeusPedidosPage() {
+  const dialogo = useDialogo();
   const [limite, setLimite] = useState<Limite>(12);
   const [pedidos, setPedidos] = useState<MeuPedido[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -71,27 +73,43 @@ export function MeusPedidosPage() {
 
   /** Envia o pedido para a administração. Antes disso, só o vendedor o vê. */
   async function confirmarEnvio(p: MeuPedido) {
-    if (
-      !confirm(
-        `Enviar o pedido de ${p.cliente.nome} para a administração?
+    const ok = await dialogo.confirmar({
+      titulo: 'Enviar para a administração',
+      textoConfirmar: 'Enviar',
+      mensagem: (
+        <>
+          <strong>{p.cliente.nome}</strong> ·{' '}
+          {p.itensCount === 1 ? '1 item' : `${p.itensCount} itens`} ·{' '}
+          {brl(p.total)}
+          <br />
+          Depois de enviado, o pedido entra na fila de revisão.
+        </>
+      ),
+    });
+    if (!ok) return;
 
-` +
-          `${p.itensCount} itens · ${brl(p.total)}`,
-      )
-    ) {
-      return;
-    }
     setProcessando(p.pedidoId);
     try {
       const { numeroPedido } = await pedidosApi.confirmar(p.pedidoId);
-      alert(`Pedido ${numeroPedido} enviado à administração.`);
       carregar();
+      await dialogo.avisar({
+        titulo: 'Pedido enviado',
+        tom: 'dica',
+        mensagem: (
+          <>
+            Pedido <strong>{numeroPedido}</strong> enviado à administração.
+          </>
+        ),
+      });
     } catch (e) {
-      if (axios.isAxiosError(e) && e.response?.data?.mensagem) {
-        alert(e.response.data.mensagem);
-      } else {
-        alert('Não foi possível enviar o pedido.');
-      }
+      await dialogo.avisar({
+        titulo: 'Não foi possível enviar',
+        tom: 'erro',
+        mensagem:
+          axios.isAxiosError(e) && e.response?.data?.mensagem
+            ? e.response.data.mensagem
+            : 'Tente novamente em alguns instantes.',
+      });
     } finally {
       setProcessando(null);
     }
@@ -107,20 +125,42 @@ export function MeusPedidosPage() {
   }
 
   async function cancelar(p: MeuPedido) {
-    if (!confirm(`Cancelar o pedido ${p.numeroPedido}? Esta ação não pode ser desfeita.`)) {
-      return;
-    }
-    const motivo = prompt('Motivo do cancelamento (opcional):') ?? undefined;
+    const ok = await dialogo.confirmar({
+      titulo: 'Cancelar pedido',
+      destrutivo: true,
+      textoConfirmar: 'Sim, cancelar',
+      mensagem: (
+        <>
+          O pedido <strong>{p.numeroPedido}</strong> de {p.cliente.nome} será
+          cancelado. <strong>Esta ação não pode ser desfeita.</strong>
+        </>
+      ),
+    });
+    if (!ok) return;
+
+    // null = desistiu no segundo passo; string vazia = seguiu sem justificar.
+    const motivo = await dialogo.pedirTexto({
+      titulo: 'Motivo do cancelamento',
+      rotulo: 'Motivo',
+      opcional: true,
+      placeholder: 'Ex.: cliente desistiu da compra',
+      mensagem: 'Ajuda a administração a entender o que aconteceu.',
+    });
+    if (motivo === null) return;
+
     setProcessando(p.pedidoId);
     try {
-      await pedidosApi.cancelar(p.pedidoId, motivo);
+      await pedidosApi.cancelar(p.pedidoId, motivo || undefined);
       carregar();
     } catch (e) {
-      if (axios.isAxiosError(e) && e.response?.data?.mensagem) {
-        alert(e.response.data.mensagem);
-      } else {
-        alert('Não foi possível cancelar.');
-      }
+      await dialogo.avisar({
+        titulo: 'Não foi possível cancelar',
+        tom: 'erro',
+        mensagem:
+          axios.isAxiosError(e) && e.response?.data?.mensagem
+            ? e.response.data.mensagem
+            : 'Tente novamente em alguns instantes.',
+      });
     } finally {
       setProcessando(null);
     }

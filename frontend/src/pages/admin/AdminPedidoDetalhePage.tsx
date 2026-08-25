@@ -6,6 +6,7 @@ import { CampoQuantidade, PrecoItem } from '../../components/ItemEditors';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { PedidoAdminDetalhe } from '../../lib/pedidosApi';
 import { estiloStatus } from '../../lib/statusPedido';
+import { useDialogo } from '../../context/DialogoContext';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -15,6 +16,7 @@ const dataHoraBR = (iso: string) =>
 
 export function AdminPedidoDetalhePage() {
   const { id = '' } = useParams();
+  const dialogo = useDialogo();
   const [pedido, setPedido] = useState<PedidoAdminDetalhe | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [processando, setProcessando] = useState<Set<string>>(new Set());
@@ -37,11 +39,14 @@ export function AdminPedidoDetalhePage() {
       const atualizado = await acao(pedido.id, itemId);
       setPedido(atualizado);
     } catch (e) {
-      alert(
-        axios.isAxiosError(e) && e.response?.data?.mensagem
-          ? e.response.data.mensagem
-          : 'Não foi possível alterar.',
-      );
+      await dialogo.avisar({
+        titulo: 'Não foi possível alterar',
+        tom: 'erro',
+        mensagem:
+          axios.isAxiosError(e) && e.response?.data?.mensagem
+            ? e.response.data.mensagem
+            : 'Tente novamente em alguns instantes.',
+      });
     } finally {
       setProcessando((s) => {
         const n = new Set(s);
@@ -60,11 +65,14 @@ export function AdminPedidoDetalhePage() {
       setAprovado(true);
       window.setTimeout(() => setAprovado(false), 2000);
     } catch (e) {
-      alert(
-        axios.isAxiosError(e) && e.response?.data?.mensagem
-          ? e.response.data.mensagem
-          : 'Não foi possível aprovar.',
-      );
+      await dialogo.avisar({
+        titulo: 'Não foi possível aprovar',
+        tom: 'erro',
+        mensagem:
+          axios.isAxiosError(e) && e.response?.data?.mensagem
+            ? e.response.data.mensagem
+            : 'Tente novamente em alguns instantes.',
+      });
     } finally {
       setAprovando(false);
     }
