@@ -63,6 +63,19 @@ const COL = {
 };
 const DIREITA = 545;
 
+// ---- Limites verticais da página A4 (841,89pt de altura) ----
+/** Onde o conteúdo começa nas páginas seguintes à primeira. */
+const TOPO = 50;
+/** Altura do rodapé, fixa em todas as páginas. */
+const RODAPE_Y = 775;
+/**
+ * Última altura utilizável pelo conteúdo. Abaixo disso começa a faixa
+ * reservada ao rodapé — nada de item ou total pode invadi-la.
+ */
+const LIMITE_CONTEUDO = RODAPE_Y - 20;
+/** Altura mínima de uma linha da tabela (nome de produto curto). */
+const ALTURA_LINHA_MIN = 16;
+
 export function desenharPedidoPdf(doc: PDFKit.PDFDocument, p: PedidoExport): void {
   const data = p.confirmadoEm ?? p.criadoEm;
 
@@ -135,22 +148,31 @@ export function desenharPedidoPdf(doc: PDFKit.PDFDocument, p: PedidoExport): voi
   // Itens
   doc.font('Helvetica').fontSize(9).fillColor(ESCURO);
   for (const it of p.itens) {
-    if (y > 760) {
+    // Altura real da linha: nome de produto comprido quebra em duas linhas, e
+    // avançar sempre 16 fazia a linha seguinte escrever por cima dela.
+    const alturaNome = doc.heightOfString(it.produtoNome, { width: COL.produto.w });
+    const alturaLinha = Math.max(ALTURA_LINHA_MIN, alturaNome + 5);
+
+    if (y + alturaLinha > LIMITE_CONTEUDO) {
       doc.addPage();
-      y = 50;
-      y = desenharCabecalhoTabela(doc, y);
+      y = desenharCabecalhoTabela(doc, TOPO);
       doc.font('Helvetica').fontSize(9).fillColor(ESCURO);
     }
+
     doc.text(it.produtoCodigo, COL.cod.x, y, { width: COL.cod.w });
     doc.text(it.produtoNome, COL.produto.x, y, { width: COL.produto.w });
     doc.text(qtd(it.quantidade), COL.qtd.x, y, { width: COL.qtd.w, align: 'right' });
     doc.text(it.unidadeMedida, COL.un.x, y, { width: COL.un.w, align: 'center' });
     doc.text(moeda(it.precoUnitario), COL.unit.x, y, { width: COL.unit.w, align: 'right' });
     doc.text(moeda(it.subtotal), COL.sub.x, y, { width: COL.sub.w, align: 'right' });
-    y += 16;
+    y += alturaLinha;
   }
 
-  // Total
+  // Total — não pode ficar sozinho no pé da página, nem cair fora dela.
+  if (y + 45 > LIMITE_CONTEUDO) {
+    doc.addPage();
+    y = TOPO;
+  }
   doc.moveTo(330, y + 2).lineTo(DIREITA, y + 2).strokeColor('#cbd5e1').stroke();
   y += 10;
   doc.font('Helvetica-Bold').fontSize(12).fillColor(ESCURO);
@@ -159,25 +181,44 @@ export function desenharPedidoPdf(doc: PDFKit.PDFDocument, p: PedidoExport): voi
   y += 30;
 
   // Observações
-  if (p.observacoes && p.observacoes.trim()) {
+  const obs = p.observacoes?.trim();
+  if (obs) {
+    doc.font('Helvetica').fontSize(10);
+    const alturaObs = doc.heightOfString(obs, { width: DIREITA - 50 }) + 25;
+    if (y + alturaObs > LIMITE_CONTEUDO) {
+      doc.addPage();
+      y = TOPO;
+    }
     doc.font('Helvetica-Bold').fontSize(10).fillColor(ESCURO).text('Observações', 50, y);
-    doc.font('Helvetica').fontSize(10).fillColor(CINZA).text(p.observacoes.trim(), 50, y + 15, {
+    doc.font('Helvetica').fontSize(10).fillColor(CINZA).text(obs, 50, y + 15, {
       width: DIREITA - 50,
     });
-    y = doc.y + 10;
   }
 
-  // Rodapé (logo após o conteúdo, para não gerar página em branco)
-  doc
-    .font('Helvetica')
-    .fontSize(8)
-    .fillColor('#94a3b8')
-    .text(
-      `Documento gerado em ${dataBR(new Date())} — sem valor fiscal.`,
-      50,
-      y + 20,
-      { width: DIREITA - 50, align: 'center' },
-    );
+  numerarPaginas(doc);
+}
+
+/**
+ * Rodapé em todas as páginas, com "Página X de Y".
+ *
+ * Feito no fim porque só aqui se sabe o total de páginas. `switchToPage` volta
+ * em cada uma para escrever no mesmo lugar — por isso o rodapé fica sempre na
+ * mesma altura, e não colado ao fim do conteúdo.
+ */
+function numerarPaginas(doc: PDFKit.PDFDocument): void {
+  const total = doc.bufferedPageRange().count;
+  const rodape = `Documento gerado em ${dataBR(new Date())} — sem valor fiscal.`;
+  for (let i = 0; i < total; i++) {
+    doc.switchToPage(i);
+    doc.font('Helvetica').fontSize(8).fillColor('#94a3b8');
+    doc.text(rodape, 50, RODAPE_Y, { width: DIREITA - 50, align: 'center' });
+    if (total > 1) {
+      doc.text(`Página ${i + 1} de ${total}`, 50, RODAPE_Y + 11, {
+        width: DIREITA - 50,
+        align: 'center',
+      });
+    }
+  }
 }
 
 function desenharCabecalhoTabela(doc: PDFKit.PDFDocument, y: number): number {
