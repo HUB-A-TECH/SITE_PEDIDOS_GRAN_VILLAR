@@ -185,6 +185,7 @@ function ClienteForm({
   const [nomeFantasia, setNomeFantasia] = useState(cliente?.nomeFantasia ?? '');
   const [cnpj, setCnpj] = useState(cliente?.cnpj ?? '');
   const [telefone, setTelefone] = useState(cliente?.telefone ?? '');
+  const [email, setEmail] = useState(cliente?.email ?? '');
   const [nomeComprador, setNomeComprador] = useState(cliente?.nomeComprador ?? '');
   const [telefoneComprador, setTelefoneComprador] = useState(
     cliente?.telefoneComprador ?? '',
@@ -253,6 +254,7 @@ function ClienteForm({
         nomeFantasia: nomeFantasia.trim() || undefined,
         cnpj: cnpj.trim() || undefined,
         telefone: telefone.trim() || undefined,
+        email: email.trim() || undefined,
         nomeComprador: nomeComprador.trim() || undefined,
         telefoneComprador: telefoneComprador.trim() || undefined,
         // CEP vai só com os dígitos; a máscara existe apenas na tela.
@@ -324,6 +326,18 @@ function ClienteForm({
           />
         </Campo>
       </div>
+
+      <Campo label="E-mail (opcional)">
+        {/* type="email" faz o próprio navegador avisar se o formato estiver
+            errado, antes de enviar — o servidor também valida. */}
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="compras@empresa.com.br"
+          className={inputCls}
+        />
+      </Campo>
 
       <fieldset className="rounded-xl border border-slate-200 p-3">
         <legend className="px-1 text-sm font-semibold text-slate-700">
