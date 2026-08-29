@@ -102,3 +102,16 @@ export async function listarLocais(): Promise<Local[]> {
   const res = await api.get<{ locais: Local[] }>('/locais');
   return res.data.locais;
 }
+
+export async function atualizarLocal(
+  id: string,
+  data: Partial<{
+    nome: string;
+    telefone: string;
+    endereco: string;
+    responsavel: string;
+  }>,
+): Promise<Local> {
+  const res = await api.put<Local>(`/locais/${id}`, data);
+  return res.data;
+}
