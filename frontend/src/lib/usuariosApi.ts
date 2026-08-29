@@ -32,6 +32,18 @@ export async function criarUsuario(payload: CriarUsuarioPayload): Promise<void> 
   await api.post('/admin/usuarios', payload);
 }
 
+/**
+ * Corrige dados de um usuário existente. Nome e telefone só têm efeito em
+ * vendedor (ficam no cadastro do vendedor); para admin, vale só o e-mail.
+ * Usuário, perfil e filial não mudam por aqui — ver PUT /admin/usuarios/:id.
+ */
+export async function atualizarUsuario(
+  id: string,
+  data: { email?: string; nomeCompleto?: string; telefone?: string },
+): Promise<void> {
+  await api.put(`/admin/usuarios/${id}`, data);
+}
+
 export async function alterarAtivo(id: string, ativo: boolean): Promise<void> {
   await api.patch(`/admin/usuarios/${id}/ativo`, { ativo });
 }

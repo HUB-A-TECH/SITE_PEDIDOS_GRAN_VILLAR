@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
@@ -40,6 +40,8 @@ export function AdminUsuariosPage() {
   const [form, setForm] = useState(FORM_VAZIO);
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
+  /** Usuário sendo corrigido. Null = a janela aberta é a de criar. */
+  const [editando, setEditando] = useState<Usuario | null>(null);
 
   function carregar() {
     setCarregando(true);
@@ -195,6 +197,12 @@ export function AdminUsuariosPage() {
               </div>
               <div className="mt-3 flex gap-2">
                 <button
+                  onClick={() => setEditando(u)}
+                  className="flex-1 rounded-lg bg-slate-100 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-200"
+                >
+                  Editar
+                </button>
+                <button
                   onClick={() => resetarSenha(u)}
                   className="flex-1 rounded-lg bg-slate-100 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-200"
                 >
@@ -215,6 +223,22 @@ export function AdminUsuariosPage() {
           ))}
         </ul>
       )}
+
+      <Modal
+        titulo={editando ? `Editar ${editando.username}` : ''}
+        aberto={editando !== null}
+        onFechar={() => setEditando(null)}
+      >
+        {editando && (
+          <EditarUsuarioForm
+            usuario={editando}
+            onSalvar={() => {
+              setEditando(null);
+              carregar();
+            }}
+          />
+        )}
+      </Modal>
 
       <Modal titulo="Novo usuário" aberto={modalAberto} onFechar={() => setModalAberto(false)}>
         <div className="space-y-3">
@@ -314,5 +338,92 @@ function Campo({
         className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 outline-none focus:border-brand-500"
       />
     </div>
+  );
+}
+
+/**
+ * Correção de dados de quem já está cadastrado.
+ *
+ * Nome e telefone existem só para vendedor (ficam no cadastro de vendedor).
+ * Usuário, perfil e filial ficam de fora de propósito: mudar o usuário tira o
+ * acesso da pessoa sem avisar, e mudar o perfil mexe na carteira de clientes e
+ * no histórico de pedidos — cada um desses precisa de tratamento próprio.
+ */
+function EditarUsuarioForm({
+  usuario,
+  onSalvar,
+}: {
+  usuario: Usuario;
+  onSalvar: () => void;
+}) {
+  const ehVendedor = usuario.type === 'VENDEDOR';
+  const [email, setEmail] = useState(usuario.email);
+  const [nomeCompleto, setNomeCompleto] = useState(
+    usuario.vendedor?.nomeCompleto ?? '',
+  );
+  const [telefone, setTelefone] = useState(usuario.vendedor?.telefone ?? '');
+  const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault();
+    setErro('');
+    if (ehVendedor && !nomeCompleto.trim()) {
+      setErro('O nome completo é obrigatório para vendedor.');
+      return;
+    }
+    setSalvando(true);
+    try {
+      await usuariosApi.atualizarUsuario(usuario.id, {
+        email: email.trim(),
+        ...(ehVendedor
+          ? { nomeCompleto: nomeCompleto.trim(), telefone: telefone.trim() }
+          : {}),
+      });
+      onSalvar();
+    } catch (err) {
+      setErro(
+        axios.isAxiosError(err) && err.response?.data?.mensagem
+          ? err.response.data.mensagem
+          : 'Não foi possível salvar.',
+      );
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <form onSubmit={enviar} className="space-y-3">
+      <Aviso compacto>
+        Nome de usuário, perfil e filial não mudam por aqui. Para trocar a
+        senha, use <strong>Resetar senha</strong>.
+      </Aviso>
+
+      {ehVendedor && (
+        <>
+          <Campo
+            label="Nome completo"
+            value={nomeCompleto}
+            onChange={setNomeCompleto}
+          />
+          <Campo label="Telefone" value={telefone} onChange={setTelefone} />
+        </>
+      )}
+      <Campo label="E-mail" value={email} onChange={setEmail} type="email" />
+
+      {erro && (
+        <Aviso tom="erro" compacto>
+          {erro}
+        </Aviso>
+      )}
+
+      <button
+        type="submit"
+        disabled={salvando}
+        className="w-full rounded-lg bg-brand-600 py-2.5 font-medium text-white hover:bg-brand-700 disabled:opacity-60"
+      >
+        {salvando ? 'Salvando…' : 'Salvar'}
+      </button>
+    </form>
   );
 }
