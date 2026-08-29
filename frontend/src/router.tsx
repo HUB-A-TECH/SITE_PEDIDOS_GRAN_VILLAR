@@ -90,7 +90,7 @@ export const router = createBrowserRouter([
   {
     path: '/admin/empresa',
     element: (
-      <RoleRoute permitido={ADMIN}>
+      <RoleRoute permitido={ADMIN_TI}>
         <AdminFiliaisPage />
       </RoleRoute>
     ),
