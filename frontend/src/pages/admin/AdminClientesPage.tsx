@@ -4,6 +4,12 @@ import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
 import { Aviso } from '../../components/Aviso';
+import {
+  apenasDigitos,
+  buscarCep,
+  CepNaoEncontrado,
+  formatarCep,
+} from '../../lib/cep';
 import * as clientesApi from '../../lib/clientesApi';
 import * as tabelasApi from '../../lib/tabelasApi';
 import type {
@@ -183,6 +189,15 @@ function ClienteForm({
   const [telefoneComprador, setTelefoneComprador] = useState(
     cliente?.telefoneComprador ?? '',
   );
+  const [cep, setCep] = useState(formatarCep(cliente?.cep ?? ''));
+  const [logradouro, setLogradouro] = useState(cliente?.logradouro ?? '');
+  const [numero, setNumero] = useState(cliente?.numero ?? '');
+  const [complemento, setComplemento] = useState(cliente?.complemento ?? '');
+  const [bairro, setBairro] = useState(cliente?.bairro ?? '');
+  const [cidade, setCidade] = useState(cliente?.cidade ?? '');
+  const [estado, setEstado] = useState(cliente?.estado ?? '');
+  const [buscandoCep, setBuscandoCep] = useState(false);
+  const [erroCep, setErroCep] = useState('');
   const [tabelaPrecoId, setTabelaPrecoId] = useState(
     cliente?.tabelaPrecoId ?? tabelas[0]?.id ?? '',
   );
@@ -199,6 +214,34 @@ function ClienteForm({
     );
   }
 
+  /**
+   * Busca o endereço assim que o CEP fica completo (8 dígitos). Preenche
+   * logradouro/bairro/cidade/UF e leva o foco para o número, que é o único
+   * campo que o CEP não sabe.
+   */
+  async function preencherPeloCep(valor: string) {
+    const digitos = apenasDigitos(valor);
+    if (digitos.length !== 8) return;
+    setBuscandoCep(true);
+    setErroCep('');
+    try {
+      const e = await buscarCep(digitos);
+      setLogradouro(e.logradouro);
+      setBairro(e.bairro);
+      setCidade(e.cidade);
+      setEstado(e.estado);
+      document.getElementById('cliente-numero')?.focus();
+    } catch (e) {
+      setErroCep(
+        e instanceof CepNaoEncontrado
+          ? 'CEP não encontrado. Confira ou preencha o endereço à mão.'
+          : 'Não foi possível consultar o CEP agora. Preencha à mão.',
+      );
+    } finally {
+      setBuscandoCep(false);
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setErro('');
@@ -212,6 +255,14 @@ function ClienteForm({
         telefone: telefone.trim() || undefined,
         nomeComprador: nomeComprador.trim() || undefined,
         telefoneComprador: telefoneComprador.trim() || undefined,
+        // CEP vai só com os dígitos; a máscara existe apenas na tela.
+        cep: apenasDigitos(cep) || undefined,
+        logradouro: logradouro.trim() || undefined,
+        numero: numero.trim() || undefined,
+        complemento: complemento.trim() || undefined,
+        bairro: bairro.trim() || undefined,
+        cidade: cidade.trim() || undefined,
+        estado: estado.trim().toUpperCase() || undefined,
         tabelaPrecoId: tabelaPrecoId || undefined,
         vendedorIds,
       };
@@ -273,6 +324,105 @@ function ClienteForm({
           />
         </Campo>
       </div>
+
+      <fieldset className="rounded-xl border border-slate-200 p-3">
+        <legend className="px-1 text-sm font-semibold text-slate-700">
+          Endereço
+        </legend>
+
+        <Campo label="CEP">
+          <div className="flex items-center gap-2">
+            <input
+              value={cep}
+              onChange={(e) => {
+                const formatado = formatarCep(e.target.value);
+                setCep(formatado);
+                if (erroCep) setErroCep('');
+                // Busca sozinho assim que completa os 8 dígitos.
+                if (apenasDigitos(formatado).length === 8) {
+                  preencherPeloCep(formatado);
+                }
+              }}
+              onBlur={() => preencherPeloCep(cep)}
+              inputMode="numeric"
+              placeholder="00000-000"
+              maxLength={9}
+              className={`${inputCls} max-w-[10rem]`}
+            />
+            {buscandoCep && (
+              <span className="text-xs text-slate-500">buscando…</span>
+            )}
+          </div>
+        </Campo>
+
+        {erroCep && (
+          <Aviso tom="atencao" compacto className="mt-2">
+            {erroCep}
+          </Aviso>
+        )}
+
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          <div className="col-span-2">
+            <Campo label="Logradouro">
+              <input
+                value={logradouro}
+                onChange={(e) => setLogradouro(e.target.value)}
+                placeholder="Rua, avenida…"
+                className={inputCls}
+              />
+            </Campo>
+          </div>
+          <Campo label="Número">
+            <input
+              id="cliente-numero"
+              value={numero}
+              onChange={(e) => setNumero(e.target.value)}
+              className={inputCls}
+            />
+          </Campo>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <Campo label="Complemento (opcional)">
+            <input
+              value={complemento}
+              onChange={(e) => setComplemento(e.target.value)}
+              placeholder="Sala, galpão…"
+              className={inputCls}
+            />
+          </Campo>
+          <Campo label="Bairro">
+            <input
+              value={bairro}
+              onChange={(e) => setBairro(e.target.value)}
+              className={inputCls}
+            />
+          </Campo>
+        </div>
+
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          <div className="col-span-2">
+            <Campo label="Cidade">
+              <input
+                value={cidade}
+                onChange={(e) => setCidade(e.target.value)}
+                className={inputCls}
+              />
+            </Campo>
+          </div>
+          <Campo label="UF">
+            <input
+              value={estado}
+              onChange={(e) =>
+                setEstado(e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase())
+              }
+              maxLength={2}
+              placeholder="SP"
+              className={`${inputCls} uppercase`}
+            />
+          </Campo>
+        </div>
+      </fieldset>
 
       <div className="grid grid-cols-2 gap-3">
         <Campo label="Nome do comprador (opcional)">

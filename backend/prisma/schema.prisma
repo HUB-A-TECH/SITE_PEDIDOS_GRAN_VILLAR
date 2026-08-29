@@ -107,7 +107,15 @@ model Cliente {
   cnpj              String?
   email             String?
   telefone          String?
-  endereco          String?
+  // Endereco em campos separados: o CEP preenche logradouro/bairro/cidade/UF
+  // automaticamente na tela, e numero/complemento sao digitados pelo usuario.
+  cep               String?
+  logradouro        String?
+  numero            String?
+  complemento       String?
+  bairro            String?
+  cidade            String?
+  estado            String?
   // Contato de quem faz a compra (pode ser diferente do telefone da empresa).
   nomeComprador     String?  @map("nome_comprador")
   telefoneComprador String?  @map("telefone_comprador")
