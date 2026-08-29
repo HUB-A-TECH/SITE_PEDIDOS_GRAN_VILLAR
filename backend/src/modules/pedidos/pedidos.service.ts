@@ -246,7 +246,7 @@ export function getPedidoCompleto(id: string) {
   return prisma.pedido.findUnique({
     where: { id },
     include: {
-      local: { select: { codigo: true, nome: true } },
+      local: { select: { codigo: true, nome: true, telefone: true } },
       vendedor: { select: { nomeCompleto: true } },
       cliente: {
         select: { codigo: true, nome: true, nomeFantasia: true, cnpj: true },
