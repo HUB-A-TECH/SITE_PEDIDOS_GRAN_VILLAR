@@ -10,6 +10,9 @@ import { isNotFoundError } from '../../utils/prisma-errors';
 // (telefone, endereço, responsável) que aparecem no PDF do pedido.
 export const locaisRoutes = Router();
 
+// Ler a lista de filiais é necessário para o cadastro de clientes, então vale
+// para os dois perfis de admin. ALTERAR os dados da empresa é só ADMIN_TI —
+// esses dados saem no PDF que chega ao cliente.
 locaisRoutes.use(
   asyncHandler(authenticate),
   authorize('ADMIN_COMERCIAL', 'ADMIN_TI'),
@@ -47,6 +50,7 @@ const atualizarSchema = z.object({
 
 locaisRoutes.put(
   '/:id',
+  authorize('ADMIN_TI'),
   asyncHandler(async (req: Request, res: Response) => {
     const parsed = atualizarSchema.safeParse(req.body);
     if (!parsed.success) {
