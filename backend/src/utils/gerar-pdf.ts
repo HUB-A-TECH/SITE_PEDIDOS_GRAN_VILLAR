@@ -1,5 +1,18 @@
 // Gera o PDF apresentável do pedido — para o vendedor entregar ao cliente.
+import fs from 'node:fs';
+import path from 'node:path';
 import type PDFDocument from 'pdfkit';
+
+/**
+ * Logo da empresa, no canto superior esquerdo da PRIMEIRA página.
+ *
+ * É uma cópia em PNG de verdade: o arquivo do site (`frontend/public`) tem
+ * extensão .png mas o conteúdo é WebP — o navegador aceita, o gerador de PDF
+ * não. Se o arquivo sumir, o PDF cai no nome escrito e continua sendo gerado.
+ */
+const LOGO = path.resolve(__dirname, '../../assets/logo-gran-villar.png');
+const LOGO_LARGURA = 110;
+const LOGO_ALTURA = Math.round((LOGO_LARGURA * 270) / 505); // proporção original
 
 export interface PedidoExport {
   numeroPedido: string | null;
@@ -9,7 +22,7 @@ export interface PedidoExport {
   observacoes: string | null;
   total: number;
   subtotal: number;
-  local: { codigo: string; nome: string };
+  local: { codigo: string; nome: string; telefone: string | null };
   vendedor: { nomeCompleto: string };
   cliente: {
     codigo: string;
@@ -60,28 +73,49 @@ export function desenharPedidoPdf(doc: PDFKit.PDFDocument, p: PedidoExport): voi
       ? 'Cancelado'
       : 'Confirmado';
 
-  // Cabeçalho
-  doc.fillColor(ESCURO).font('Helvetica-Bold').fontSize(22).text('GRAN VILLAR', 50, 50);
+  // ---- Cabeçalho (desenhado uma vez, só na primeira página) ----
+  // A logo à esquerda; se o arquivo faltar, escreve o nome no lugar dela.
+  let baseEsquerda = 50 + LOGO_ALTURA;
+  try {
+    doc.image(LOGO, 50, 45, { width: LOGO_LARGURA });
+    baseEsquerda = 45 + LOGO_ALTURA;
+  } catch {
+    doc.fillColor(ESCURO).font('Helvetica-Bold').fontSize(22).text('GRAN VILLAR', 50, 50);
+    baseEsquerda = 78;
+  }
   doc
     .font('Helvetica')
     .fontSize(10)
     .fillColor(CINZA)
-    .text(ehRascunho ? 'Proposta de Pedido' : 'Pedido de Venda', 50, 76);
+    .text(ehRascunho ? 'Proposta de Pedido' : 'Pedido de Venda', 50, baseEsquerda + 6);
 
+  // Dados do pedido à direita: número, data, vendedor e telefone da empresa.
+  const direita = { x: 300, largura: 245 } as const;
   doc.font('Helvetica-Bold').fontSize(11).fillColor(ESCURO);
-  doc.text(p.numeroPedido ? `Pedido ${p.numeroPedido}` : 'Proposta', 300, 50, {
-    width: 245,
+  doc.text(p.numeroPedido ? `Pedido ${p.numeroPedido}` : 'Proposta', direita.x, 48, {
+    width: direita.largura,
     align: 'right',
   });
-  doc.font('Helvetica').fontSize(10).fillColor(CINZA);
-  doc.text(`Data: ${dataBR(data)}`, 300, 68, { width: 245, align: 'right' });
-  doc.text(`Status: ${statusLabel}`, 300, 82, { width: 245, align: 'right' });
 
-  // Linha divisória
-  doc.moveTo(50, 105).lineTo(DIREITA, 105).strokeColor('#cbd5e1').stroke();
+  doc.font('Helvetica').fontSize(9.5).fillColor(CINZA);
+  let yDir = 66;
+  const linhaDireita = (texto: string) => {
+    doc.text(texto, direita.x, yDir, { width: direita.largura, align: 'right' });
+    yDir += 13;
+  };
+  linhaDireita(`Data: ${dataBR(data)}`);
+  linhaDireita(`Vendedor: ${p.vendedor.nomeCompleto}`);
+  // Telefone da empresa (filial), não o do vendedor. Some se não estiver
+  // cadastrado, em vez de imprimir um rótulo vazio.
+  if (p.local.telefone) linhaDireita(`Telefone: ${p.local.telefone}`);
+  linhaDireita(`Status: ${statusLabel}`);
 
-  // Dados do cliente / vendedor
-  let y = 120;
+  // Linha divisória logo abaixo do mais alto dos dois blocos.
+  const yLinha = Math.max(baseEsquerda + 22, yDir + 4);
+  doc.moveTo(50, yLinha).lineTo(DIREITA, yLinha).strokeColor('#cbd5e1').stroke();
+
+  // Dados do cliente (o vendedor agora aparece no cabeçalho, não repetir aqui)
+  let y = yLinha + 15;
   const fantasia = p.cliente.nomeFantasia ? ` (${p.cliente.nomeFantasia})` : '';
   doc.fillColor(ESCURO).font('Helvetica-Bold').fontSize(10).text('CLIENTE', 50, y);
   doc.font('Helvetica').fillColor(CINZA);
@@ -92,9 +126,6 @@ export function desenharPedidoPdf(doc: PDFKit.PDFDocument, p: PedidoExport): voi
     doc.font('Helvetica').fillColor(CINZA).text(p.cliente.cnpj, 120, y);
     y += 15;
   }
-  doc.font('Helvetica-Bold').fillColor(ESCURO).text('VENDEDOR', 50, y);
-  doc.font('Helvetica').fillColor(CINZA).text(p.vendedor.nomeCompleto, 120, y);
-  y += 15;
   doc.font('Helvetica-Bold').fillColor(ESCURO).text('FILIAL', 50, y);
   doc.font('Helvetica').fillColor(CINZA).text(`[${p.local.codigo}] ${p.local.nome}`, 120, y);
   y += 25;
