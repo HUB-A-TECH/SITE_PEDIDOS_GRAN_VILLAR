@@ -45,6 +45,11 @@ export function DashboardPage() {
         { titulo: 'Tabelas de Preço', desc: 'Preços por grupo de clientes', to: '/admin/tabelas' },
         { titulo: 'Clientes', desc: 'Cadastro e mix de cada cliente', to: '/admin/clientes' },
         { titulo: 'Pedidos', desc: 'Ver pedidos e baixar TXT', to: '/admin/pedidos' },
+        {
+          titulo: 'Dados da Empresa',
+          desc: 'Telefone e endereço que saem no PDF',
+          to: '/admin/empresa',
+        },
         ...(isAdminTI
           ? [
               {

@@ -111,6 +111,10 @@ export interface Local {
   id: string;
   codigo: string;
   nome: string;
+  /** Dados da empresa que saem no PDF do pedido. */
+  telefone?: string | null;
+  endereco?: string | null;
+  responsavel?: string | null;
 }
 
 export const CATEGORIAS: Categoria[] = [
