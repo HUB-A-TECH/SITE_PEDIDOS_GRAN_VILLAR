@@ -14,7 +14,13 @@ export interface ClienteInput {
   cnpj?: string;
   email?: string;
   telefone?: string;
-  endereco?: string;
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  complemento?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
   nomeComprador?: string;
   telefoneComprador?: string;
   localId: string;
