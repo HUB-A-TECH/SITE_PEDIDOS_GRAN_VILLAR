@@ -22,6 +22,14 @@ export function getById(id: string): Promise<Cliente | null> {
   return prisma.cliente.findUnique({ where: { id } });
 }
 
+/** Cliente com o nome do setor — usado nas telas do vendedor (perfil). */
+export function getByIdComSetor(id: string) {
+  return prisma.cliente.findUnique({
+    where: { id },
+    include: { setor: { select: { id: true, nome: true } } },
+  });
+}
+
 export function criar(data: {
   codigo: string;
   nome: string;

@@ -140,8 +140,14 @@ export function AdminClientesPage() {
                 </button>
               </div>
               <button
-                onClick={() => navigate(`/admin/clientes/${c.id}/mix`)}
+                onClick={() => navigate(`/clientes/${c.id}`)}
                 className="mt-3 w-full rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+              >
+                Ver perfil do cliente →
+              </button>
+              <button
+                onClick={() => navigate(`/admin/clientes/${c.id}/mix`)}
+                className="mt-2 w-full rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
               >
                 Gerenciar mix de produtos →
               </button>

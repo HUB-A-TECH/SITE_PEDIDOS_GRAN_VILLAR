@@ -8,6 +8,7 @@ export const clientesRoutes = Router();
 
 clientesRoutes.use(asyncHandler(authenticate));
 clientesRoutes.get('/', asyncHandler(controller.listar));
+clientesRoutes.get('/:id/perfil', asyncHandler(controller.perfilCliente));
 clientesRoutes.get('/:id/historico', asyncHandler(controller.historicoCliente));
 clientesRoutes.get(
   '/:id/historico-itens',

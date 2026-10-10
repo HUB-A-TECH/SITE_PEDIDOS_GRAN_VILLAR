@@ -267,10 +267,10 @@ export function PedidoPage() {
         <div className="flex items-center gap-2">
           {salvo && <span className="text-xs text-brand-100">Salvo ✓</span>}
           <Link
-            to={`/clientes/${pedido.clienteId}/historico`}
+            to={`/clientes/${pedido.clienteId}`}
             className="rounded-lg bg-brand-700 px-2.5 py-1.5 text-xs hover:bg-brand-800"
           >
-            Histórico
+            Perfil
           </Link>
         </div>
       }

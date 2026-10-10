@@ -7,6 +7,8 @@ import { SelecionarClientePage } from './pages/vendedor/SelecionarClientePage';
 import { PedidoPage } from './pages/vendedor/PedidoPage';
 import { HistoricoClientePage } from './pages/vendedor/HistoricoClientePage';
 import { MeusPedidosPage } from './pages/vendedor/MeusPedidosPage';
+import { MeusClientesPage } from './pages/vendedor/MeusClientesPage';
+import { PerfilClientePage } from './pages/vendedor/PerfilClientePage';
 import { AdminProdutosPage } from './pages/admin/AdminProdutosPage';
 import { AdminClientesPage } from './pages/admin/AdminClientesPage';
 import { AdminClienteMixPage } from './pages/admin/AdminClienteMixPage';
@@ -54,6 +56,24 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <MeusPedidosPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/meus-clientes',
+    element: (
+      <ProtectedRoute>
+        <MeusClientesPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    // Perfil: vendedor (clientes dos seus setores) e admin (todos) — o
+    // servidor é quem decide quem pode ver cada cliente.
+    path: '/clientes/:clienteId',
+    element: (
+      <ProtectedRoute>
+        <PerfilClientePage />
       </ProtectedRoute>
     ),
   },

@@ -82,8 +82,8 @@ export async function listar(req: Request, res: Response): Promise<void> {
 async function clienteAcessivel(
   req: Request,
   res: Response,
-): Promise<Cliente | null> {
-  const cliente = await service.getById(req.params.id);
+) {
+  const cliente = await service.getByIdComSetor(req.params.id);
   if (!cliente) {
     res.status(404).json({ mensagem: 'Cliente não encontrado' });
     return null;
@@ -116,6 +116,26 @@ export async function historicoCliente(req: Request, res: Response): Promise<voi
         unidadeMedida: i.produto.unidadeMedida,
       })),
     })),
+  });
+}
+
+/**
+ * Perfil do cliente: cadastro + resumo de compras + últimos pedidos. Para o
+ * vendedor, diz também se já existe um pedido salvo dele para esse cliente
+ * (o botão vira "Continuar pedido salvo").
+ */
+export async function perfilCliente(req: Request, res: Response): Promise<void> {
+  const cliente = await clienteAcessivel(req, res);
+  if (!cliente) return;
+  const ehVendedor = req.user!.type === 'VENDEDOR';
+  const [resumo, vendedor] = await Promise.all([
+    historico.resumoDoCliente(cliente.id),
+    ehVendedor ? carteira.getVendedorDoUsuario(req.user!.sub) : null,
+  ]);
+  res.json({
+    cliente: { ...serialize(cliente), setor: cliente.setor },
+    ...resumo,
+    pedidoSalvoId: vendedor ? await historico.pedidoSalvoId(vendedor.id, cliente.id) : null,
   });
 }
 
