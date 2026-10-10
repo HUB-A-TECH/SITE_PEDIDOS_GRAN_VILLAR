@@ -15,6 +15,7 @@ import { pedidosAdminRoutes } from './modules/pedidos/pedidos.admin.routes';
 import { usuariosRoutes } from './modules/usuarios/usuarios.routes';
 import { tabelasAdminRoutes } from './modules/tabelas/tabelas.admin.routes';
 import { setoresAdminRoutes } from './modules/setores/setores.admin.routes';
+import { contaRoutes } from './modules/conta/conta.routes';
 
 export const app = express();
 
@@ -28,6 +29,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/conta', contaRoutes);
 app.use('/api/produtos', produtosRoutes);
 app.use('/api/clientes', clientesRoutes);
 app.use('/api/pedidos', pedidosRoutes);

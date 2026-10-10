@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Aviso } from '../components/Aviso';
 
 export function LoginPage() {
-  const { login, usuario, carregando } = useAuth();
+  const { login, usuario, carregando, avisoSaida } = useAuth();
   const navigate = useNavigate();
 
   const [username, setUsername] = useState('');
@@ -51,6 +51,11 @@ export function LoginPage() {
           </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {avisoSaida && (
+            <Aviso tom="atencao" compacto>
+              {avisoSaida}
+            </Aviso>
+          )}
           <div>
             <label
               htmlFor="username"

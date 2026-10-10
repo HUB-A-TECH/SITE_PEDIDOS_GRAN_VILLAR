@@ -28,7 +28,10 @@ export async function authenticate(
     const payload = verifyToken(token);
     const [revogado, usuario] = await Promise.all([
       prisma.tokenRevogado.findUnique({ where: { jti: payload.jti } }),
-      prisma.user.findUnique({ where: { id: payload.sub }, select: { ativo: true } }),
+      prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { ativo: true, senhaAlteradaEm: true },
+      }),
     ]);
     if (revogado) {
       res.status(401).json({ mensagem: 'Sessão encerrada' });
@@ -37,6 +40,16 @@ export async function authenticate(
     // Conta desativada pelo Admin TI: derruba a sessão mesmo antes do token expirar.
     if (!usuario || !usuario.ativo) {
       res.status(401).json({ mensagem: 'Conta desativada' });
+      return;
+    }
+    // Senha trocada depois deste login: a sessão é de antes da troca, cai.
+    // (iat é em segundos; quem acabou de trocar recebe um token novo, do
+    // mesmo segundo ou depois, e continua conectado.)
+    if (
+      usuario.senhaAlteradaEm &&
+      (payload.iat ?? 0) < Math.floor(usuario.senhaAlteradaEm.getTime() / 1000)
+    ) {
+      res.status(401).json({ mensagem: 'A senha foi alterada. Entre novamente.' });
       return;
     }
     req.user = payload;

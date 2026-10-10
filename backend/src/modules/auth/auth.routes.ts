@@ -7,4 +7,4 @@ export const authRoutes = Router();
 
 authRoutes.post('/login', asyncHandler(authController.login));
 authRoutes.post('/logout', asyncHandler(authController.logout));
-authRoutes.get('/me', asyncHandler(authenticate), authController.me);
+authRoutes.get('/me', asyncHandler(authenticate), asyncHandler(authController.me));
