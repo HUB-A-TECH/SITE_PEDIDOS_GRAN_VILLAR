@@ -13,6 +13,8 @@ import { AdminClienteMixPage } from './pages/admin/AdminClienteMixPage';
 import { AdminTabelasPage } from './pages/admin/AdminTabelasPage';
 import { AdminFiliaisPage } from './pages/admin/AdminFiliaisPage';
 import { AdminTabelaDetalhePage } from './pages/admin/AdminTabelaDetalhePage';
+import { AdminSetoresPage } from './pages/admin/AdminSetoresPage';
+import { AdminSetorDetalhePage } from './pages/admin/AdminSetorDetalhePage';
 import { AdminPedidosPage } from './pages/admin/AdminPedidosPage';
 import { AdminPedidoDetalhePage } from './pages/admin/AdminPedidoDetalhePage';
 import { AdminUsuariosPage } from './pages/admin/AdminUsuariosPage';
@@ -84,6 +86,22 @@ export const router = createBrowserRouter([
     element: (
       <RoleRoute permitido={ADMIN}>
         <AdminClienteMixPage />
+      </RoleRoute>
+    ),
+  },
+  {
+    path: '/admin/setores',
+    element: (
+      <RoleRoute permitido={ADMIN}>
+        <AdminSetoresPage />
+      </RoleRoute>
+    ),
+  },
+  {
+    path: '/admin/setores/:id',
+    element: (
+      <RoleRoute permitido={ADMIN}>
+        <AdminSetorDetalhePage />
       </RoleRoute>
     ),
   },

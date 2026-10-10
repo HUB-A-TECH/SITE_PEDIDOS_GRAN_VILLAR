@@ -35,7 +35,7 @@ async function resolverClienteAcessivel(
   if (req.user!.type === 'VENDEDOR') {
     const atende = await carteira.vendedorAtendeCliente(req.user!.sub, cliente.id);
     if (!atende) {
-      return { ok: false, status: 403, msg: 'Cliente não está na sua carteira' };
+      return { ok: false, status: 403, msg: 'Cliente não está nos seus setores' };
     }
   }
   return { ok: true };

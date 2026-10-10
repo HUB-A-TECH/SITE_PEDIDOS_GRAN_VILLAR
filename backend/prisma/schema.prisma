@@ -48,6 +48,7 @@ model Local {
   vendedores Vendedor[]
   clientes   Cliente[]
   pedidos    Pedido[]
+  setores    Setor[]
 
   @@map("locais")
 }
@@ -85,6 +86,7 @@ model Vendedor {
   local    Local             @relation(fields: [localId], references: [id])
   pedidos  Pedido[]
   clientes ClienteVendedor[]
+  setores  SetorVendedor[]
 
   @@map("vendedores")
 }
@@ -122,12 +124,16 @@ model Cliente {
   localId           String   @map("local_id")
   // Tabela de preco do cliente. Opcional: sem tabela, vale o preco do catalogo.
   tabelaPrecoId     String?  @map("tabela_preco_id")
+  // Setor (região) do cliente. Os vendedores do setor são os que o atendem;
+  // sem setor, nenhum vendedor vê o cliente.
+  setorId           String?  @map("setor_id")
   ativo             Boolean  @default(true)
   criadoEm          DateTime @default(now()) @map("criado_em")
   atualizadoEm      DateTime @updatedAt @map("atualizado_em")
 
   local           Local             @relation(fields: [localId], references: [id])
   tabelaPreco     TabelaPreco?      @relation(fields: [tabelaPrecoId], references: [id])
+  setor           Setor?            @relation(fields: [setorId], references: [id], onDelete: SetNull)
   clienteProdutos ClienteProduto[]
   vendedores      ClienteVendedor[]
   pedidos         Pedido[]
@@ -199,7 +205,39 @@ model TabelaPrecoItem {
   @@map("tabelas_preco_itens")
 }
 
-// Carteira: quais vendedores atendem o cliente. Vendedor so ve os seus.
+// Setor: região de visitas. O admin coloca vendedores e clientes no setor; o
+// vendedor vê os clientes de todos os setores em que está. Cliente fica em um
+// setor só; vendedor pode estar em vários, e um setor pode ter vários vendedores.
+model Setor {
+  id           String   @id @default(uuid())
+  nome         String
+  localId      String   @map("local_id")
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  local      Local           @relation(fields: [localId], references: [id])
+  clientes   Cliente[]
+  vendedores SetorVendedor[]
+
+  @@unique([localId, nome])
+  @@map("setores")
+}
+
+model SetorVendedor {
+  id          String   @id @default(uuid())
+  setorId     String   @map("setor_id")
+  vendedorId  String   @map("vendedor_id")
+  associadoEm DateTime @default(now()) @map("associado_em")
+
+  setor    Setor    @relation(fields: [setorId], references: [id], onDelete: Cascade)
+  vendedor Vendedor @relation(fields: [vendedorId], references: [id], onDelete: Cascade)
+
+  @@unique([setorId, vendedorId])
+  @@map("setores_vendedores")
+}
+
+// LEGADO: carteira antiga (vínculo cliente↔vendedor um a um), substituída pelos
+// setores. Mantida só até o deploy dos setores; será removida em seguida.
 model ClienteVendedor {
   id          String   @id @default(uuid())
   clienteId   String   @map("cliente_id")

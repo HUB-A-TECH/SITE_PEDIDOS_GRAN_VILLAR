@@ -48,6 +48,8 @@ interface OpcoesTexto {
   opcional?: boolean;
   tipo?: 'text' | 'password';
   placeholder?: string;
+  /** Texto que já vem no campo (ex.: o nome atual, ao renomear). */
+  valorInicial?: string;
   /** Devolve a mensagem de erro, ou null se o valor estiver bom. */
   validar?: (valor: string) => string | null;
 }
@@ -185,7 +187,7 @@ function ConteudoTexto({
   opcoes: OpcoesTexto;
   onResponder: (v: string | null) => void;
 }) {
-  const [valor, setValor] = useState('');
+  const [valor, setValor] = useState(opcoes.valorInicial ?? '');
   const [erro, setErro] = useState('');
 
   function enviar(e: FormEvent) {

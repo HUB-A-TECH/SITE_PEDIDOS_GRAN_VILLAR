@@ -1,9 +1,9 @@
 import { prisma } from './prisma';
 
 /**
- * Carteira de clientes: cada cliente é atendido por um ou mais vendedores
- * (tabela clientes_vendedores). O vendedor só enxerga e só faz pedido para os
- * clientes da própria carteira; o admin continua vendo todos.
+ * Carteira de clientes por setor: o admin coloca vendedores e clientes em
+ * setores (regiões). O vendedor só enxerga e só faz pedido para os clientes dos
+ * setores em que está; o admin continua vendo todos.
  *
  * Ponto único da regra — usado pela lista de clientes, pelo catálogo e pela
  * criação de pedido, para as três não divergirem.
@@ -13,6 +13,11 @@ export function getVendedorDoUsuario(usuarioId: string) {
   return prisma.vendedor.findUnique({ where: { usuarioId }, select: { id: true } });
 }
 
+/** Filtro "cliente está num setor deste vendedor". */
+function doSetorDoVendedor(vendedorId: string) {
+  return { setor: { vendedores: { some: { vendedorId } } } };
+}
+
 /** O usuário (vendedor) atende esse cliente? Admin nunca passa por aqui. */
 export async function vendedorAtendeCliente(
   usuarioId: string,
@@ -20,14 +25,13 @@ export async function vendedorAtendeCliente(
 ): Promise<boolean> {
   const vendedor = await getVendedorDoUsuario(usuarioId);
   if (!vendedor) return false;
-  const vinculo = await prisma.clienteVendedor.findUnique({
-    where: { clienteId_vendedorId: { clienteId, vendedorId: vendedor.id } },
-    select: { id: true },
+  const total = await prisma.cliente.count({
+    where: { id: clienteId, ...doSetorDoVendedor(vendedor.id) },
   });
-  return Boolean(vinculo);
+  return total > 0;
 }
 
-/** Clientes da carteira do vendedor (por usuarioId). */
+/** Clientes dos setores do vendedor (por usuarioId), com o setor de cada um. */
 export async function clientesDoUsuarioVendedor(
   usuarioId: string,
   apenasAtivos: boolean,
@@ -37,8 +41,9 @@ export async function clientesDoUsuarioVendedor(
   return prisma.cliente.findMany({
     where: {
       ...(apenasAtivos ? { ativo: true } : {}),
-      vendedores: { some: { vendedorId: vendedor.id } },
+      ...doSetorDoVendedor(vendedor.id),
     },
+    include: { setor: { select: { id: true, nome: true } } },
     orderBy: { nome: 'asc' },
   });
 }

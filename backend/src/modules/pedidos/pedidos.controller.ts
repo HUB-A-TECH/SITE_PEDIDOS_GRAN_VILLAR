@@ -174,7 +174,7 @@ export async function criar(req: Request, res: Response): Promise<void> {
   }
   const atende = await carteira.vendedorAtendeCliente(req.user!.sub, cliente.id);
   if (!atende) {
-    res.status(403).json({ mensagem: 'Cliente não está na sua carteira' });
+    res.status(403).json({ mensagem: 'Cliente não está nos seus setores' });
     return;
   }
 

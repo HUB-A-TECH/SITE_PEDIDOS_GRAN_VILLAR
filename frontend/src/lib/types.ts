@@ -98,13 +98,47 @@ export interface Cliente {
   telefoneComprador: string | null;
   localId: string;
   tabelaPrecoId: string | null;
+  setorId: string | null;
   ativo: boolean;
+  /** Setor (região) do cliente — vem na lista do vendedor, que agrupa por ele. */
+  setor?: { id: string; nome: string } | null;
 }
 
 /** Cliente com os vínculos — só o admin recebe esta versão. */
 export interface ClienteCompleto extends Cliente {
   tabelaPreco: { id: string; nome: string } | null;
+  /** Setor + vendedores dele (são os que atendem o cliente). */
+  setor: { id: string; nome: string; vendedores: VendedorOpcao[] } | null;
+}
+
+// ---- Setores (regiões de visita) ----
+
+export interface Setor {
+  id: string;
+  nome: string;
+  localId: string;
   vendedores: VendedorOpcao[];
+  totalClientes: number;
+}
+
+/** Cliente da filial na tela do setor, com o setor em que está hoje. */
+export interface ClienteDoSetor {
+  id: string;
+  codigo: string;
+  nome: string;
+  nomeFantasia: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  ativo: boolean;
+  setor: { id: string; nome: string } | null;
+}
+
+export interface SetorDetalhe {
+  setor: Setor;
+  /** Vendedores da filial que podem atender o setor. */
+  vendedores: VendedorOpcao[];
+  /** Todos os clientes da filial (os do setor e os que podem entrar). */
+  clientes: ClienteDoSetor[];
 }
 
 export interface Local {
