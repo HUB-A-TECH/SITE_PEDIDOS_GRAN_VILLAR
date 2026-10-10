@@ -68,6 +68,11 @@ export function DashboardPage() {
     : [
         { titulo: 'Novo Pedido', desc: 'Começa selecionando o cliente', to: '/clientes' },
         {
+          titulo: 'Meus Clientes',
+          desc: 'Perfil, contato e compras de cada cliente',
+          to: '/meus-clientes',
+        },
+        {
           titulo: 'Meus Pedidos',
           desc:
             aConfirmar > 0

@@ -24,7 +24,11 @@ export function HistoricoClientePage() {
   }, [clienteId, limite]);
 
   return (
-    <AppLayout titulo="Histórico do Cliente" voltarPara="/pedido">
+    <AppLayout
+      titulo="Histórico do Cliente"
+      voltarPara={`/clientes/${clienteId}`}
+      voltarUsaHistorico
+    >
       <div className="mb-4 flex gap-2">
         {LIMITE_OPCOES.map((o) => (
           <button

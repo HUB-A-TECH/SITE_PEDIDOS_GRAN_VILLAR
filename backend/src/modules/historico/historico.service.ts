@@ -65,6 +65,124 @@ export async function historicoPorProduto(
   return mapa;
 }
 
+const UM_DIA_MS = 24 * 60 * 60 * 1000;
+const dataDoPedido = (p: { confirmadoEm: Date | null; criadoEm: Date }) =>
+  p.confirmadoEm ?? p.criadoEm;
+
+/**
+ * Resumo de compras para o perfil do cliente. Tudo calculado dos pedidos
+ * confirmados (cancelados e não enviados não contam); as médias e os mais
+ * comprados olham os últimos 12 meses, para refletir o cliente de hoje.
+ */
+export async function resumoDoCliente(clienteId: string) {
+  const confirmado = { clienteId, status: 'CONFIRMADO' as const };
+  const desde = new Date(Date.now() - 365 * UM_DIA_MS);
+  const [totalPedidos, ultimos, doAno] = await Promise.all([
+    prisma.pedido.count({ where: confirmado }),
+    prisma.pedido.findMany({
+      where: confirmado,
+      select: {
+        id: true,
+        numeroPedido: true,
+        total: true,
+        confirmadoEm: true,
+        criadoEm: true,
+        _count: { select: { itens: true } },
+      },
+      orderBy: { confirmadoEm: { sort: 'desc', nulls: 'last' } },
+      take: 5,
+    }),
+    prisma.pedido.findMany({
+      where: {
+        ...confirmado,
+        OR: [
+          { confirmadoEm: { gte: desde } },
+          { confirmadoEm: null, criadoEm: { gte: desde } },
+        ],
+      },
+      select: {
+        total: true,
+        confirmadoEm: true,
+        criadoEm: true,
+        itens: {
+          select: {
+            quantidade: true,
+            produto: { select: { id: true, nome: true, unidadeMedida: true } },
+          },
+        },
+      },
+    }),
+  ]);
+
+  // Intervalo médio entre compras: do pedido mais antigo ao mais recente do
+  // período, dividido pelo número de intervalos.
+  const datas = doAno.map((p) => dataDoPedido(p).getTime()).sort((a, b) => a - b);
+  const intervaloMedioDias =
+    datas.length >= 2
+      ? Math.round((datas[datas.length - 1] - datas[0]) / (datas.length - 1) / UM_DIA_MS)
+      : null;
+
+  const ticketMedio =
+    doAno.length > 0
+      ? Math.round((doAno.reduce((s, p) => s + Number(p.total), 0) / doAno.length) * 100) / 100
+      : null;
+
+  // Mais comprados: em quantos pedidos o produto aparece (frequência), e a
+  // quantidade média quando aparece.
+  const porProduto = new Map<
+    string,
+    { produtoId: string; nome: string; unidadeMedida: string; pedidos: number; quantidade: number }
+  >();
+  for (const p of doAno) {
+    for (const it of p.itens) {
+      const atual = porProduto.get(it.produto.id) ?? {
+        produtoId: it.produto.id,
+        nome: it.produto.nome,
+        unidadeMedida: it.produto.unidadeMedida,
+        pedidos: 0,
+        quantidade: 0,
+      };
+      atual.pedidos += 1;
+      atual.quantidade += Number(it.quantidade);
+      porProduto.set(it.produto.id, atual);
+    }
+  }
+  const maisComprados = [...porProduto.values()]
+    .sort((a, b) => b.pedidos - a.pedidos || b.quantidade - a.quantidade)
+    .slice(0, 5)
+    .map(({ quantidade, ...p }) => ({
+      ...p,
+      mediaPorPedido: Math.round((quantidade / p.pedidos) * 100) / 100,
+    }));
+
+  return {
+    resumo: {
+      totalPedidos,
+      pedidos12Meses: doAno.length,
+      ultimaCompra: ultimos[0] ? dataDoPedido(ultimos[0]) : null,
+      intervaloMedioDias,
+      ticketMedio,
+      maisComprados,
+    },
+    ultimosPedidos: ultimos.map((p) => ({
+      pedidoId: p.id,
+      numeroPedido: p.numeroPedido,
+      data: dataDoPedido(p),
+      total: Number(p.total),
+      itensCount: p._count.itens,
+    })),
+  };
+}
+
+/** Pedido salvo (ainda não enviado) do vendedor para esse cliente, se houver. */
+export async function pedidoSalvoId(vendedorId: string, clienteId: string) {
+  const p = await prisma.pedido.findFirst({
+    where: { vendedorId, clienteId, status: 'RASCUNHO' },
+    select: { id: true },
+  });
+  return p?.id ?? null;
+}
+
 /**
  * Todos os pedidos do vendedor (salvos ainda não enviados, enviados e
  * cancelados), mais recentes primeiro. Ordena por criadoEm pois rascunhos

@@ -29,6 +29,42 @@ export async function listar(): Promise<Cliente[]> {
   return res.data.clientes;
 }
 
+// ---- Perfil do cliente (vendedor do setor e admin) ----
+
+export interface PerfilCliente {
+  cliente: Cliente & { setor: { id: string; nome: string } | null };
+  resumo: {
+    totalPedidos: number;
+    pedidos12Meses: number;
+    ultimaCompra: string | null;
+    /** Intervalo médio entre compras nos últimos 12 meses (null: menos de 2). */
+    intervaloMedioDias: number | null;
+    ticketMedio: number | null;
+    maisComprados: {
+      produtoId: string;
+      nome: string;
+      unidadeMedida: string;
+      /** Em quantos pedidos (12 meses) o produto aparece. */
+      pedidos: number;
+      mediaPorPedido: number;
+    }[];
+  };
+  ultimosPedidos: {
+    pedidoId: string;
+    numeroPedido: string | null;
+    data: string;
+    total: number;
+    itensCount: number;
+  }[];
+  /** Só para vendedor: pedido salvo (não enviado) dele para este cliente. */
+  pedidoSalvoId: string | null;
+}
+
+export async function perfil(clienteId: string): Promise<PerfilCliente> {
+  const res = await api.get<PerfilCliente>(`/clientes/${clienteId}/perfil`);
+  return res.data;
+}
+
 // ---- Admin ----
 
 export async function adminListar(localId: string): Promise<ClienteCompleto[]> {
