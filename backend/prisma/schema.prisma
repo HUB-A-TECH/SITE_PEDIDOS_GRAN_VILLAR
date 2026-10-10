@@ -1,7 +1,8 @@
 // Schema do Sistema de Pedidos Gran Villar.
 // Fase 1: User, Local, Vendedor, TokenRevogado.
 // Fase 2: Cliente, Produto, ClienteProduto, Pedido, ItemPedido.
-// Tabelas de preco: TabelaPreco, TabelaPrecoItem, ClienteVendedor (carteira).
+// Tabelas de preco: TabelaPreco, TabelaPrecoItem.
+// Setores (regioes de visita): Setor, SetorVendedor — substituiram a carteira.
 
 generator client {
   provider = "prisma-client-js"
@@ -85,7 +86,6 @@ model Vendedor {
   usuario  User              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   local    Local             @relation(fields: [localId], references: [id])
   pedidos  Pedido[]
-  clientes ClienteVendedor[]
   setores  SetorVendedor[]
 
   @@map("vendedores")
@@ -135,7 +135,6 @@ model Cliente {
   tabelaPreco     TabelaPreco?      @relation(fields: [tabelaPrecoId], references: [id])
   setor           Setor?            @relation(fields: [setorId], references: [id], onDelete: SetNull)
   clienteProdutos ClienteProduto[]
-  vendedores      ClienteVendedor[]
   pedidos         Pedido[]
 
   @@map("clientes")
@@ -234,21 +233,6 @@ model SetorVendedor {
 
   @@unique([setorId, vendedorId])
   @@map("setores_vendedores")
-}
-
-// LEGADO: carteira antiga (vínculo cliente↔vendedor um a um), substituída pelos
-// setores. Mantida só até o deploy dos setores; será removida em seguida.
-model ClienteVendedor {
-  id          String   @id @default(uuid())
-  clienteId   String   @map("cliente_id")
-  vendedorId  String   @map("vendedor_id")
-  associadoEm DateTime @default(now()) @map("associado_em")
-
-  cliente  Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
-  vendedor Vendedor @relation(fields: [vendedorId], references: [id], onDelete: Cascade)
-
-  @@unique([clienteId, vendedorId])
-  @@map("clientes_vendedores")
 }
 
 model Pedido {
