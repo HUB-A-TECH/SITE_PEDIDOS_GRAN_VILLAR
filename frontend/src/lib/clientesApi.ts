@@ -1,11 +1,5 @@
 import { api } from './api';
-import type {
-  Cliente,
-  ClienteCompleto,
-  Local,
-  MixProduto,
-  VendedorOpcao,
-} from './types';
+import type { Cliente, ClienteCompleto, Local, MixProduto } from './types';
 
 export interface ClienteInput {
   codigo: string;
@@ -25,11 +19,11 @@ export interface ClienteInput {
   telefoneComprador?: string;
   localId: string;
   tabelaPrecoId?: string;
-  /** Carteira: vendedores responsáveis por este cliente. */
-  vendedorIds?: string[];
+  /** Setor (região); os vendedores do setor atendem o cliente. null = sem setor. */
+  setorId?: string | null;
 }
 
-// Vendedor: clientes do próprio local.
+// Vendedor: clientes dos seus setores (cada um com o nome do setor).
 export async function listar(): Promise<Cliente[]> {
   const res = await api.get<{ clientes: Cliente[] }>('/clientes');
   return res.data.clientes;
@@ -55,17 +49,6 @@ export async function adminAtualizar(
 ): Promise<ClienteCompleto> {
   const res = await api.put<ClienteCompleto>(`/admin/clientes/${id}`, data);
   return res.data;
-}
-
-/** Vendedores ativos da filial — opções da carteira no cadastro do cliente. */
-export async function adminListarVendedores(
-  localId: string,
-): Promise<VendedorOpcao[]> {
-  const res = await api.get<{ vendedores: VendedorOpcao[] }>(
-    '/admin/clientes/vendedores',
-    { params: { local_id: localId } },
-  );
-  return res.data.vendedores;
 }
 
 // ---- Mix do cliente (admin) ----

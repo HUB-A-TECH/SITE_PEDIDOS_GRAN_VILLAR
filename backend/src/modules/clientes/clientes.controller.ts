@@ -27,20 +27,27 @@ function serialize(c: Cliente) {
     telefoneComprador: c.telefoneComprador,
     localId: c.localId,
     tabelaPrecoId: c.tabelaPrecoId,
+    setorId: c.setorId,
     ativo: c.ativo,
   };
 }
 
-/** Versão do admin: inclui a tabela de preço e os vendedores responsáveis. */
+/** Versão do admin: inclui a tabela de preço e o setor (com os vendedores). */
 function serializeCompleto(c: service.ClienteCompleto) {
   return {
     ...serialize(c),
     tabelaPreco: c.tabelaPreco,
-    vendedores: c.vendedores.map((v) => v.vendedor),
+    setor: c.setor
+      ? {
+          id: c.setor.id,
+          nome: c.setor.nome,
+          vendedores: c.setor.vendedores.map((v) => v.vendedor),
+        }
+      : null,
   };
 }
 
-/** Lista clientes: vendedor vê os do próprio local; admin escolhe via local_id. */
+/** Lista clientes: vendedor vê os dos seus setores; admin escolhe via local_id. */
 export async function listar(req: Request, res: Response): Promise<void> {
   const schema = z.object({
     local_id: z.string().uuid().optional(),
@@ -54,10 +61,11 @@ export async function listar(req: Request, res: Response): Promise<void> {
 
   const apenasAtivos = parsed.data.ativos !== 'false';
 
-  // Vendedor enxerga apenas os clientes da própria carteira (RN da carteira).
+  // Vendedor enxerga apenas os clientes dos próprios setores, com o nome do
+  // setor (a tela agrupa por região).
   if (req.user!.type === 'VENDEDOR') {
     const meus = await carteira.clientesDoUsuarioVendedor(req.user!.sub, apenasAtivos);
-    res.json({ clientes: meus.map(serialize) });
+    res.json({ clientes: meus.map((c) => ({ ...serialize(c), setor: c.setor })) });
     return;
   }
 
@@ -83,7 +91,7 @@ async function clienteAcessivel(
   if (req.user!.type === 'VENDEDOR') {
     const atende = await carteira.vendedorAtendeCliente(req.user!.sub, cliente.id);
     if (!atende) {
-      res.status(403).json({ mensagem: 'Cliente não está na sua carteira' });
+      res.status(403).json({ mensagem: 'Cliente não está nos seus setores' });
       return null;
     }
   }
@@ -143,28 +151,27 @@ const clienteCreateSchema = z.object({
   telefoneComprador: z.string().optional(),
   localId: z.string().uuid(),
   tabelaPrecoId: z.string().uuid().optional(),
-  // Carteira: vendedores responsáveis por esse cliente.
-  vendedorIds: z.array(z.string().uuid()).optional(),
+  // Setor (região) do cliente; null tira o cliente do setor.
+  setorId: z.string().uuid().nullable().optional(),
 });
 
 const clienteUpdateSchema = clienteCreateSchema.partial().extend({
   ativo: z.boolean().optional(),
 });
 
-/** Valida tabela de preço e vendedores antes de gravar. Devolve erro ou null. */
+/** Valida tabela de preço e setor antes de gravar. Devolve erro ou null. */
 async function validarVinculos(
-  dados: { tabelaPrecoId?: string; vendedorIds?: string[] },
+  dados: { tabelaPrecoId?: string; setorId?: string | null },
   localId: string,
 ): Promise<string | null> {
   if (dados.tabelaPrecoId) {
     const tabela = await service.tabelaExiste(dados.tabelaPrecoId);
     if (!tabela) return 'Tabela de preço não encontrada';
   }
-  if (dados.vendedorIds && dados.vendedorIds.length > 0) {
-    const total = await service.vendedoresExistemNoLocal(dados.vendedorIds, localId);
-    if (total !== dados.vendedorIds.length) {
-      return 'Um ou mais vendedores não pertencem a esta filial';
-    }
+  if (dados.setorId) {
+    const setor = await service.getSetor(dados.setorId);
+    if (!setor) return 'Setor não encontrado';
+    if (setor.localId !== localId) return 'Esse setor não pertence a esta filial';
   }
   return null;
 }
@@ -192,15 +199,14 @@ export async function adminCriar(req: Request, res: Response): Promise<void> {
     res.status(400).json({ mensagem: 'Dados inválidos', erros: parsed.error.flatten() });
     return;
   }
-  const { vendedorIds, ...dados } = parsed.data;
-  const erro = await validarVinculos(parsed.data, dados.localId);
+  const dados = parsed.data;
+  const erro = await validarVinculos(dados, dados.localId);
   if (erro) {
     res.status(400).json({ mensagem: erro });
     return;
   }
   try {
     const cliente = await service.criar(dados);
-    if (vendedorIds) await service.definirVendedores(cliente.id, vendedorIds);
     const completo = await service.getByIdCompleto(cliente.id);
     res.status(201).json(completo ? serializeCompleto(completo) : serialize(cliente));
   } catch (e) {
@@ -218,20 +224,23 @@ export async function adminAtualizar(req: Request, res: Response): Promise<void>
     res.status(400).json({ mensagem: 'Dados inválidos', erros: parsed.error.flatten() });
     return;
   }
-  const { vendedorIds, ...dados } = parsed.data;
+  const dados = parsed.data;
   const atual = await service.getById(req.params.id);
   if (!atual) {
     res.status(404).json({ mensagem: 'Cliente não encontrado' });
     return;
   }
-  const erro = await validarVinculos(parsed.data, dados.localId ?? atual.localId);
+  // Trocou de filial sem escolher setor: o setor antigo é da outra filial, sai.
+  if (dados.localId && dados.localId !== atual.localId && dados.setorId === undefined) {
+    dados.setorId = null;
+  }
+  const erro = await validarVinculos(dados, dados.localId ?? atual.localId);
   if (erro) {
     res.status(400).json({ mensagem: erro });
     return;
   }
   try {
     const cliente = await service.atualizar(req.params.id, dados);
-    if (vendedorIds) await service.definirVendedores(cliente.id, vendedorIds);
     const completo = await service.getByIdCompleto(cliente.id);
     res.json(completo ? serializeCompleto(completo) : serialize(cliente));
   } catch (e) {
@@ -245,21 +254,6 @@ export async function adminAtualizar(req: Request, res: Response): Promise<void>
     }
     throw e;
   }
-}
-
-/** Vendedores ativos de uma filial — opções do cadastro de cliente. */
-export async function adminVendedores(req: Request, res: Response): Promise<void> {
-  const parsed = z
-    .object({ local_id: z.string().uuid() })
-    .safeParse(req.query);
-  if (!parsed.success) {
-    res.status(400).json({ mensagem: 'local_id é obrigatório' });
-    return;
-  }
-  const vendedores = await service.listVendedoresDoLocal(parsed.data.local_id);
-  res.json({
-    vendedores: vendedores.map((v) => ({ id: v.id, nomeCompleto: v.nomeCompleto })),
-  });
 }
 
 // ---- Mix do cliente (admin) ----

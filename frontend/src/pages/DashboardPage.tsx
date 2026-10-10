@@ -44,6 +44,11 @@ export function DashboardPage() {
         { titulo: 'Produtos', desc: 'Catálogo: adicionar e editar', to: '/admin/produtos' },
         { titulo: 'Tabelas de Preço', desc: 'Preços por grupo de clientes', to: '/admin/tabelas' },
         { titulo: 'Clientes', desc: 'Cadastro e mix de cada cliente', to: '/admin/clientes' },
+        {
+          titulo: 'Setores',
+          desc: 'Regiões de visita: vendedores e clientes de cada uma',
+          to: '/admin/setores',
+        },
         { titulo: 'Pedidos', desc: 'Ver pedidos e baixar TXT', to: '/admin/pedidos' },
         ...(isAdminTI
           ? [

@@ -11,13 +11,9 @@ import {
   formatarCep,
 } from '../../lib/cep';
 import * as clientesApi from '../../lib/clientesApi';
+import * as setoresApi from '../../lib/setoresApi';
 import * as tabelasApi from '../../lib/tabelasApi';
-import type {
-  ClienteCompleto,
-  Local,
-  TabelaPreco,
-  VendedorOpcao,
-} from '../../lib/types';
+import type { ClienteCompleto, Local, Setor, TabelaPreco } from '../../lib/types';
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500';
@@ -31,7 +27,7 @@ export function AdminClientesPage() {
   const [editando, setEditando] = useState<ClienteCompleto | null>(null);
   const [modalAberto, setModalAberto] = useState(false);
   const [tabelas, setTabelas] = useState<TabelaPreco[]>([]);
-  const [vendedores, setVendedores] = useState<VendedorOpcao[]>([]);
+  const [setores, setSetores] = useState<Setor[]>([]);
 
   useEffect(() => {
     clientesApi.listarLocais().then((ls) => {
@@ -41,10 +37,10 @@ export function AdminClientesPage() {
     tabelasApi.listar().then(setTabelas);
   }, []);
 
-  // Vendedores do cadastro são os da filial selecionada.
+  // Setores do cadastro são os da filial selecionada.
   useEffect(() => {
     if (!localId) return;
-    clientesApi.adminListarVendedores(localId).then(setVendedores);
+    setoresApi.listar(localId).then(setSetores);
   }, [localId]);
 
   async function carregar(id: string) {
@@ -127,9 +123,13 @@ export function AdminClientesPage() {
                     </span>
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {c.vendedores.length === 0
-                      ? 'Sem vendedor responsável — ninguém vê este cliente'
-                      : `Vendedor: ${c.vendedores.map((v) => v.nomeCompleto).join(', ')}`}
+                    {!c.setor
+                      ? 'Sem setor: nenhum vendedor vê este cliente'
+                      : c.setor.vendedores.length === 0
+                        ? `Setor: ${c.setor.nome} · sem vendedor`
+                        : `Setor: ${c.setor.nome} · ${c.setor.vendedores
+                            .map((v) => v.nomeCompleto)
+                            .join(', ')}`}
                   </p>
                 </div>
                 <button
@@ -159,7 +159,7 @@ export function AdminClientesPage() {
           cliente={editando}
           localId={localId}
           tabelas={tabelas}
-          vendedores={vendedores}
+          setores={setores}
           onSalvar={aoSalvar}
         />
       </Modal>
@@ -171,13 +171,13 @@ function ClienteForm({
   cliente,
   localId,
   tabelas,
-  vendedores,
+  setores,
   onSalvar,
 }: {
   cliente: ClienteCompleto | null;
   localId: string;
   tabelas: TabelaPreco[];
-  vendedores: VendedorOpcao[];
+  setores: Setor[];
   onSalvar: () => void;
 }) {
   const [codigo, setCodigo] = useState(cliente?.codigo ?? '');
@@ -202,18 +202,11 @@ function ClienteForm({
   const [tabelaPrecoId, setTabelaPrecoId] = useState(
     cliente?.tabelaPrecoId ?? tabelas[0]?.id ?? '',
   );
-  const [vendedorIds, setVendedorIds] = useState<string[]>(
-    cliente?.vendedores.map((v) => v.id) ?? [],
-  );
+  const [setorId, setSetorId] = useState(cliente?.setorId ?? '');
   const [ativo, setAtivo] = useState(cliente?.ativo ?? true);
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
-
-  function alternarVendedor(id: string) {
-    setVendedorIds((atual) =>
-      atual.includes(id) ? atual.filter((v) => v !== id) : [...atual, id],
-    );
-  }
+  const setorEscolhido = setores.find((s) => s.id === setorId);
 
   /**
    * Busca o endereço assim que o CEP fica completo (8 dígitos). Preenche
@@ -266,7 +259,7 @@ function ClienteForm({
         cidade: cidade.trim() || undefined,
         estado: estado.trim().toUpperCase() || undefined,
         tabelaPrecoId: tabelaPrecoId || undefined,
-        vendedorIds,
+        setorId: setorId || null,
       };
       if (cliente) {
         await clientesApi.adminAtualizar(cliente.id, { ...dados, ativo });
@@ -470,37 +463,36 @@ function ClienteForm({
         </select>
       </Campo>
 
-      <fieldset>
-        <legend className="mb-1 block text-sm font-medium text-slate-700">
-          Vendedores responsáveis
-        </legend>
-        {vendedores.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Nenhum vendedor cadastrado nesta filial.
-          </p>
-        ) : (
-          <div className="space-y-1.5">
-            {vendedores.map((v) => (
-              <label
-                key={v.id}
-                className="flex items-center gap-2 text-sm text-slate-700"
-              >
-                <input
-                  type="checkbox"
-                  checked={vendedorIds.includes(v.id)}
-                  onChange={() => alternarVendedor(v.id)}
-                />
-                {v.nomeCompleto}
-              </label>
-            ))}
-          </div>
-        )}
-        {vendedorIds.length === 0 && vendedores.length > 0 && (
-          <Aviso tom="atencao" compacto className="mt-2">
-            Sem nenhum marcado, nenhum vendedor verá este cliente.
-          </Aviso>
-        )}
-      </fieldset>
+      <Campo label="Setor (região de visita)">
+        <select
+          value={setorId}
+          onChange={(e) => setSetorId(e.target.value)}
+          className={inputCls}
+        >
+          <option value="">Sem setor</option>
+          {setores.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.nome}
+            </option>
+          ))}
+        </select>
+      </Campo>
+      {!setorEscolhido ? (
+        <Aviso tom="atencao" compacto>
+          {setores.length === 0
+            ? 'Nenhum setor criado ainda. Crie em Setores, no menu. Sem setor, nenhum vendedor verá este cliente.'
+            : 'Sem setor, nenhum vendedor verá este cliente.'}
+        </Aviso>
+      ) : setorEscolhido.vendedores.length === 0 ? (
+        <Aviso tom="atencao" compacto>
+          Este setor ainda não tem vendedor. Adicione em Setores.
+        </Aviso>
+      ) : (
+        <p className="-mt-1 text-xs text-slate-500">
+          Quem visita:{' '}
+          {setorEscolhido.vendedores.map((v) => v.nomeCompleto).join(', ')}
+        </p>
+      )}
 
       {cliente && (
         <label className="flex items-center gap-2 text-sm text-slate-700">

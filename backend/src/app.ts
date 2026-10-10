@@ -14,6 +14,7 @@ import { pedidosRoutes } from './modules/pedidos/pedidos.routes';
 import { pedidosAdminRoutes } from './modules/pedidos/pedidos.admin.routes';
 import { usuariosRoutes } from './modules/usuarios/usuarios.routes';
 import { tabelasAdminRoutes } from './modules/tabelas/tabelas.admin.routes';
+import { setoresAdminRoutes } from './modules/setores/setores.admin.routes';
 
 export const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/admin/clientes', clientesAdminRoutes);
 app.use('/api/admin/pedidos', pedidosAdminRoutes);
 app.use('/api/admin/usuarios', usuariosRoutes);
 app.use('/api/admin/tabelas', tabelasAdminRoutes);
+app.use('/api/admin/setores', setoresAdminRoutes);
 app.use('/api/locais', locaisRoutes);
 
 // Em produção, o mesmo serviço serve o site (React já buildado) — mesmo domínio

@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma';
-import type { Cliente, ClienteProduto, Produto, Vendedor } from '@prisma/client';
+import type { Cliente, ClienteProduto, Produto } from '@prisma/client';
 
 export function listByLocal(
   localId: string,
@@ -40,6 +40,7 @@ export function criar(data: {
   telefoneComprador?: string;
   localId: string;
   tabelaPrecoId?: string;
+  setorId?: string | null;
 }): Promise<Cliente> {
   return prisma.cliente.create({ data });
 }
@@ -64,24 +65,37 @@ export function atualizar(
     telefoneComprador: string;
     localId: string;
     tabelaPrecoId: string;
+    setorId: string | null;
     ativo: boolean;
   }>,
 ): Promise<Cliente> {
   return prisma.cliente.update({ where: { id }, data });
 }
 
-// ---- Tabela de preço e carteira de vendedores ----
+// ---- Tabela de preço e setor ----
 
 const clienteInclude = {
   tabelaPreco: { select: { id: true, nome: true } },
-  vendedores: {
-    select: { vendedor: { select: { id: true, nomeCompleto: true } } },
+  // Setor + vendedores dele: são esses que atendem o cliente.
+  setor: {
+    select: {
+      id: true,
+      nome: true,
+      vendedores: {
+        select: { vendedor: { select: { id: true, nomeCompleto: true } } },
+        orderBy: { vendedor: { nomeCompleto: 'asc' } },
+      },
+    },
   },
 } as const;
 
 export type ClienteCompleto = Cliente & {
   tabelaPreco: { id: string; nome: string } | null;
-  vendedores: { vendedor: { id: string; nomeCompleto: string } }[];
+  setor: {
+    id: string;
+    nome: string;
+    vendedores: { vendedor: { id: string; nomeCompleto: string } }[];
+  } | null;
 };
 
 export function listByLocalCompleto(
@@ -99,40 +113,8 @@ export function getByIdCompleto(id: string): Promise<ClienteCompleto | null> {
   return prisma.cliente.findUnique({ where: { id }, include: clienteInclude });
 }
 
-/** Vendedores ativos de uma filial — opções do cadastro do cliente. */
-export function listVendedoresDoLocal(localId: string): Promise<Vendedor[]> {
-  return prisma.vendedor.findMany({
-    where: { localId, ativo: true },
-    orderBy: { nomeCompleto: 'asc' },
-  });
-}
-
-/** Substitui a carteira do cliente pela lista informada. */
-export async function definirVendedores(
-  clienteId: string,
-  vendedorIds: string[],
-): Promise<void> {
-  await prisma.$transaction([
-    prisma.clienteVendedor.deleteMany({
-      where: { clienteId, vendedorId: { notIn: vendedorIds } },
-    }),
-    ...vendedorIds.map((vendedorId) =>
-      prisma.clienteVendedor.upsert({
-        where: { clienteId_vendedorId: { clienteId, vendedorId } },
-        create: { clienteId, vendedorId },
-        update: {},
-      }),
-    ),
-  ]);
-}
-
-export function vendedoresExistemNoLocal(
-  vendedorIds: string[],
-  localId: string,
-): Promise<number> {
-  return prisma.vendedor.count({
-    where: { id: { in: vendedorIds }, localId, ativo: true },
-  });
+export function getSetor(id: string) {
+  return prisma.setor.findUnique({ where: { id }, select: { id: true, localId: true } });
 }
 
 export function tabelaExiste(id: string) {
