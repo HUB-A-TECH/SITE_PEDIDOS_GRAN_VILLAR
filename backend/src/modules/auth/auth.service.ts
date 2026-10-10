@@ -49,6 +49,13 @@ export async function login(
   };
 }
 
+export function getUsuarioSessao(id: string) {
+  return prisma.user.findUnique({
+    where: { id },
+    select: { id: true, username: true, type: true, localId: true },
+  });
+}
+
 export async function revokeToken(
   jti: string,
   usuarioId: string,

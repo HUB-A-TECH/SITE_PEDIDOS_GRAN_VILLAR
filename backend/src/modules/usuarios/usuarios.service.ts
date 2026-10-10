@@ -83,7 +83,14 @@ export function definirAtivo(id: string, ativo: boolean) {
   return prisma.user.update({ where: { id }, data: { ativo } });
 }
 
+/**
+ * Admin TI redefine a senha de alguém (ex.: esqueceu, ou perdeu o celular):
+ * as sessões abertas dessa pessoa caem, como na troca feita por ela mesma.
+ */
 export async function resetarSenha(id: string, senha: string) {
   const passwordHash = await hashPassword(senha);
-  await prisma.user.update({ where: { id }, data: { passwordHash } });
+  await prisma.user.update({
+    where: { id },
+    data: { passwordHash, senhaAlteradaEm: new Date() },
+  });
 }

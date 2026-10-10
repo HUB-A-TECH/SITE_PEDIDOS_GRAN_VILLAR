@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { MinhaContaPage } from './pages/MinhaContaPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleRoute } from './components/RoleRoute';
 import { SelecionarClientePage } from './pages/vendedor/SelecionarClientePage';
@@ -32,6 +33,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <DashboardPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/minha-conta',
+    element: (
+      <ProtectedRoute>
+        <MinhaContaPage />
       </ProtectedRoute>
     ),
   },

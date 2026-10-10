@@ -10,7 +10,7 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-const cookieOptions = {
+export const cookieOptions = {
   httpOnly: true,
   secure: env.cookieSecure,
   sameSite: 'lax' as const,
@@ -50,14 +50,15 @@ export async function logout(req: Request, res: Response): Promise<void> {
   res.json({ mensagem: 'Desconectado com sucesso' });
 }
 
+/**
+ * Quem está conectado. Lê do banco (e não só do token) para refletir na hora
+ * uma troca de usuário feita em outro aparelho, em "Minha Conta".
+ */
 export async function me(req: Request, res: Response): Promise<void> {
-  const user = req.user!;
-  res.json({
-    usuario: {
-      id: user.sub,
-      username: user.username,
-      type: user.type,
-      localId: user.localId,
-    },
-  });
+  const user = await authService.getUsuarioSessao(req.user!.sub);
+  if (!user) {
+    res.status(401).json({ mensagem: 'Não autenticado' });
+    return;
+  }
+  res.json({ usuario: user });
 }
