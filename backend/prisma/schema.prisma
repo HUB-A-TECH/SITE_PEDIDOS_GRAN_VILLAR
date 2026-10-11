@@ -73,6 +73,7 @@ model User {
   vendedor         Vendedor?
   pedidosEditados  Pedido[]  @relation("PedidoEditadoPor")
   pedidosAlterados Pedido[]  @relation("PedidoUltimaAlteracao")
+  revisoesFeitas   RevisaoPedido[]
 
   @@map("usuarios")
 }
@@ -264,10 +265,38 @@ model Pedido {
   cliente            Cliente      @relation(fields: [clienteId], references: [id])
   local              Local        @relation(fields: [localId], references: [id])
   itens              ItemPedido[]
+  revisoes           RevisaoPedido[]
   editadoPor         User?        @relation("PedidoEditadoPor", fields: [editadoPorId], references: [id])
   ultimaAlteracaoPor User?        @relation("PedidoUltimaAlteracao", fields: [ultimaAlteracaoPorId], references: [id])
 
   @@map("pedidos")
+}
+
+// Revisão do comercial que ALTEROU o pedido: o que mudou em relação ao que o
+// vendedor enviou (para o vendedor ver e, se quiser, questionar). Uma linha por
+// "Confirmar pedido com alterações"; aprovar sem alterar não cria linha.
+model RevisaoPedido {
+  id            String   @id @default(uuid())
+  pedidoId      String   @map("pedido_id")
+  revisadoPorId String   @map("revisado_por_id")
+  revisadoEm    DateTime @map("revisado_em")
+  // [{ produtoId, codigo, nome, unidadeMedida, removido,
+  //    quantidadeAntes, quantidadeDepois, precoAntes, precoDepois }]
+  alteracoes    Json
+  totalAntes    Decimal  @map("total_antes") @db.Decimal(10, 2)
+  totalDepois   Decimal  @map("total_depois") @db.Decimal(10, 2)
+  // Quando o vendedor viu (some o aviso do menu dele).
+  vistoPeloVendedorEm DateTime? @map("visto_pelo_vendedor_em")
+  // O vendedor editou o pedido depois desta revisão: ela deixa de descrever o
+  // pedido atual (ele volta para análise) e para de aparecer como "aprovado
+  // com alterações".
+  superadaEm    DateTime? @map("superada_em")
+
+  pedido      Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  revisadoPor User   @relation(fields: [revisadoPorId], references: [id])
+
+  @@index([pedidoId])
+  @@map("revisoes_pedido")
 }
 
 model ItemPedido {

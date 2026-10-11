@@ -140,8 +140,32 @@ export async function meuHistorico(req: Request, res: Response): Promise<void> {
         : null,
       ultimaAlteracaoEm: p.ultimaAlteracaoEm,
       revisao: calcularRevisao(p),
+      // O que o comercial alterou e ainda vale (pedido cancelado não mostra).
+      alteracoesComercial: p.status === 'CONFIRMADO' ? serializeRevisoes(p.revisoes) : [],
     })),
   });
+}
+
+/** Quantas revisões com alterações o vendedor ainda não viu (aviso no menu). */
+export async function alteracoesNaoVistas(req: Request, res: Response): Promise<void> {
+  const vendedor = await exigirVendedor(req, res);
+  if (!vendedor) return;
+  res.json({ total: await service.contarAlteracoesNaoVistas(vendedor.id) });
+}
+
+/** O vendedor abriu Meus Pedidos e viu as alterações desses pedidos. */
+export async function marcarAlteracoesVistas(req: Request, res: Response): Promise<void> {
+  const vendedor = await exigirVendedor(req, res);
+  if (!vendedor) return;
+  const parsed = z
+    .object({ pedidoIds: z.array(z.string().uuid()).min(1).max(500) })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'pedidoIds inválidos' });
+    return;
+  }
+  const r = await service.marcarAlteracoesVistas(vendedor.id, parsed.data.pedidoIds);
+  res.json({ marcadas: r.count });
 }
 
 export async function obterPedido(req: Request, res: Response): Promise<void> {
@@ -538,8 +562,24 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
         : null,
       ultimaAlteracaoEm: p.ultimaAlteracaoEm,
       revisao: calcularRevisao(p),
+      comAlteracoes: p._count.revisoes > 0,
     })),
   });
+}
+
+type RevisaoVigente = PedidoAdminComItens['revisoes'][number];
+
+/** Revisões do comercial com alterações, no formato das telas. */
+function serializeRevisoes(revisoes: RevisaoVigente[]) {
+  return revisoes.map((r) => ({
+    id: r.id,
+    revisadoPor: r.revisadoPor.username,
+    revisadoEm: r.revisadoEm,
+    alteracoes: r.alteracoes as unknown as service.AlteracaoItem[],
+    totalAntes: Number(r.totalAntes),
+    totalDepois: Number(r.totalDepois),
+    novo: !r.vistoPeloVendedorEm,
+  }));
 }
 
 type PedidoAdminComItens = NonNullable<
@@ -564,6 +604,7 @@ function serializeAdmin(p: PedidoAdminComItens) {
       : null,
     ultimaAlteracaoEm: p.ultimaAlteracaoEm,
     revisao: calcularRevisao(p),
+    alteracoesComercial: serializeRevisoes(p.revisoes),
     itens: p.itens.map((i) => ({
       id: i.id,
       produtoId: i.produtoId,
@@ -597,17 +638,6 @@ async function carregarPedidoAdminEditavel(
   return pedido;
 }
 
-async function responderPedidoAdminAtualizado(
-  pedidoId: string,
-  usuarioId: string,
-  res: Response,
-): Promise<void> {
-  await service.recomputarTotais(pedidoId);
-  await service.registrarEdicaoAdmin(pedidoId, usuarioId);
-  const atualizado = await service.getPedidoParaAdmin(pedidoId);
-  res.json({ pedido: atualizado ? serializeAdmin(atualizado) : null });
-}
-
 export async function adminObterPedido(req: Request, res: Response): Promise<void> {
   const pedido = await service.getPedidoParaAdmin(req.params.id);
   if (!pedido) {
@@ -629,52 +659,106 @@ export async function adminAprovar(req: Request, res: Response): Promise<void> {
   res.json({ pedido: atualizado ? serializeAdmin(atualizado) : null });
 }
 
-export async function adminAtualizarItem(req: Request, res: Response): Promise<void> {
+const revisaoSchema = z.object({
+  // Todos os itens do pedido: como o comercial viu ao abrir (base) e como
+  // deixou. Quantidade 0 = remover o item.
+  itens: z
+    .array(
+      z.object({
+        itemId: z.string().uuid(),
+        quantidadeBase: z.number().nonnegative(),
+        precoBase: z.number().nonnegative(),
+        quantidade: z.number().nonnegative().max(1_000_000),
+        precoUnitario: z.number().positive('O preço deve ser maior que zero').max(1_000_000),
+      }),
+    )
+    .min(1),
+});
+
+const arred = (v: number, casas: number) => Math.round(v * 10 ** casas) / 10 ** casas;
+
+/**
+ * "Confirmar pedido com alterações": aplica de uma vez tudo o que o comercial
+ * mudou na tela (enquanto ele mexia, nada era gravado), registra o que mudou
+ * para o vendedor ver e marca o pedido como revisado. Se o vendedor mexeu no
+ * pedido enquanto o comercial revisava, recusa (409) sem gravar nada.
+ */
+export async function adminRevisar(req: Request, res: Response): Promise<void> {
   const pedido = await carregarPedidoAdminEditavel(req.params.id, res);
   if (!pedido) return;
 
-  const parsed = z.object({ quantidade: z.number().nonnegative() }).safeParse(req.body);
+  const parsed = revisaoSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ mensagem: 'quantidade (>= 0) é obrigatória' });
+    res.status(400).json({ mensagem: parsed.error.issues[0]?.message ?? 'Dados inválidos' });
     return;
   }
 
-  const item = await service.getItem(req.params.itemId);
-  if (!item || item.pedidoId !== pedido.id) {
-    res.status(404).json({ mensagem: 'Item não encontrado no pedido' });
+  const MUDOU =
+    'O vendedor alterou este pedido enquanto você revisava. Recarregue a página para ver a versão atual.';
+  const enviados = new Map(parsed.data.itens.map((i) => [i.itemId, i]));
+  if (
+    enviados.size !== parsed.data.itens.length ||
+    enviados.size !== pedido.itens.length ||
+    pedido.itens.some((i) => !enviados.has(i.id))
+  ) {
+    res.status(409).json({ mensagem: MUDOU });
     return;
   }
 
-  if (parsed.data.quantidade <= 0) {
-    if (pedido.itens.length <= 1) {
-      res.status(400).json({ mensagem: 'O pedido deve ter ao menos 1 item' });
+  const itens: service.ItemRevisado[] = [];
+  const alteracoes: service.AlteracaoItem[] = [];
+  for (const atual of pedido.itens) {
+    const e = enviados.get(atual.id)!;
+    const quantidade = arred(e.quantidade, 3);
+    const precoUnitario = arred(e.precoUnitario, 2);
+    itens.push({
+      itemId: atual.id,
+      quantidadeBase: e.quantidadeBase,
+      precoBase: e.precoBase,
+      quantidade,
+      precoUnitario,
+    });
+    const quantidadeAntes = Number(atual.quantidade);
+    const precoAntes = Number(atual.precoUnitario);
+    const removido = quantidade <= 0;
+    if (removido || quantidade !== quantidadeAntes || precoUnitario !== precoAntes) {
+      alteracoes.push({
+        produtoId: atual.produtoId,
+        codigo: atual.produto.codigo,
+        nome: atual.produto.nome,
+        unidadeMedida: atual.produto.unidadeMedida,
+        removido,
+        quantidadeAntes,
+        quantidadeDepois: removido ? 0 : quantidade,
+        precoAntes,
+        precoDepois: precoUnitario,
+      });
+    }
+  }
+
+  if (alteracoes.length === 0) {
+    res.status(400).json({ mensagem: 'Nenhuma alteração para confirmar. Use "Aprovar pedido".' });
+    return;
+  }
+  if (itens.every((i) => i.quantidade <= 0)) {
+    res.status(400).json({ mensagem: 'O pedido precisa ter ao menos 1 item' });
+    return;
+  }
+
+  try {
+    await service.aplicarRevisaoComercial({
+      pedidoId: pedido.id,
+      usuarioId: req.user!.sub,
+      itens,
+      alteracoes,
+    });
+  } catch (e) {
+    if (e instanceof service.PedidoMudouError) {
+      res.status(409).json({ mensagem: MUDOU });
       return;
     }
-    await service.excluirItem(item.id);
-  } else {
-    await service.atualizarQuantidadeItem(item, parsed.data.quantidade);
+    throw e;
   }
-  await responderPedidoAdminAtualizado(pedido.id, req.user!.sub, res);
-}
-
-export async function adminAtualizarPreco(req: Request, res: Response): Promise<void> {
-  const pedido = await carregarPedidoAdminEditavel(req.params.id, res);
-  if (!pedido) return;
-
-  const parsed = z
-    .object({ preco_unitario: z.number().positive() })
-    .safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ mensagem: 'preco_unitario (> 0) é obrigatório' });
-    return;
-  }
-
-  const item = await service.getItem(req.params.itemId);
-  if (!item || item.pedidoId !== pedido.id) {
-    res.status(404).json({ mensagem: 'Item não encontrado no pedido' });
-    return;
-  }
-
-  await service.atualizarPrecoItem(item, parsed.data.preco_unitario);
-  await responderPedidoAdminAtualizado(pedido.id, req.user!.sub, res);
+  const atualizado = await service.getPedidoParaAdmin(pedido.id);
+  res.json({ pedido: atualizado ? serializeAdmin(atualizado) : null });
 }

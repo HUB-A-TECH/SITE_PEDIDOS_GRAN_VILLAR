@@ -130,6 +130,42 @@ export function pdfHref(pedidoId: string): string {
   return `/api/pedidos/${pedidoId}/pdf`;
 }
 
+// ---- Alterações do comercial ----
+
+/** O que mudou num item quando o comercial confirmou com alterações. */
+export interface AlteracaoItem {
+  produtoId: string;
+  codigo: string;
+  nome: string;
+  unidadeMedida: string;
+  removido: boolean;
+  quantidadeAntes: number;
+  quantidadeDepois: number;
+  precoAntes: number;
+  precoDepois: number;
+}
+
+export interface AlteracaoComercial {
+  id: string;
+  revisadoPor: string;
+  revisadoEm: string;
+  alteracoes: AlteracaoItem[];
+  totalAntes: number;
+  totalDepois: number;
+  /** O vendedor ainda não viu. */
+  novo: boolean;
+}
+
+/** Quantas alterações do comercial o vendedor ainda não viu (aviso no menu). */
+export async function alteracoesNaoVistas(): Promise<number> {
+  const res = await api.get<{ total: number }>('/pedidos/alteracoes/nao-vistas');
+  return res.data.total;
+}
+
+export async function marcarAlteracoesVistas(pedidoIds: string[]): Promise<void> {
+  await api.post('/pedidos/alteracoes/vistas', { pedidoIds });
+}
+
 export interface PedidoAdmin {
   pedidoId: string;
   numeroPedido: string | null;
@@ -144,6 +180,8 @@ export interface PedidoAdmin {
   ultimaAlteracaoPor: { username: string } | null;
   ultimaAlteracaoEm: string | null;
   revisao: Revisao;
+  /** Aprovado com alterações do comercial (ainda valendo). */
+  comAlteracoes: boolean;
 }
 
 export async function adminListarPedidos(
@@ -174,6 +212,7 @@ export interface PedidoAdminDetalhe {
   ultimaAlteracaoPor: { username: string } | null;
   ultimaAlteracaoEm: string | null;
   revisao: Revisao;
+  alteracoesComercial: AlteracaoComercial[];
   itens: ItemPedido[];
 }
 
@@ -182,14 +221,27 @@ export async function adminObterPedido(pedidoId: string): Promise<PedidoAdminDet
   return res.data.pedido;
 }
 
-export async function adminAtualizarQuantidade(
+/** Item na revisão: como estava ao abrir (base) e como o comercial deixou. */
+export interface ItemRevisado {
+  itemId: string;
+  quantidadeBase: number;
+  precoBase: number;
+  /** 0 = remover. */
+  quantidade: number;
+  precoUnitario: number;
+}
+
+/**
+ * "Confirmar pedido com alterações": grava tudo de uma vez. Se o vendedor
+ * mexeu no pedido enquanto o comercial revisava, o servidor recusa (409).
+ */
+export async function adminRevisar(
   pedidoId: string,
-  itemId: string,
-  quantidade: number,
+  itens: ItemRevisado[],
 ): Promise<PedidoAdminDetalhe> {
-  const res = await api.put<{ pedido: PedidoAdminDetalhe }>(
-    `/admin/pedidos/${pedidoId}/itens/${itemId}`,
-    { quantidade },
+  const res = await api.post<{ pedido: PedidoAdminDetalhe }>(
+    `/admin/pedidos/${pedidoId}/revisao`,
+    { itens },
   );
   return res.data.pedido;
 }
@@ -199,18 +251,6 @@ export async function adminAprovar(pedidoId: string): Promise<PedidoAdminDetalhe
   const res = await api.post<{ pedido: PedidoAdminDetalhe }>(
     `/admin/pedidos/${pedidoId}/aprovar`,
     {},
-  );
-  return res.data.pedido;
-}
-
-export async function adminAtualizarPreco(
-  pedidoId: string,
-  itemId: string,
-  precoUnitario: number,
-): Promise<PedidoAdminDetalhe> {
-  const res = await api.put<{ pedido: PedidoAdminDetalhe }>(
-    `/admin/pedidos/${pedidoId}/itens/${itemId}/preco`,
-    { preco_unitario: precoUnitario },
   );
   return res.data.pedido;
 }

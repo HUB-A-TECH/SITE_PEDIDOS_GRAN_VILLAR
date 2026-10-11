@@ -17,10 +17,13 @@ export interface EstiloStatus {
 /**
  * Cor e rótulo de um pedido:
  * 🔴 cancelado · 🟢 aprovado · 🟡 em análise (novo ou alterado após revisão).
+ * `comAlteracoes`: o comercial aprovou mudando itens/preços — continua verde
+ * (está aprovado), mas o rótulo avisa.
  */
 export function estiloStatus(
   status: StatusPedido,
   revisao: Revisao,
+  comAlteracoes = false,
 ): EstiloStatus {
   if (status === 'CANCELADO') {
     return {
@@ -41,7 +44,7 @@ export function estiloStatus(
   // CONFIRMADO (enviado)
   if (revisao === 'REVISADO') {
     return {
-      label: 'Aprovado',
+      label: comAlteracoes ? 'Aprovado com alterações' : 'Aprovado',
       textClass: 'text-brand-600',
       borderClass: 'border-brand-500',
       badge: null,
