@@ -83,7 +83,7 @@ export function AdminPedidosPage() {
       ) : (
         <ul className="space-y-2">
           {pedidos.map((p) => {
-            const est = estiloStatus(p.status, p.revisao);
+            const est = estiloStatus(p.status, p.revisao, p.comAlteracoes);
             return (
             <li
               key={p.pedidoId}

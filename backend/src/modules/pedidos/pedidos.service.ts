@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma';
-import type { Cliente, ItemPedido, Produto, Vendedor } from '@prisma/client';
+import type { Cliente, ItemPedido, Prisma, Produto, Vendedor } from '@prisma/client';
 import { isUniqueConstraintError } from '../../utils/prisma-errors';
 
 export function getVendedorByUsuario(usuarioId: string): Promise<Vendedor | null> {
@@ -40,11 +40,30 @@ export function getPedidoDoVendedor(id: string, vendedorId: string) {
   });
 }
 
+/**
+ * Revisões do comercial que ainda descrevem o pedido (não superadas por uma
+ * edição posterior do vendedor), da mais antiga para a mais nova.
+ */
+export const revisoesVigentesInclude = {
+  where: { superadaEm: null },
+  orderBy: { revisadoEm: 'asc' },
+  select: {
+    id: true,
+    revisadoEm: true,
+    alteracoes: true,
+    totalAntes: true,
+    totalDepois: true,
+    vistoPeloVendedorEm: true,
+    revisadoPor: { select: { username: true } },
+  },
+} as const;
+
 const pedidoAdminInclude = {
   ...pedidoInclude,
   vendedor: { select: { id: true, nomeCompleto: true } },
   editadoPor: { select: { username: true } },
   ultimaAlteracaoPor: { select: { username: true } },
+  revisoes: revisoesVigentesInclude,
 } as const;
 
 /** Pedido completo para a tela de detalhe do admin (qualquer vendedor/cliente). */
@@ -75,12 +94,156 @@ export function registrarEdicaoAdmin(pedidoId: string, usuarioId: string) {
 /**
  * Registra apenas a última alteração (usado quando o vendedor edita um pedido
  * já enviado). NÃO mexe em editadoPor, para não marcar como "revisado" pelo
- * comercial.
+ * comercial. As revisões do comercial com alterações deixam de descrever o
+ * pedido (ele volta para análise), então ficam marcadas como superadas.
  */
 export function registrarUltimaAlteracao(pedidoId: string, usuarioId: string) {
-  return prisma.pedido.update({
-    where: { id: pedidoId },
-    data: { ultimaAlteracaoPorId: usuarioId, ultimaAlteracaoEm: new Date() },
+  const agora = new Date();
+  return prisma.$transaction([
+    prisma.pedido.update({
+      where: { id: pedidoId },
+      data: { ultimaAlteracaoPorId: usuarioId, ultimaAlteracaoEm: agora },
+    }),
+    prisma.revisaoPedido.updateMany({
+      where: { pedidoId, superadaEm: null },
+      data: { superadaEm: agora },
+    }),
+  ]);
+}
+
+// ---- Revisão do comercial ----
+
+/** O que mudou num item: guardado na revisão para o vendedor ver. */
+export interface AlteracaoItem {
+  produtoId: string;
+  codigo: string;
+  nome: string;
+  unidadeMedida: string;
+  removido: boolean;
+  quantidadeAntes: number;
+  quantidadeDepois: number;
+  precoAntes: number;
+  precoDepois: number;
+}
+
+/** Item como o comercial viu ao abrir (base) e como deixou (novo). */
+export interface ItemRevisado {
+  itemId: string;
+  quantidadeBase: number;
+  precoBase: number;
+  quantidade: number; // 0 = remover
+  precoUnitario: number;
+}
+
+/** O pedido mudou no banco depois que o comercial abriu a tela. */
+export class PedidoMudouError extends Error {}
+
+const mesmaQuantidade = (a: number, b: number) => Math.abs(a - b) < 0.0005;
+const mesmoPreco = (a: number, b: number) => Math.abs(a - b) < 0.005;
+
+/**
+ * Aplica de uma vez (transação) a revisão confirmada pelo comercial: novas
+ * quantidades/preços, itens removidos, totais, o registro do que mudou e a
+ * marca de revisão. Antes, confere que os itens no banco ainda são os que o
+ * comercial viu — se o vendedor mexeu nesse meio-tempo, lança
+ * PedidoMudouError e nada é gravado.
+ */
+export function aplicarRevisaoComercial(params: {
+  pedidoId: string;
+  usuarioId: string;
+  itens: ItemRevisado[];
+  alteracoes: AlteracaoItem[];
+}) {
+  const { pedidoId, usuarioId, itens, alteracoes } = params;
+  const agora = new Date();
+  return prisma.$transaction(async (tx) => {
+    const atuais = await tx.itemPedido.findMany({ where: { pedidoId } });
+    const base = new Map(itens.map((i) => [i.itemId, i]));
+    const igual =
+      atuais.length === itens.length &&
+      atuais.every((a) => {
+        const b = base.get(a.id);
+        return (
+          b &&
+          mesmaQuantidade(Number(a.quantidade), b.quantidadeBase) &&
+          mesmoPreco(Number(a.precoUnitario), b.precoBase)
+        );
+      });
+    if (!igual) throw new PedidoMudouError();
+
+    const totalAntes =
+      Math.round(atuais.reduce((s, it) => s + Number(it.subtotal), 0) * 100) / 100;
+
+    // Só grava o que mudou: cada gravação é uma ida ao banco (na nuvem), e
+    // regravar itens iguais deixava a confirmação lenta em pedidos grandes.
+    const mudou = (i: ItemRevisado) =>
+      !mesmaQuantidade(i.quantidade, i.quantidadeBase) || !mesmoPreco(i.precoUnitario, i.precoBase);
+    const removidos = itens.filter((i) => i.quantidade <= 0).map((i) => i.itemId);
+    if (removidos.length > 0) {
+      await tx.itemPedido.deleteMany({ where: { id: { in: removidos }, pedidoId } });
+    }
+    await Promise.all(
+      itens
+        .filter((i) => i.quantidade > 0 && mudou(i))
+        .map((i) =>
+          tx.itemPedido.update({
+            where: { id: i.itemId },
+            data: {
+              quantidade: i.quantidade,
+              precoUnitario: i.precoUnitario,
+              subtotal: calcularSubtotal(i.quantidade, i.precoUnitario),
+            },
+          }),
+        ),
+    );
+
+    const restantes = await tx.itemPedido.findMany({ where: { pedidoId } });
+    const total =
+      Math.round(restantes.reduce((s, it) => s + Number(it.subtotal), 0) * 100) / 100;
+    await tx.pedido.update({
+      where: { id: pedidoId },
+      data: {
+        subtotal: total,
+        total,
+        editadoPorId: usuarioId,
+        editadoEm: agora,
+        ultimaAlteracaoPorId: usuarioId,
+        ultimaAlteracaoEm: agora,
+      },
+    });
+    await tx.revisaoPedido.create({
+      data: {
+        pedidoId,
+        revisadoPorId: usuarioId,
+        revisadoEm: agora,
+        alteracoes: alteracoes as unknown as Prisma.InputJsonValue,
+        totalAntes,
+        totalDepois: total,
+      },
+    });
+  }, { maxWait: 10_000, timeout: 30_000 }); // folga: o banco fica na nuvem
+}
+
+/** Revisões com alterações ainda não vistas pelo vendedor (aviso no menu). */
+export function contarAlteracoesNaoVistas(vendedorId: string) {
+  return prisma.revisaoPedido.count({
+    where: {
+      superadaEm: null,
+      vistoPeloVendedorEm: null,
+      pedido: { vendedorId, status: 'CONFIRMADO' },
+    },
+  });
+}
+
+/** Marca como vistas as revisões desses pedidos (só os do próprio vendedor). */
+export function marcarAlteracoesVistas(vendedorId: string, pedidoIds: string[]) {
+  return prisma.revisaoPedido.updateMany({
+    where: {
+      pedidoId: { in: pedidoIds },
+      vistoPeloVendedorEm: null,
+      pedido: { vendedorId },
+    },
+    data: { vistoPeloVendedorEm: new Date() },
   });
 }
 
@@ -274,7 +437,7 @@ export function listarPedidosAdmin(filtro: FiltroAdminPedidos) {
       vendedor: { select: { id: true, nomeCompleto: true } },
       editadoPor: { select: { username: true } },
       ultimaAlteracaoPor: { select: { username: true } },
-      _count: { select: { itens: true } },
+      _count: { select: { itens: true, revisoes: { where: { superadaEm: null } } } },
     },
     orderBy: { confirmadoEm: 'desc' },
     ...(filtro.limite ? { take: filtro.limite } : {}),

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
+import { Aviso } from '../components/Aviso';
 import { useAuth } from '../context/AuthContext';
 import * as historicoApi from '../lib/historicoApi';
+import * as pedidosApi from '../lib/pedidosApi';
 import type { UserType } from '../lib/types';
 
 const TIPO_LABEL: Record<UserType, string> = {
@@ -24,6 +26,8 @@ export function DashboardPage() {
   // Pedidos salvos que ainda não foram enviados. Mostrado aqui para o vendedor
   // não esquecer de confirmar — antes disso, a administração não os vê.
   const [aConfirmar, setAConfirmar] = useState(0);
+  // Pedidos que o comercial aprovou com alterações e o vendedor ainda não viu.
+  const [alteracoes, setAlteracoes] = useState(0);
   const ehVendedor = usuario?.type === 'VENDEDOR';
 
   useEffect(() => {
@@ -32,6 +36,10 @@ export function DashboardPage() {
       .meuHistorico('tudo')
       .then((ps) => setAConfirmar(ps.filter((p) => p.status === 'RASCUNHO').length))
       .catch(() => setAConfirmar(0));
+    pedidosApi
+      .alteracoesNaoVistas()
+      .then(setAlteracoes)
+      .catch(() => setAlteracoes(0));
   }, [ehVendedor]);
 
   if (!usuario) return null;
@@ -87,6 +95,20 @@ export function DashboardPage() {
 
   return (
     <AppLayout titulo={`Gran Villar · ${TIPO_LABEL[usuario.type]}`}>
+      {alteracoes > 0 && (
+        <Link to="/meus-pedidos" className="mb-4 block">
+          <Aviso
+            tom="atencao"
+            titulo={
+              alteracoes === 1
+                ? '1 pedido aprovado com alterações do comercial'
+                : `${alteracoes} pedidos aprovados com alterações do comercial`
+            }
+          >
+            Toque para ver o que foi mudado.
+          </Aviso>
+        </Link>
+      )}
       <h2 className="mb-4 text-lg font-bold text-slate-800">Menu</h2>
       <div className="grid grid-cols-1 gap-3">
         {itens.map((item) =>

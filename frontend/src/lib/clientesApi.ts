@@ -55,6 +55,7 @@ export interface PerfilCliente {
     data: string;
     total: number;
     itensCount: number;
+    alteradoPeloComercial: boolean;
   }[];
   /** Só para vendedor: pedido salvo (não enviado) dele para este cliente. */
   pedidoSalvoId: string | null;

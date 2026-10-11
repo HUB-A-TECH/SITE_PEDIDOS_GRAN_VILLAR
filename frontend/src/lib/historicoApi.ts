@@ -1,6 +1,7 @@
 import { api } from './api';
 import type { Limite } from './types';
 import type { Revisao } from './statusPedido';
+import type { AlteracaoComercial } from './pedidosApi';
 
 function limiteParam(l: Limite) {
   return { limite: String(l) };
@@ -34,6 +35,8 @@ export interface MeuPedido {
   ultimaAlteracaoPor: { username: string } | null;
   ultimaAlteracaoEm: string | null;
   revisao: Revisao;
+  /** O que o comercial alterou e ainda vale (vazio se nada). */
+  alteracoesComercial: AlteracaoComercial[];
 }
 
 export async function historicoCliente(

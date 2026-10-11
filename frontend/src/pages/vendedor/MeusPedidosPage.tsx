@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Aviso } from '../../components/Aviso';
+import { AlteracoesComercial } from '../../components/AlteracoesComercial';
 import { useDialogo } from '../../context/DialogoContext';
 import * as historicoApi from '../../lib/historicoApi';
 import * as pedidosApi from '../../lib/pedidosApi';
@@ -22,6 +23,13 @@ const dataHoraBR = (iso: string) =>
   new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
+
+/** O comercial aprovou mudando itens/preços (e o vendedor não mexeu depois). */
+const aprovadoComAlteracoes = (p: MeuPedido) =>
+  p.status === 'CONFIRMADO' && p.revisao === 'REVISADO' && p.alteracoesComercial.length > 0;
+/** Alterações que o servidor diz que o vendedor ainda não tinha visto. */
+const naoVisto = (p: MeuPedido) =>
+  aprovadoComAlteracoes(p) && p.alteracoesComercial.some((r) => r.novo);
 
 /** Vendedor pode cancelar sozinho até 1 dia após confirmar (RN-08). */
 function dentroDaJanela(iso: string): boolean {
@@ -49,12 +57,33 @@ export function MeusPedidosPage() {
   }, [pedidos]);
 
   const totalAConfirmar = porGrupo.get('A_CONFIRMAR')?.length ?? 0;
+  // Pedidos com alterações que eram novidade quando a tela abriu. Guardado à
+  // parte porque, assim que a tela abre, o servidor já marca como visto — e
+  // um recarregamento (ex.: trocar o filtro) viria sem o "novo".
+  const [novidades, setNovidades] = useState<Set<string>>(new Set());
+  const comNovidade = pedidos.filter(
+    (p) => aprovadoComAlteracoes(p) && novidades.has(p.pedidoId),
+  );
 
   const carregar = useCallback(() => {
     setCarregando(true);
     historicoApi
       .meuHistorico(limite)
-      .then(setPedidos)
+      .then((lista) => {
+        setPedidos(lista);
+        const novos = lista.filter(naoVisto).map((p) => p.pedidoId);
+        if (novos.length > 0) {
+          setNovidades((s) => new Set([...s, ...novos]));
+          // "Aprovados" começa fechado: abre para as alterações não passarem
+          // despercebidas, e já conta como visto (some o aviso do menu).
+          setRecolhidos((s) => {
+            const n = new Set(s);
+            n.delete('APROVADOS');
+            return n;
+          });
+          pedidosApi.marcarAlteracoesVistas(novos).catch(() => {});
+        }
+      })
       .finally(() => setCarregando(false));
   }, [limite]);
 
@@ -172,7 +201,8 @@ export function MeusPedidosPage() {
             p.status === 'CONFIRMADO' && dentroDaJanela(p.data);
           const mostraHistorico = p.status !== 'RASCUNHO';
           const historicoVisivel = historicoAberto.has(p.pedidoId);
-          const est = estiloStatus(p.status, p.revisao);
+          const comAlteracoes = aprovadoComAlteracoes(p);
+          const est = estiloStatus(p.status, p.revisao, comAlteracoes);
           return (
             <li
               key={p.pedidoId}
@@ -193,6 +223,13 @@ export function MeusPedidosPage() {
                   </span>
                 </div>
               </div>
+
+              {comAlteracoes && (
+                <AlteracoesComercial
+                  revisoes={p.alteracoesComercial}
+                  destacarNovo={novidades.has(p.pedidoId)}
+                />
+              )}
 
               {mostraHistorico && (
                 <div className="mt-2">
@@ -304,6 +341,20 @@ export function MeusPedidosPage() {
           }
         >
           Enquanto não confirmar, a administração não recebe.
+        </Aviso>
+      )}
+
+      {comNovidade.length > 0 && (
+        <Aviso
+          tom="atencao"
+          className="mb-4"
+          titulo={
+            comNovidade.length === 1
+              ? '1 pedido aprovado com alterações do comercial'
+              : `${comNovidade.length} pedidos aprovados com alterações do comercial`
+          }
+        >
+          Veja abaixo, em Aprovados, o que foi mudado. Se tiver dúvida, fale com o comercial.
         </Aviso>
       )}
 

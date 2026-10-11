@@ -259,6 +259,11 @@ export function PerfilClientePage() {
                   <p className="text-xs text-slate-400">
                     {dataBR(p.data)} · {p.itensCount === 1 ? '1 item' : `${p.itensCount} itens`}
                   </p>
+                  {p.alteradoPeloComercial && (
+                    <span className="mt-0.5 inline-block rounded-md bg-brandYellow-50 px-1.5 py-0.5 text-[11px] font-medium text-brandYellow-800">
+                      alterado pelo comercial
+                    </span>
+                  )}
                 </div>
                 <p className="font-semibold text-slate-800">{brl(p.total)}</p>
               </li>

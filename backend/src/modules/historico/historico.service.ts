@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { revisoesVigentesInclude } from '../pedidos/pedidos.service';
 
 /**
  * Interpreta o parâmetro de limite: "tudo" -> undefined (sem limite);
@@ -87,7 +88,7 @@ export async function resumoDoCliente(clienteId: string) {
         total: true,
         confirmadoEm: true,
         criadoEm: true,
-        _count: { select: { itens: true } },
+        _count: { select: { itens: true, revisoes: { where: { superadaEm: null } } } },
       },
       orderBy: { confirmadoEm: { sort: 'desc', nulls: 'last' } },
       take: 5,
@@ -170,6 +171,7 @@ export async function resumoDoCliente(clienteId: string) {
       data: dataDoPedido(p),
       total: Number(p.total),
       itensCount: p._count.itens,
+      alteradoPeloComercial: p._count.revisoes > 0,
     })),
   };
 }
@@ -193,6 +195,8 @@ const meuPedidoInclude = {
   editadoPor: { select: { username: true } },
   ultimaAlteracaoPor: { select: { username: true } },
   _count: { select: { itens: true } },
+  // O que o comercial alterou (e ainda vale): o vendedor vê no card.
+  revisoes: revisoesVigentesInclude,
 } as const;
 
 /**
