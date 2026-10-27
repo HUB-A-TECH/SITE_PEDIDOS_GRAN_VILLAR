@@ -19,7 +19,10 @@ enum UserType {
   ADMIN_TI
 }
 
-enum Categoria {
+// Categoria fixa antiga. Substituída pela tabela Categoria (editável pelo
+// admin); a coluna continua no banco só para a versão anterior do site seguir
+// funcionando durante a troca. Remover numa migration futura.
+enum CategoriaLegada {
   ALHOS
   PIMENTAS
   CHAS
@@ -27,6 +30,8 @@ enum Categoria {
   ESPECIARIAS
   SAIS
   OUTROS
+
+  @@map("Categoria")
 }
 
 enum StatusPedido {
@@ -55,24 +60,24 @@ model Local {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  username     String    @unique
-  email        String    @unique
-  passwordHash String    @map("password_hash")
-  type         UserType
-  localId      String?   @map("local_id")
-  ativo        Boolean   @default(true)
-  criadoEm     DateTime  @default(now()) @map("criado_em")
-  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
-  ultimoAcesso DateTime? @map("ultimo_acesso")
+  id              String    @id @default(uuid())
+  username        String    @unique
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  type            UserType
+  localId         String?   @map("local_id")
+  ativo           Boolean   @default(true)
+  criadoEm        DateTime  @default(now()) @map("criado_em")
+  atualizadoEm    DateTime  @updatedAt @map("atualizado_em")
+  ultimoAcesso    DateTime? @map("ultimo_acesso")
   // Última troca de senha: sessões abertas antes disso deixam de valer
   // (trocar a senha desconecta os outros aparelhos).
   senhaAlteradaEm DateTime? @map("senha_alterada_em")
 
-  local            Local?    @relation(fields: [localId], references: [id])
+  local            Local?          @relation(fields: [localId], references: [id])
   vendedor         Vendedor?
-  pedidosEditados  Pedido[]  @relation("PedidoEditadoPor")
-  pedidosAlterados Pedido[]  @relation("PedidoUltimaAlteracao")
+  pedidosEditados  Pedido[]        @relation("PedidoEditadoPor")
+  pedidosAlterados Pedido[]        @relation("PedidoUltimaAlteracao")
   revisoesFeitas   RevisaoPedido[]
 
   @@map("usuarios")
@@ -87,10 +92,10 @@ model Vendedor {
   localId            String  @map("local_id")
   ativo              Boolean @default(true)
 
-  usuario  User              @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  local    Local             @relation(fields: [localId], references: [id])
-  pedidos  Pedido[]
-  setores  SetorVendedor[]
+  usuario User            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  local   Local           @relation(fields: [localId], references: [id])
+  pedidos Pedido[]
+  setores SetorVendedor[]
 
   @@map("vendedores")
 }
@@ -135,9 +140,9 @@ model Cliente {
   criadoEm          DateTime @default(now()) @map("criado_em")
   atualizadoEm      DateTime @updatedAt @map("atualizado_em")
 
-  local           Local             @relation(fields: [localId], references: [id])
-  tabelaPreco     TabelaPreco?      @relation(fields: [tabelaPrecoId], references: [id])
-  setor           Setor?            @relation(fields: [setorId], references: [id], onDelete: SetNull)
+  local           Local            @relation(fields: [localId], references: [id])
+  tabelaPreco     TabelaPreco?     @relation(fields: [tabelaPrecoId], references: [id])
+  setor           Setor?           @relation(fields: [setorId], references: [id], onDelete: SetNull)
   clienteProdutos ClienteProduto[]
   pedidos         Pedido[]
 
@@ -145,22 +150,40 @@ model Cliente {
 }
 
 model Produto {
-  id            String    @id @default(uuid())
-  codigo        String    @unique
-  nome          String
-  categoria     Categoria
-  descricao     String?
-  preco         Decimal   @db.Decimal(10, 2)
-  unidadeMedida String    @map("unidade_medida")
-  ativo         Boolean   @default(true)
-  criadoEm      DateTime  @default(now()) @map("criado_em")
-  atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
+  id              String          @id @default(uuid())
+  codigo          String          @unique
+  nome            String
+  // Sem categoria (null) = o admin excluiu a categoria; aparece no fim da lista.
+  categoriaId     String?         @map("categoria_id")
+  categoriaLegada CategoriaLegada @default(OUTROS) @map("categoria")
+  descricao       String?
+  preco           Decimal         @db.Decimal(10, 2)
+  unidadeMedida   String          @map("unidade_medida")
+  ativo           Boolean         @default(true)
+  criadoEm        DateTime        @default(now()) @map("criado_em")
+  atualizadoEm    DateTime        @updatedAt @map("atualizado_em")
 
+  categoria        Categoria?        @relation(fields: [categoriaId], references: [id], onDelete: SetNull)
   clienteProdutos  ClienteProduto[]
   tabelaPrecoItens TabelaPrecoItem[]
   itensPedido      ItemPedido[]
 
+  @@index([categoriaId])
   @@map("produtos")
+}
+
+// Categorias do catálogo (Alhos, Chás...). O admin cria, renomeia, exclui e
+// define a ordem — é a ordem em que os produtos aparecem no pedido.
+model Categoria {
+  id           String   @id @default(uuid())
+  nome         String   @unique
+  ordem        Int      @default(0)
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  produtos Produto[]
+
+  @@map("categorias")
 }
 
 // "Mix do cliente" (RN-10): quais produtos cada cliente compra. Gerenciado pelo admin.
@@ -265,13 +288,13 @@ model Pedido {
   ultimaAlteracaoPorId String?      @map("ultima_alteracao_por_id")
   ultimaAlteracaoEm    DateTime?    @map("ultima_alteracao_em")
 
-  vendedor           Vendedor     @relation(fields: [vendedorId], references: [id])
-  cliente            Cliente      @relation(fields: [clienteId], references: [id])
-  local              Local        @relation(fields: [localId], references: [id])
+  vendedor           Vendedor        @relation(fields: [vendedorId], references: [id])
+  cliente            Cliente         @relation(fields: [clienteId], references: [id])
+  local              Local           @relation(fields: [localId], references: [id])
   itens              ItemPedido[]
   revisoes           RevisaoPedido[]
-  editadoPor         User?        @relation("PedidoEditadoPor", fields: [editadoPorId], references: [id])
-  ultimaAlteracaoPor User?        @relation("PedidoUltimaAlteracao", fields: [ultimaAlteracaoPorId], references: [id])
+  editadoPor         User?           @relation("PedidoEditadoPor", fields: [editadoPorId], references: [id])
+  ultimaAlteracaoPor User?           @relation("PedidoUltimaAlteracao", fields: [ultimaAlteracaoPorId], references: [id])
 
   @@map("pedidos")
 }
@@ -280,21 +303,21 @@ model Pedido {
 // vendedor enviou (para o vendedor ver e, se quiser, questionar). Uma linha por
 // "Confirmar pedido com alterações"; aprovar sem alterar não cria linha.
 model RevisaoPedido {
-  id            String   @id @default(uuid())
-  pedidoId      String   @map("pedido_id")
-  revisadoPorId String   @map("revisado_por_id")
-  revisadoEm    DateTime @map("revisado_em")
+  id                  String    @id @default(uuid())
+  pedidoId            String    @map("pedido_id")
+  revisadoPorId       String    @map("revisado_por_id")
+  revisadoEm          DateTime  @map("revisado_em")
   // [{ produtoId, codigo, nome, unidadeMedida, removido,
   //    quantidadeAntes, quantidadeDepois, precoAntes, precoDepois }]
-  alteracoes    Json
-  totalAntes    Decimal  @map("total_antes") @db.Decimal(10, 2)
-  totalDepois   Decimal  @map("total_depois") @db.Decimal(10, 2)
+  alteracoes          Json
+  totalAntes          Decimal   @map("total_antes") @db.Decimal(10, 2)
+  totalDepois         Decimal   @map("total_depois") @db.Decimal(10, 2)
   // Quando o vendedor viu (some o aviso do menu dele).
   vistoPeloVendedorEm DateTime? @map("visto_pelo_vendedor_em")
   // O vendedor editou o pedido depois desta revisão: ela deixa de descrever o
   // pedido atual (ele volta para análise) e para de aparecer como "aprovado
   // com alterações".
-  superadaEm    DateTime? @map("superada_em")
+  superadaEm          DateTime? @map("superada_em")
 
   pedido      Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   revisadoPor User   @relation(fields: [revisadoPorId], references: [id])

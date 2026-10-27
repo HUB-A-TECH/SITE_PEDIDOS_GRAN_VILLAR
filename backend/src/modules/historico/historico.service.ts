@@ -21,7 +21,7 @@ const itemInclude = {
           id: true,
           codigo: true,
           nome: true,
-          categoria: true,
+          categoriaId: true,
           unidadeMedida: true,
         },
       },

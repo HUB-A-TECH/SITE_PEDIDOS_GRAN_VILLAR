@@ -10,11 +10,9 @@ import * as produtosApi from '../../lib/produtosApi';
 import * as historicoApi from '../../lib/historicoApi';
 import type { ItemHistoricoProduto } from '../../lib/historicoApi';
 import {
-  CATEGORIAS,
-  CATEGORIA_LABEL,
-  type Categoria,
   type Produto,
 } from '../../lib/types';
+import { useCategorias } from '../../lib/categoriasApi';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -32,7 +30,8 @@ export function PedidoPage() {
   const [pedido, setPedido] = useState<Pedido | null>(null);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [categoria, setCategoria] = useState<Categoria | 'TODAS'>('TODAS');
+  const [categoria, setCategoria] = useState<string>('TODAS');
+  const { categorias, nomeDe } = useCategorias();
   const [busca, setBusca] = useState('');
   const [processando, setProcessando] = useState<Set<string>>(new Set());
   const [obs, setObs] = useState('');
@@ -286,12 +285,12 @@ export function PedidoPage() {
 
         <div className="mb-4 flex flex-wrap gap-2">
           <Chip ativa={categoria === 'TODAS'} onClick={() => setCategoria('TODAS')} label="Todas" />
-          {CATEGORIAS.map((c) => (
+          {categorias.map(({ id: c }) => (
             <Chip
               key={c}
               ativa={categoria === c}
               onClick={() => setCategoria(c)}
-              label={CATEGORIA_LABEL[c]}
+              label={nomeDe(c)}
             />
           ))}
         </div>
@@ -385,7 +384,16 @@ export function PedidoPage() {
             </h3>
             <div className="overflow-hidden rounded-xl bg-white shadow-sm">
               {[...pedido.itens]
-                .sort((a, b) => a.produto.nome.localeCompare(b.produto.nome))
+                .sort((a, b) => {
+                  const ordem = (id: string | null) => {
+                    const i = categorias.findIndex((c) => c.id === id);
+                    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+                  };
+                  return (
+                    ordem(a.produto.categoria) - ordem(b.produto.categoria) ||
+                    a.produto.nome.localeCompare(b.produto.nome)
+                  );
+                })
                 .map((it, idx) => (
                   <div
                     key={it.id}
