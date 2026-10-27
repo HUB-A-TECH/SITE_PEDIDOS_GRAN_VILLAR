@@ -73,7 +73,6 @@ export function DashboardPage() {
               },
             ]
           : []),
-        { titulo: 'Minha Conta', desc: 'Seu usuário, e-mail e senha', to: '/minha-conta' },
       ]
     : [
         { titulo: 'Novo Pedido', desc: 'Começa selecionando o cliente', to: '/clientes' },
@@ -91,7 +90,6 @@ export function DashboardPage() {
           to: '/meus-pedidos',
           aviso: aConfirmar,
         },
-        { titulo: 'Minha Conta', desc: 'Seu nome, e-mail, usuário e senha', to: '/minha-conta' },
       ];
 
   return (
