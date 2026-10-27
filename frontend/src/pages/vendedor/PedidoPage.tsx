@@ -8,13 +8,12 @@ import * as pedidosApi from '../../lib/pedidosApi';
 import type { Pedido } from '../../lib/pedidosApi';
 import * as produtosApi from '../../lib/produtosApi';
 import * as historicoApi from '../../lib/historicoApi';
+import * as clientesApi from '../../lib/clientesApi';
 import type { ItemHistoricoProduto } from '../../lib/historicoApi';
 import {
-  CATEGORIAS,
-  CATEGORIA_LABEL,
-  type Categoria,
   type Produto,
 } from '../../lib/types';
+import { useCategorias } from '../../lib/categoriasApi';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -31,8 +30,17 @@ export function PedidoPage() {
   const dialogo = useDialogo();
   const [pedido, setPedido] = useState<Pedido | null>(null);
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  // Produtos que o cliente não tem no mix, e os que o vendedor puxou de lá
+  // "só neste pedido" (ainda sem quantidade).
+  const [foraDoMix, setForaDoMix] = useState<Produto[]>([]);
+  const [extras, setExtras] = useState<Set<string>>(new Set());
+  const [foraAberto, setForaAberto] = useState(false);
+  // Muda para o campo de preço voltar ao valor salvo quando o vendedor desiste.
+  const [desfazerPreco, setDesfazerPreco] = useState(0);
+  const [buscaFora, setBuscaFora] = useState('');
   const [carregando, setCarregando] = useState(true);
-  const [categoria, setCategoria] = useState<Categoria | 'TODAS'>('TODAS');
+  const [categoria, setCategoria] = useState<string>('TODAS');
+  const { categorias, nomeDe } = useCategorias();
   const [busca, setBusca] = useState('');
   const [processando, setProcessando] = useState<Set<string>>(new Set());
   const [obs, setObs] = useState('');
@@ -80,12 +88,14 @@ export function PedidoPage() {
         setPedido(p);
         setObs(p.observacoes ?? '');
         // Mix e histórico por produto em paralelo (mais rápido).
-        const [mix, hist] = await Promise.all([
+        const [mix, hist, fora] = await Promise.all([
           produtosApi.listarPorMix(p.clienteId),
           historicoApi.historicoItens(p.clienteId),
+          clientesApi.foraDoMix(p.clienteId),
         ]);
         setProdutos(mix);
         setHistProdutos(hist);
+        setForaDoMix(fora);
       })
       .finally(() => setCarregando(false));
   }, [id, navigate]);
@@ -96,9 +106,41 @@ export function PedidoPage() {
     return m;
   }, [pedido]);
 
+  const noMix = useMemo(() => new Set(produtos.map((p) => p.id)), [produtos]);
+
+  /**
+   * Lista do pedido: o mix mais os produtos de fora que entram só neste
+   * pedido (os já com quantidade e os que o vendedor acabou de puxar), na
+   * ordem das categorias e alfabética.
+   */
+  const lista = useMemo(() => {
+    const deFora = foraDoMix.filter((p) => extras.has(p.id) || itemPorProduto.has(p.id));
+    if (deFora.length === 0) return produtos;
+    const ordem = (id: string | null) => {
+      const i = categorias.findIndex((c) => c.id === id);
+      return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+    };
+    return [...produtos, ...deFora].sort(
+      (a, b) => ordem(a.categoria) - ordem(b.categoria) || a.nome.localeCompare(b.nome),
+    );
+  }, [produtos, foraDoMix, extras, itemPorProduto, categorias]);
+
+  /** Aba "Produtos que o cliente não tem": tira os já puxados para o pedido. */
+  const foraVisiveis = useMemo(() => {
+    const termo = buscaFora.trim().toLowerCase();
+    return foraDoMix.filter(
+      (p) =>
+        !extras.has(p.id) &&
+        !itemPorProduto.has(p.id) &&
+        (!termo ||
+          p.nome.toLowerCase().includes(termo) ||
+          p.codigo.toLowerCase().includes(termo)),
+    );
+  }, [foraDoMix, extras, itemPorProduto, buscaFora]);
+
   const visiveis = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    return produtos.filter((p) => {
+    return lista.filter((p) => {
       const okCat = categoria === 'TODAS' || p.categoria === categoria;
       const okBusca =
         !termo ||
@@ -106,7 +148,77 @@ export function PedidoPage() {
         p.codigo.toLowerCase().includes(termo);
       return okCat && okBusca;
     });
-  }, [produtos, categoria, busca]);
+  }, [lista, categoria, busca]);
+
+  /** Depois de puxar um produto: mostra o card e põe o cursor na quantidade. */
+  function focarNoCard(produtoId: string) {
+    setCategoria('TODAS');
+    setBusca('');
+    window.setTimeout(() => {
+      alinharCardNoTopo(produtoId);
+      const input = document.getElementById(`qtd-${produtoId}`) as HTMLInputElement | null;
+      input?.focus({ preventScroll: true });
+    }, 0);
+  }
+
+  function soNestePedido(p: Produto) {
+    setExtras((s) => new Set(s).add(p.id));
+    focarNoCard(p.id);
+  }
+
+  async function paraOsProximos(p: Produto) {
+    if (!pedido) return;
+    const ok = await dialogo.confirmar({
+      titulo: 'Colocar no mix do cliente',
+      mensagem: (
+        <>
+          <strong>{p.nome}</strong> passa a aparecer em todos os próximos pedidos
+          de <strong>{pedido.cliente.nome}</strong>. Fica registrado no histórico
+          do cliente.
+        </>
+      ),
+      textoConfirmar: 'Colocar no mix',
+    });
+    if (!ok) return;
+    try {
+      await clientesApi.vendedorAdicionarAoMix(pedido.clienteId, p.id);
+    } catch {
+      await dialogo.avisar({ titulo: 'Não foi possível', tom: 'erro', mensagem: 'Tente novamente.' });
+      return;
+    }
+    setForaDoMix((l) => l.filter((x) => x.id !== p.id));
+    setProdutos((l) => [...l, p]);
+    focarNoCard(p.id);
+  }
+
+  async function tirarDoMix(p: Produto) {
+    if (!pedido) return;
+    const temNoPedido = itemPorProduto.has(p.id);
+    const ok = await dialogo.confirmar({
+      titulo: 'Tirar do mix do cliente',
+      tom: 'atencao',
+      destrutivo: true,
+      textoConfirmar: 'Tirar do mix',
+      mensagem: (
+        <>
+          <strong>{p.nome}</strong> deixa de aparecer nos próximos pedidos de{' '}
+          <strong>{pedido.cliente.nome}</strong>
+          {temNoPedido ? ' (neste pedido ele continua, com a quantidade que já tem)' : ''}.
+          Dá para colocar de volta pela aba "Produtos que o cliente não tem". Fica
+          registrado no histórico do cliente.
+        </>
+      ),
+    });
+    if (!ok) return;
+    try {
+      await clientesApi.vendedorRemoverDoMix(pedido.clienteId, p.id);
+    } catch {
+      await dialogo.avisar({ titulo: 'Não foi possível', tom: 'erro', mensagem: 'Tente novamente.' });
+      return;
+    }
+    setProdutos((l) => l.filter((x) => x.id !== p.id));
+    setForaDoMix((l) => [...l, p]);
+  }
 
   /** Folga entre a base do cabeçalho e o topo do card, ao pular de produto. */
   const FOLGA_APOS_CABECALHO = 12;
@@ -173,7 +285,12 @@ export function PedidoPage() {
       } else if (item) {
         atualizado = await pedidosApi.atualizarItem(pedido.id, item.id, quantidade);
       } else {
-        atualizado = await pedidosApi.adicionarItem(pedido.id, produtoId, quantidade);
+        atualizado = await pedidosApi.adicionarItem(
+          pedido.id,
+          produtoId,
+          quantidade,
+          !noMix.has(produtoId),
+        );
       }
       aplicarPedido(atualizado);
     } finally {
@@ -194,10 +311,37 @@ export function PedidoPage() {
     }
   }
 
-  async function definirPreco(produtoId: string, precoUnitario: number) {
+  async function definirPreco(produto: Produto, precoUnitario: number) {
     if (!pedido) return;
+    const produtoId = produto.id;
     const item = itemPorProduto.get(produtoId);
     if (!item) return;
+    // Só desconto: nunca acima do preço da tabela do cliente.
+    if (precoUnitario > produto.preco + 0.001) {
+      await dialogo.avisar({
+        titulo: 'Preço não permitido',
+        tom: 'atencao',
+        mensagem: `O preço só pode ser reduzido. O máximo para este produto é ${brl(produto.preco)}.`,
+      });
+      setDesfazerPreco((n) => n + 1);
+      return;
+    }
+    const ok = await dialogo.confirmar({
+      titulo: 'Alterar preço',
+      tom: 'atencao',
+      textoConfirmar: 'Sim, alterar',
+      mensagem: (
+        <>
+          Deseja realmente alterar o preço de <strong>{produto.nome}</strong> de{' '}
+          <strong>{brl(item.precoUnitario)}</strong> para{' '}
+          <strong>{brl(precoUnitario)}</strong>? Vale só para este pedido.
+        </>
+      ),
+    });
+    if (!ok) {
+      setDesfazerPreco((n) => n + 1);
+      return;
+    }
     setProcessando((s) => new Set(s).add(produtoId));
     try {
       const atualizado = await pedidosApi.atualizarPrecoItem(pedido.id, item.id, precoUnitario);
@@ -286,12 +430,12 @@ export function PedidoPage() {
 
         <div className="mb-4 flex flex-wrap gap-2">
           <Chip ativa={categoria === 'TODAS'} onClick={() => setCategoria('TODAS')} label="Todas" />
-          {CATEGORIAS.map((c) => (
+          {categorias.map(({ id: c }) => (
             <Chip
               key={c}
               ativa={categoria === c}
               onClick={() => setCategoria(c)}
-              label={CATEGORIA_LABEL[c]}
+              label={nomeDe(c)}
             />
           ))}
         </div>
@@ -312,13 +456,19 @@ export function PedidoPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-semibold text-slate-800">{p.nome}</p>
+                    {!noMix.has(p.id) && (
+                      <span className="mb-0.5 inline-block rounded-md bg-brandYellow-50 px-1.5 py-0.5 text-[11px] font-medium text-brandYellow-800">
+                        fora do mix · só neste pedido
+                      </span>
+                    )}
                     {qtd > 0 && item ? (
                       <PrecoItem
+                        key={`${p.id}-${desfazerPreco}`}
                         precoCatalogo={p.preco}
                         precoAtual={item.precoUnitario}
                         unidade={p.unidadeMedida}
                         desabilitado={ocupado}
-                        onChange={(v) => definirPreco(p.id, v)}
+                        onChange={(v) => definirPreco(p, v)}
                       />
                     ) : (
                       <p className="text-xs text-slate-500">
@@ -343,6 +493,30 @@ export function PedidoPage() {
                     onEnter={() => focarProximoProduto(p.id)}
                   />
                 </div>
+
+                {noMix.has(p.id) ? (
+                  <button
+                    onClick={() => tirarDoMix(p)}
+                    className="mt-2 text-xs text-slate-400 hover:text-red-600 hover:underline"
+                  >
+                    Tirar do mix do cliente
+                  </button>
+                ) : (
+                  !itemPorProduto.has(p.id) && (
+                    <button
+                      onClick={() =>
+                        setExtras((s) => {
+                          const n = new Set(s);
+                          n.delete(p.id);
+                          return n;
+                        })
+                      }
+                      className="mt-2 text-xs text-slate-400 hover:underline"
+                    >
+                      Devolver para a lista de fora
+                    </button>
+                  )
+                )}
 
                 {histProdutos[p.id]?.length > 0 && (
                   <div className="mt-3 border-t border-slate-100 pt-2">
@@ -378,6 +552,65 @@ export function PedidoPage() {
           })}
         </ul>
 
+        <div className="mt-6 overflow-hidden rounded-xl border border-dashed border-slate-300 bg-white">
+          <button
+            onClick={() => setForaAberto((a) => !a)}
+            className="flex w-full items-center justify-between px-4 py-3 text-left"
+          >
+            <span className="text-sm font-bold text-slate-700">
+              Produtos que o cliente não tem ({foraVisiveis.length})
+            </span>
+            <span className="text-xs text-slate-400">{foraAberto ? '▾ fechar' : '▸ abrir'}</span>
+          </button>
+          {foraAberto && (
+            <div className="border-t border-slate-100 px-4 pb-4 pt-3">
+              <p className="mb-2 text-xs text-slate-500">
+                <strong>Só neste pedido</strong>: entra só agora, o mix não muda.{' '}
+                <strong>Para os próximos</strong>: passa a fazer parte do mix do cliente.
+              </p>
+              <input
+                type="search"
+                placeholder="Buscar produto…"
+                value={buscaFora}
+                onChange={(e) => setBuscaFora(e.target.value)}
+                className="mb-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+              />
+              {foraVisiveis.length === 0 ? (
+                <p className="py-2 text-center text-sm text-slate-500">
+                  {foraDoMix.length === 0
+                    ? 'O cliente já tem todos os produtos no mix.'
+                    : 'Nenhum produto encontrado.'}
+                </p>
+              ) : (
+                <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
+                  {foraVisiveis.map((p) => (
+                    <li key={p.id} className="py-2.5">
+                      <p className="text-sm font-medium text-slate-800">{p.nome}</p>
+                      <p className="text-xs text-slate-500">
+                        {nomeDe(p.categoria)} · {brl(p.preco)} / {p.unidadeMedida}
+                      </p>
+                      <div className="mt-1.5 flex gap-2">
+                        <button
+                          onClick={() => soNestePedido(p)}
+                          className="flex-1 rounded-lg border border-slate-300 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                        >
+                          Só neste pedido
+                        </button>
+                        <button
+                          onClick={() => paraOsProximos(p)}
+                          className="flex-1 rounded-lg bg-brand-600 py-1.5 text-xs font-medium text-white hover:bg-brand-500"
+                        >
+                          Para os próximos
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+
         {pedido.itens.length > 0 && (
           <div className="mt-6">
             <h3 className="mb-2 text-sm font-bold text-slate-700">
@@ -385,7 +618,16 @@ export function PedidoPage() {
             </h3>
             <div className="overflow-hidden rounded-xl bg-white shadow-sm">
               {[...pedido.itens]
-                .sort((a, b) => a.produto.nome.localeCompare(b.produto.nome))
+                .sort((a, b) => {
+                  const ordem = (id: string | null) => {
+                    const i = categorias.findIndex((c) => c.id === id);
+                    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+                  };
+                  return (
+                    ordem(a.produto.categoria) - ordem(b.produto.categoria) ||
+                    a.produto.nome.localeCompare(b.produto.nome)
+                  );
+                })
                 .map((it, idx) => (
                   <div
                     key={it.id}

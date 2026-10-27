@@ -101,7 +101,7 @@ export async function detalhe(req: Request, res: Response): Promise<void> {
         id: p.id,
         codigo: p.codigo,
         nome: p.nome,
-        categoria: p.categoria,
+        categoria: p.categoriaId,
         unidadeMedida: p.unidadeMedida,
         preco: item ? Number(item.preco) : Number(p.preco),
         precoCatalogo: Number(p.preco),

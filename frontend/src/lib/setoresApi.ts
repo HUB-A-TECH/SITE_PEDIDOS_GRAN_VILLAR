@@ -9,7 +9,7 @@ export async function listar(localId: string): Promise<Setor[]> {
   return res.data.setores;
 }
 
-export async function criar(data: { nome: string; localId: string }): Promise<Setor> {
+export async function criar(data: { nome: string; localId: string; cor: string }): Promise<Setor> {
   const res = await api.post<Setor>('/admin/setores', data);
   return res.data;
 }
@@ -19,9 +19,15 @@ export async function detalhe(id: string): Promise<SetorDetalhe> {
   return res.data;
 }
 
-export async function renomear(id: string, nome: string): Promise<Setor> {
-  const res = await api.put<Setor>(`/admin/setores/${id}`, { nome });
+export async function atualizar(id: string, data: { nome?: string; cor?: string }): Promise<Setor> {
+  const res = await api.put<Setor>(`/admin/setores/${id}`, data);
   return res.data;
+}
+
+/** Grava a ordem dos cartões (ids na ordem desejada). */
+export async function reordenar(localId: string, ids: string[]): Promise<Setor[]> {
+  const res = await api.put<{ setores: Setor[] }>('/admin/setores/ordem', { localId, ids });
+  return res.data.setores;
 }
 
 export async function excluir(id: string): Promise<void> {

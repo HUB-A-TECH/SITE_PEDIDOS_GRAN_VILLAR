@@ -53,10 +53,13 @@ export async function adicionarItem(
   pedidoId: string,
   produtoId: string,
   quantidade: number,
+  /** Produto fora do mix, só para este pedido (o mix não muda). */
+  soNestePedido = false,
 ): Promise<Pedido> {
   const res = await api.post<{ pedido: Pedido }>(`/pedidos/${pedidoId}/itens`, {
     produto_id: produtoId,
     quantidade,
+    ...(soNestePedido ? { so_neste_pedido: true } : {}),
   });
   return res.data.pedido;
 }
@@ -213,7 +216,8 @@ export interface PedidoAdminDetalhe {
   ultimaAlteracaoEm: string | null;
   revisao: Revisao;
   alteracoesComercial: AlteracaoComercial[];
-  itens: ItemPedido[];
+  /** precoTabela: preço da tabela do cliente hoje (para o aviso de desconto). */
+  itens: (ItemPedido & { precoTabela: number })[];
 }
 
 export async function adminObterPedido(pedidoId: string): Promise<PedidoAdminDetalhe> {

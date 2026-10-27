@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Aviso } from './Aviso';
+import { paleta } from '../lib/coresSetor';
 import type { Cliente } from '../lib/types';
 
 interface Props {
@@ -19,15 +20,24 @@ export function ListaClientesPorSetor({ clientes, carregando, onEscolher, abrind
 
   const grupos = useMemo(() => {
     const termo = busca.toLowerCase();
-    const mapa = new Map<string, { nome: string; clientes: Cliente[] }>();
+    const mapa = new Map<string, { nome: string; cor: string | null; ordem: number; clientes: Cliente[] }>();
     for (const c of clientes) {
       const texto = `${c.nome} ${c.nomeFantasia ?? ''} ${c.codigo} ${c.bairro ?? ''} ${c.cidade ?? ''}`;
       if (!texto.toLowerCase().includes(termo)) continue;
       const chave = c.setor?.id ?? '';
-      if (!mapa.has(chave)) mapa.set(chave, { nome: c.setor?.nome ?? 'Sem setor', clientes: [] });
+      if (!mapa.has(chave))
+        mapa.set(chave, {
+          nome: c.setor?.nome ?? 'Sem setor',
+          cor: c.setor?.cor ?? null,
+          ordem: c.setor?.ordem ?? Number.MAX_SAFE_INTEGER,
+          clientes: [],
+        });
       mapa.get(chave)!.clientes.push(c);
     }
-    return [...mapa.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    // Mesma ordem dos cartões coloridos definida pelo admin.
+    return [...mapa.values()].sort(
+      (a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'),
+    );
   }, [clientes, busca]);
 
   return (
@@ -54,7 +64,10 @@ export function ListaClientesPorSetor({ clientes, carregando, onEscolher, abrind
           {grupos.map((g) => (
             <section key={g.nome}>
               <h2 className="mb-2 flex items-baseline justify-between text-sm font-bold text-slate-700">
-                {g.nome}
+                <span className="flex items-center gap-2">
+                  <span className={`h-3 w-3 shrink-0 rounded-full ${paleta(g.cor).bolinha}`} />
+                  {g.nome}
+                </span>
                 <span className="text-xs font-normal text-slate-500">
                   {g.clientes.length === 1 ? '1 cliente' : `${g.clientes.length} clientes`}
                 </span>

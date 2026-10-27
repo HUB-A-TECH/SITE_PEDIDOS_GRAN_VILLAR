@@ -13,3 +13,4 @@ produtosAdminRoutes.use(
 produtosAdminRoutes.get('/', asyncHandler(controller.adminListar));
 produtosAdminRoutes.post('/', asyncHandler(controller.adminCriar));
 produtosAdminRoutes.put('/:id', asyncHandler(controller.adminAtualizar));
+produtosAdminRoutes.post('/:id/clientes', asyncHandler(controller.adminEnviarParaClientes));
