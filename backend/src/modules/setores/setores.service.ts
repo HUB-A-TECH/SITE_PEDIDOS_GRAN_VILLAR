@@ -12,7 +12,7 @@ export function listar(localId: string) {
   return prisma.setor.findMany({
     where: { localId },
     include: setorInclude,
-    orderBy: { nome: 'asc' },
+    orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
   });
 }
 
@@ -20,12 +20,29 @@ export function getById(id: string) {
   return prisma.setor.findUnique({ where: { id }, include: setorInclude });
 }
 
-export function criar(data: { nome: string; localId: string }) {
-  return prisma.setor.create({ data, include: setorInclude });
+/** Cria o setor no fim da fila de cartões da filial. */
+export async function criar(data: { nome: string; localId: string; cor: string }) {
+  const ultimo = await prisma.setor.aggregate({
+    where: { localId: data.localId },
+    _max: { ordem: true },
+  });
+  return prisma.setor.create({
+    data: { ...data, ordem: (ultimo._max.ordem ?? -1) + 1 },
+    include: setorInclude,
+  });
 }
 
-export function renomear(id: string, nome: string) {
-  return prisma.setor.update({ where: { id }, data: { nome }, include: setorInclude });
+export function atualizar(id: string, data: { nome?: string; cor?: string }) {
+  return prisma.setor.update({ where: { id }, data, include: setorInclude });
+}
+
+/** Grava a ordem dos cartões: a posição de cada id na lista vira a ordem. */
+export async function reordenar(localId: string, ids: string[]) {
+  await prisma.$transaction(
+    ids.map((id, ordem) =>
+      prisma.setor.updateMany({ where: { id, localId }, data: { ordem } }),
+    ),
+  );
 }
 
 /** Exclui o setor. Os clientes dele ficam sem setor (FK com SET NULL). */

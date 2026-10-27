@@ -3,14 +3,14 @@ import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
 import { Aviso } from '../../components/Aviso';
+import { EnviarProdutoClientes } from '../../components/EnviarProdutoClientes';
 import * as produtosApi from '../../lib/produtosApi';
 import {
-  CATEGORIAS,
-  CATEGORIA_LABEL,
   UNIDADES,
   type Categoria,
   type Produto,
 } from '../../lib/types';
+import { useCategorias } from '../../lib/categoriasApi';
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500';
@@ -18,7 +18,8 @@ const inputCls =
 export function AdminProdutosPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [filtro, setFiltro] = useState<Categoria | 'TODAS'>('TODAS');
+  const [filtro, setFiltro] = useState<string>('TODAS');
+  const { categorias, nomeDe } = useCategorias();
   const [busca, setBusca] = useState('');
   const [editando, setEditando] = useState<Produto | null>(null);
   const [modalAberto, setModalAberto] = useState(false);
@@ -55,9 +56,17 @@ export function AdminProdutosPage() {
     setEditando(p);
     setModalAberto(true);
   }
-  async function aoSalvar() {
-    setModalAberto(false);
+  // Produto recém-criado: o modal passa para "enviar para quais clientes".
+  const [enviando, setEnviando] = useState<Produto | null>(null);
+
+  async function aoSalvar(criado?: Produto) {
+    if (criado) setEnviando(criado);
+    else setModalAberto(false);
     await carregar();
+  }
+  function fecharModal() {
+    setModalAberto(false);
+    setEnviando(null);
   }
 
   return (
@@ -83,13 +92,13 @@ export function AdminProdutosPage() {
 
       <select
         value={filtro}
-        onChange={(e) => setFiltro(e.target.value as Categoria | 'TODAS')}
+        onChange={(e) => setFiltro(e.target.value)}
         className={`${inputCls} mb-4`}
       >
         <option value="TODAS">Todas as categorias</option>
-        {CATEGORIAS.map((c) => (
+        {categorias.map(({ id: c }) => (
           <option key={c} value={c}>
-            {CATEGORIA_LABEL[c]}
+            {nomeDe(c)}
           </option>
         ))}
       </select>
@@ -115,7 +124,7 @@ export function AdminProdutosPage() {
                   )}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {p.codigo} · {CATEGORIA_LABEL[p.categoria]} ·{' '}
+                  {p.codigo} · {nomeDe(p.categoria)} ·{' '}
                   {p.preco.toLocaleString('pt-BR', {
                     style: 'currency',
                     currency: 'BRL',
@@ -135,11 +144,15 @@ export function AdminProdutosPage() {
       )}
 
       <Modal
-        titulo={editando ? 'Editar Produto' : 'Novo Produto'}
+        titulo={enviando ? 'Enviar para clientes' : editando ? 'Editar Produto' : 'Novo Produto'}
         aberto={modalAberto}
-        onFechar={() => setModalAberto(false)}
+        onFechar={fecharModal}
       >
-        <ProdutoForm produto={editando} onSalvar={aoSalvar} />
+        {enviando ? (
+          <EnviarProdutoClientes produto={enviando} onConcluir={fecharModal} />
+        ) : (
+          <ProdutoForm produto={editando} onSalvar={aoSalvar} />
+        )}
       </Modal>
     </AppLayout>
   );
@@ -150,13 +163,19 @@ function ProdutoForm({
   onSalvar,
 }: {
   produto: Produto | null;
-  onSalvar: () => void;
+  /** Recebe o produto quando ele acabou de ser criado. */
+  onSalvar: (criado?: Produto) => void;
 }) {
   const [codigo, setCodigo] = useState(produto?.codigo ?? '');
   const [nome, setNome] = useState(produto?.nome ?? '');
-  const [categoria, setCategoria] = useState<Categoria>(
-    produto?.categoria ?? 'ALHOS',
-  );
+  const { categorias, nomeDe } = useCategorias();
+  // Produto novo: começa sem categoria até a lista carregar (efeito abaixo).
+  const [categoria, setCategoria] = useState<Categoria>(produto ? produto.categoria : null);
+  useEffect(() => {
+    if (!produto && categorias.length > 0) setCategoria(categorias[0].id);
+    // Só quando a lista chega; depois a escolha é do admin.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorias]);
   const [preco, setPreco] = useState(produto ? String(produto.preco) : '');
   const [unidade, setUnidade] = useState(produto?.unidadeMedida ?? 'UND');
   const [descricao, setDescricao] = useState(produto?.descricao ?? '');
@@ -184,10 +203,10 @@ function ProdutoForm({
       };
       if (produto) {
         await produtosApi.adminAtualizar(produto.id, { ...dados, ativo });
+        onSalvar();
       } else {
-        await produtosApi.adminCriar(dados);
+        onSalvar(await produtosApi.adminCriar(dados));
       }
-      onSalvar();
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data?.mensagem) {
         setErro(err.response.data.mensagem);
@@ -220,13 +239,14 @@ function ProdutoForm({
       <div className="grid grid-cols-2 gap-3">
         <Campo label="Categoria">
           <select
-            value={categoria}
-            onChange={(e) => setCategoria(e.target.value as Categoria)}
+            value={categoria ?? ''}
+            onChange={(e) => setCategoria(e.target.value || null)}
             className={inputCls}
           >
-            {CATEGORIAS.map((c) => (
+            <option value="">{nomeDe(null)}</option>
+            {categorias.map(({ id: c }) => (
               <option key={c} value={c}>
-                {CATEGORIA_LABEL[c]}
+                {nomeDe(c)}
               </option>
             ))}
           </select>

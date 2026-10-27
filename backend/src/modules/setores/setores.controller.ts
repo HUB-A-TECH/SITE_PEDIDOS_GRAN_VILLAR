@@ -9,6 +9,8 @@ function serialize(s: SetorComVinculos) {
   return {
     id: s.id,
     nome: s.nome,
+    cor: s.cor,
+    ordem: s.ordem,
     localId: s.localId,
     vendedores: s.vendedores.map((v) => v.vendedor),
     totalClientes: s._count.clientes,
@@ -17,6 +19,9 @@ function serialize(s: SetorComVinculos) {
 
 const NOME_DUPLICADO = 'Já existe um setor com esse nome nesta filial';
 const nomeSchema = z.string().trim().min(1, 'Informe o nome do setor').max(60);
+// Cores dos cartões no Novo Pedido (o frontend tem a paleta de cada uma).
+export const CORES_SETOR = ['VERMELHO', 'AMARELO', 'VERDE', 'AZUL', 'LARANJA', 'ROXO'] as const;
+const corSchema = z.enum(CORES_SETOR, { message: 'Cor inválida' });
 
 export async function listar(req: Request, res: Response): Promise<void> {
   const parsed = z.object({ local_id: z.string().uuid() }).safeParse(req.query);
@@ -30,7 +35,7 @@ export async function listar(req: Request, res: Response): Promise<void> {
 
 export async function criar(req: Request, res: Response): Promise<void> {
   const parsed = z
-    .object({ nome: nomeSchema, localId: z.string().uuid() })
+    .object({ nome: nomeSchema, localId: z.string().uuid(), cor: corSchema.default('AZUL') })
     .safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ mensagem: 'Dados inválidos', erros: parsed.error.flatten() });
@@ -77,14 +82,17 @@ export async function detalhe(req: Request, res: Response): Promise<void> {
   await responderDetalhe(res, req.params.id);
 }
 
-export async function renomear(req: Request, res: Response): Promise<void> {
-  const parsed = z.object({ nome: nomeSchema }).safeParse(req.body);
+/** Muda o nome e/ou a cor do setor. */
+export async function atualizar(req: Request, res: Response): Promise<void> {
+  const parsed = z
+    .object({ nome: nomeSchema.optional(), cor: corSchema.optional() })
+    .safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ mensagem: 'Informe o nome do setor' });
+    res.status(400).json({ mensagem: 'Informe o nome e a cor do setor' });
     return;
   }
   try {
-    const setor = await service.renomear(req.params.id, parsed.data.nome);
+    const setor = await service.atualizar(req.params.id, parsed.data);
     res.json(serialize(setor));
   } catch (e) {
     if (isNotFoundError(e)) {
@@ -97,6 +105,20 @@ export async function renomear(req: Request, res: Response): Promise<void> {
     }
     throw e;
   }
+}
+
+/** Nova ordem dos cartões da filial: lista de ids na ordem desejada. */
+export async function reordenar(req: Request, res: Response): Promise<void> {
+  const parsed = z
+    .object({ localId: z.string().uuid(), ids: z.array(z.string().uuid()).min(1) })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'Dados inválidos' });
+    return;
+  }
+  await service.reordenar(parsed.data.localId, parsed.data.ids);
+  const setores = await service.listar(parsed.data.localId);
+  res.json({ setores: setores.map(serialize) });
 }
 
 export async function excluir(req: Request, res: Response): Promise<void> {

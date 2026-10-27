@@ -32,7 +32,7 @@ export async function mapaPrecosDaTabela(tabelaId: string): Promise<MapaPrecos> 
 }
 
 /** Aplica o mapa a um produto, caindo no preço do catálogo quando faltar. */
-export function precoEfetivo(produto: Produto, mapa: MapaPrecos): number {
+export function precoEfetivo(produto: Pick<Produto, 'id' | 'preco'>, mapa: MapaPrecos): number {
   return mapa.get(produto.id) ?? Number(produto.preco);
 }
 

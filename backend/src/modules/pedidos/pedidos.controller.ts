@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Vendedor } from '@prisma/client';
+import * as clientes from '../clientes/clientes.service';
 import * as service from './pedidos.service';
 import * as historico from '../historico/historico.service';
 import * as precos from '../precos/precos.service';
@@ -36,7 +37,7 @@ function serialize(p: PedidoComItens) {
       produto: {
         codigo: i.produto.codigo,
         nome: i.produto.nome,
-        categoria: i.produto.categoria,
+        categoria: i.produto.categoriaId,
         unidadeMedida: i.produto.unidadeMedida,
       },
       quantidade: Number(i.quantidade),
@@ -247,6 +248,8 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
     .object({
       produto_id: z.string().uuid(),
       quantidade: z.number().positive(),
+      // Produto fora do mix, pedido só desta vez (o mix não muda).
+      so_neste_pedido: z.boolean().optional(),
     })
     .safeParse(req.body);
   if (!parsed.success) {
@@ -255,7 +258,7 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
   }
 
   const noMix = await service.produtoNoMix(pedido.clienteId, parsed.data.produto_id);
-  if (!noMix) {
+  if (!noMix && !parsed.data.so_neste_pedido) {
     res.status(400).json({ mensagem: 'Produto não está no mix deste cliente' });
     return;
   }
@@ -268,6 +271,15 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
   // Preço da tabela do cliente (cai no catálogo se a tabela não tiver o item).
   const preco = await precos.precoDoProdutoParaCliente(pedido.clienteId, produto);
   await service.definirItem(pedido.id, produto, parsed.data.quantidade, preco);
+  if (!noMix) {
+    await clientes.registrarAlteracaoMix({
+      clienteId: pedido.clienteId,
+      produtoId: produto.id,
+      usuarioId: req.user!.sub,
+      acao: 'ADICIONADO_NO_PEDIDO',
+      pedidoId: pedido.id,
+    });
+  }
   await responderPedidoAtualizado(pedido.id, vendedor.id, req.user!.sub, res);
 }
 
@@ -312,6 +324,19 @@ export async function atualizarPreco(req: Request, res: Response): Promise<void>
   const item = await service.getItem(req.params.itemId);
   if (!item || item.pedidoId !== pedido.id) {
     res.status(404).json({ mensagem: 'Item não encontrado no pedido' });
+    return;
+  }
+
+  // O vendedor só pode baixar o preço (desconto), nunca passar do preço da
+  // tabela do cliente (ou do catálogo, se a tabela não tiver o produto).
+  const produto = await service.getProduto(item.produtoId);
+  const precoTabela = produto
+    ? await precos.precoDoProdutoParaCliente(pedido.clienteId, produto)
+    : Number(item.precoUnitario);
+  if (parsed.data.preco_unitario > precoTabela + 0.001) {
+    res.status(400).json({
+      mensagem: `O preço só pode ser reduzido (máximo R$ ${precoTabela.toFixed(2).replace('.', ',')}).`,
+    });
     return;
   }
 
@@ -586,7 +611,11 @@ type PedidoAdminComItens = NonNullable<
   Awaited<ReturnType<typeof service.getPedidoParaAdmin>>
 >;
 
-function serializeAdmin(p: PedidoAdminComItens) {
+/**
+ * `precoTabela` = preço da tabela do cliente (ou do catálogo) hoje. Só a tela
+ * web usa, para avisar o comercial de item vendido abaixo dele; PDF e TXT não.
+ */
+function serializeAdmin(p: PedidoAdminComItens, mapa: precos.MapaPrecos = new Map()) {
   return {
     id: p.id,
     numeroPedido: p.numeroPedido,
@@ -611,14 +640,19 @@ function serializeAdmin(p: PedidoAdminComItens) {
       produto: {
         codigo: i.produto.codigo,
         nome: i.produto.nome,
-        categoria: i.produto.categoria,
+        categoria: i.produto.categoriaId,
         unidadeMedida: i.produto.unidadeMedida,
       },
       quantidade: Number(i.quantidade),
       precoUnitario: Number(i.precoUnitario),
+      precoTabela: precos.precoEfetivo(i.produto, mapa),
       subtotal: Number(i.subtotal),
     })),
   };
+}
+
+async function serializeAdminComTabela(p: PedidoAdminComItens) {
+  return serializeAdmin(p, await precos.mapaPrecosDoCliente(p.clienteId));
 }
 
 /** Carrega um pedido CONFIRMADO para edição pelo admin (comercial/TI). */
@@ -644,7 +678,7 @@ export async function adminObterPedido(req: Request, res: Response): Promise<voi
     res.status(404).json({ mensagem: 'Pedido não encontrado' });
     return;
   }
-  res.json({ pedido: serializeAdmin(pedido) });
+  res.json({ pedido: await serializeAdminComTabela(pedido) });
 }
 
 /**
@@ -656,7 +690,7 @@ export async function adminAprovar(req: Request, res: Response): Promise<void> {
   if (!pedido) return;
   await service.registrarEdicaoAdmin(pedido.id, req.user!.sub);
   const atualizado = await service.getPedidoParaAdmin(pedido.id);
-  res.json({ pedido: atualizado ? serializeAdmin(atualizado) : null });
+  res.json({ pedido: atualizado ? await serializeAdminComTabela(atualizado) : null });
 }
 
 const revisaoSchema = z.object({
@@ -760,5 +794,5 @@ export async function adminRevisar(req: Request, res: Response): Promise<void> {
     throw e;
   }
   const atualizado = await service.getPedidoParaAdmin(pedido.id);
-  res.json({ pedido: atualizado ? serializeAdmin(atualizado) : null });
+  res.json({ pedido: atualizado ? await serializeAdminComTabela(atualizado) : null });
 }

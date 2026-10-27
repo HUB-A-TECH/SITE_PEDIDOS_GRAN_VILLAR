@@ -8,14 +8,16 @@ export const LIMITE_OPCOES: { valor: Limite; label: string }[] = [
   { valor: 'tudo', label: 'Tudo' },
 ];
 
-export type Categoria =
-  | 'ALHOS'
-  | 'PIMENTAS'
-  | 'CHAS'
-  | 'ERVAS'
-  | 'ESPECIARIAS'
-  | 'SAIS'
-  | 'OUTROS';
+/** Id da categoria do produto (null = sem categoria). */
+export type Categoria = string | null;
+
+/** Categoria do catálogo, editável pelo admin (ver lib/categoriasApi). */
+export interface CategoriaItem {
+  id: string;
+  nome: string;
+  ordem: number;
+  totalProdutos: number;
+}
 
 export type UnidadeMedida = 'UND' | 'KG' | 'G' | 'ML' | 'L';
 
@@ -101,7 +103,7 @@ export interface Cliente {
   setorId: string | null;
   ativo: boolean;
   /** Setor (região) do cliente — vem na lista do vendedor, que agrupa por ele. */
-  setor?: { id: string; nome: string } | null;
+  setor?: { id: string; nome: string; cor?: string; ordem?: number } | null;
 }
 
 /** Cliente com os vínculos — só o admin recebe esta versão. */
@@ -116,6 +118,9 @@ export interface ClienteCompleto extends Cliente {
 export interface Setor {
   id: string;
   nome: string;
+  /** Cor do cartão no Novo Pedido (ver lib/coresSetor). */
+  cor: string;
+  ordem: number;
   localId: string;
   vendedores: VendedorOpcao[];
   totalClientes: number;
@@ -151,24 +156,6 @@ export interface Local {
   responsavel?: string | null;
 }
 
-export const CATEGORIAS: Categoria[] = [
-  'ALHOS',
-  'PIMENTAS',
-  'CHAS',
-  'ERVAS',
-  'ESPECIARIAS',
-  'SAIS',
-  'OUTROS',
-];
-
 export const UNIDADES: UnidadeMedida[] = ['UND', 'KG', 'G', 'ML', 'L'];
 
-export const CATEGORIA_LABEL: Record<Categoria, string> = {
-  ALHOS: 'Alhos',
-  PIMENTAS: 'Pimentas',
-  CHAS: 'Chás',
-  ERVAS: 'Ervas',
-  ESPECIARIAS: 'Especiarias',
-  SAIS: 'Sais',
-  OUTROS: 'Outros',
-};
+

@@ -5,6 +5,7 @@ import { AppLayout } from '../../components/AppLayout';
 import { Aviso } from '../../components/Aviso';
 import { useDialogo } from '../../context/DialogoContext';
 import * as setoresApi from '../../lib/setoresApi';
+import { CORES_SETOR, paleta, type CorSetor } from '../../lib/coresSetor';
 import type { ClienteDoSetor, SetorDetalhe } from '../../lib/types';
 
 type Filtro = 'NESTE' | 'SEM' | 'TODOS';
@@ -93,10 +94,20 @@ export function AdminSetorDetalhePage() {
     });
     if (!nome || nome === setor.nome) return;
     try {
-      const atualizado = await setoresApi.renomear(setor.id, nome);
+      const atualizado = await setoresApi.atualizar(setor.id, { nome });
       setDados((d) => (d ? { ...d, setor: { ...d.setor, nome: atualizado.nome } } : d));
     } catch (e) {
       await avisar({ titulo: 'Não foi possível renomear', tom: 'erro', mensagem: mensagemErro(e, 'Tente novamente.') });
+    }
+  }
+
+  async function mudarCor(cor: CorSetor) {
+    if (cor === setor.cor) return;
+    try {
+      const atualizado = await setoresApi.atualizar(setor.id, { cor });
+      setDados((d) => (d ? { ...d, setor: { ...d.setor, cor: atualizado.cor } } : d));
+    } catch (e) {
+      await avisar({ titulo: 'Não foi possível mudar a cor', tom: 'erro', mensagem: mensagemErro(e, 'Tente novamente.') });
     }
   }
 
@@ -136,12 +147,34 @@ export function AdminSetorDetalhePage() {
 
   return (
     <AppLayout titulo={setor.nome} voltarPara="/admin/setores">
-      <div className="mb-4 rounded-xl border-l-4 border-brand-500 bg-white p-4 shadow-sm">
+      <div className={`mb-4 rounded-xl border-l-8 bg-white p-4 shadow-sm ${paleta(setor.cor).borda}`}>
         <p className="font-semibold text-slate-800">{setor.nome}</p>
         <p className="text-xs text-slate-500">
           {contagem.NESTE === 1 ? '1 cliente' : `${contagem.NESTE} clientes`} ·{' '}
           {setor.vendedores.length === 1 ? '1 vendedor' : `${setor.vendedores.length} vendedores`}
         </p>
+        <p className="mt-3 text-xs font-medium text-slate-600">
+          Cor do setor (é a cor que o vendedor vê no Novo Pedido)
+        </p>
+        <div className="mt-1 flex flex-wrap gap-2">
+          {(Object.keys(CORES_SETOR) as CorSetor[]).map((cor) => {
+            const p = CORES_SETOR[cor];
+            const atual = setor.cor === cor;
+            return (
+              <button
+                key={cor}
+                onClick={() => mudarCor(cor)}
+                aria-pressed={atual}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                  atual ? 'border-slate-800 bg-slate-100 text-slate-900' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span className={`h-3.5 w-3.5 rounded-full ${p.bolinha}`} />
+                {p.nome}
+              </button>
+            );
+          })}
+        </div>
         <div className="mt-3 flex gap-2">
           <button
             onClick={renomear}

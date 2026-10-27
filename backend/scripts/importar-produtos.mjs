@@ -69,17 +69,22 @@ async function main() {
   for (const p of produtos) contagem[p.categoria] = (contagem[p.categoria] ?? 0) + 1;
   console.log('Distribuição por categoria:', contagem);
 
+  // Código antigo (ALHOS, CHAS...) -> id da categoria com o nome equivalente.
+  const NOMES = { ALHOS: 'Alhos', PIMENTAS: 'Pimentas', CHAS: 'Chás', ERVAS: 'Ervas', ESPECIARIAS: 'Especiarias', SAIS: 'Sais', OUTROS: 'Outros' };
+  const cats = await prisma.categoria.findMany({ select: { id: true, nome: true } });
+  const idDe = (codigo) => cats.find((c) => c.nome === NOMES[codigo])?.id ?? null;
+
   let criados = 0;
   let atualizados = 0;
   for (const p of produtos) {
     const existente = await prisma.produto.findUnique({ where: { codigo: p.codigo } });
     await prisma.produto.upsert({
       where: { codigo: p.codigo },
-      update: { nome: p.nome, preco: p.preco, categoria: p.categoria },
+      update: { nome: p.nome, preco: p.preco, categoriaId: idDe(p.categoria) },
       create: {
         codigo: p.codigo,
         nome: p.nome,
-        categoria: p.categoria,
+        categoriaId: idDe(p.categoria),
         preco: p.preco,
         unidadeMedida: 'UND',
       },

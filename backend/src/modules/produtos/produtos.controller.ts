@@ -1,12 +1,13 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { Categoria, type Produto } from '@prisma/client';
+import { Prisma, type Produto } from '@prisma/client';
 import * as service from './produtos.service';
 import * as precos from '../precos/precos.service';
 import * as carteira from '../../lib/carteira';
 import { isUniqueConstraintError, isNotFoundError } from '../../utils/prisma-errors';
 
-const categoriaEnum = z.nativeEnum(Categoria);
+// Categoria = id da tabela categorias; null = sem categoria.
+const categoriaId = z.string().uuid();
 const unidadeEnum = z.enum(['UND', 'KG', 'G', 'ML', 'L']);
 
 // Atenção: nunca usar `.map(serialize)` — o índice do map viraria o preço.
@@ -15,7 +16,7 @@ function serialize(p: Produto, preco = Number(p.preco)) {
     id: p.id,
     codigo: p.codigo,
     nome: p.nome,
-    categoria: p.categoria,
+    categoria: p.categoriaId,
     descricao: p.descricao,
     preco,
     unidadeMedida: p.unidadeMedida,
@@ -44,7 +45,7 @@ async function resolverClienteAcessivel(
 export async function listarPorMix(req: Request, res: Response): Promise<void> {
   const schema = z.object({
     cliente_id: z.string().uuid(),
-    categoria: categoriaEnum.optional(),
+    categoria: categoriaId.optional(),
   });
   const parsed = schema.safeParse(req.query);
   if (!parsed.success) {
@@ -88,16 +89,12 @@ export async function buscar(req: Request, res: Response): Promise<void> {
   });
 }
 
-export function categorias(_req: Request, res: Response): void {
-  res.json({ categorias: service.listCategoriaValues() });
-}
-
 // ---- Admin ----
 
 const produtoCreateSchema = z.object({
   codigo: z.string().min(1),
   nome: z.string().min(1),
-  categoria: categoriaEnum,
+  categoria: categoriaId.nullable(),
   descricao: z.string().optional(),
   preco: z.number().nonnegative(),
   unidadeMedida: unidadeEnum,
@@ -109,7 +106,7 @@ const produtoUpdateSchema = produtoCreateSchema.partial().extend({
 
 export async function adminListar(req: Request, res: Response): Promise<void> {
   const schema = z.object({
-    categoria: categoriaEnum.optional(),
+    categoria: categoriaId.optional(),
     ativo: z.enum(['true', 'false']).optional(),
   });
   const parsed = schema.safeParse(req.query);
@@ -118,7 +115,7 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
     return;
   }
   const produtos = await service.listCatalogo({
-    categoria: parsed.data.categoria,
+    categoriaId: parsed.data.categoria,
     ativo: parsed.data.ativo ? parsed.data.ativo === 'true' : undefined,
   });
   res.json({ produtos: produtos.map((p) => serialize(p)) });
@@ -131,7 +128,8 @@ export async function adminCriar(req: Request, res: Response): Promise<void> {
     return;
   }
   try {
-    const produto = await service.criarProduto(parsed.data);
+    const { categoria, ...resto } = parsed.data;
+    const produto = await service.criarProduto({ ...resto, categoriaId: categoria });
     res.status(201).json(serialize(produto));
   } catch (e) {
     if (isUniqueConstraintError(e)) {
@@ -149,7 +147,11 @@ export async function adminAtualizar(req: Request, res: Response): Promise<void>
     return;
   }
   try {
-    const produto = await service.atualizarProduto(req.params.id, parsed.data);
+    const { categoria, ...resto } = parsed.data;
+    const produto = await service.atualizarProduto(req.params.id, {
+      ...resto,
+      ...(categoria !== undefined ? { categoriaId: categoria } : {}),
+    });
     res.json(serialize(produto));
   } catch (e) {
     if (isNotFoundError(e)) {
@@ -158,6 +160,31 @@ export async function adminAtualizar(req: Request, res: Response): Promise<void>
     }
     if (isUniqueConstraintError(e)) {
       res.status(409).json({ mensagem: 'Já existe um produto com esse código' });
+      return;
+    }
+    throw e;
+  }
+}
+
+/** Produto novo: enviar para todos os clientes ou só para os escolhidos. */
+export async function adminEnviarParaClientes(req: Request, res: Response): Promise<void> {
+  const parsed = z
+    .union([
+      z.object({ todos: z.literal(true) }),
+      z.object({ clienteIds: z.array(z.string().uuid()).min(1, 'Escolha pelo menos um cliente') }),
+    ])
+    .safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'Escolha para quais clientes enviar' });
+    return;
+  }
+  try {
+    const total = await service.enviarParaClientes(req.params.id, parsed.data);
+    res.json({ total });
+  } catch (e) {
+    // FK: produto ou cliente inexistente.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+      res.status(404).json({ mensagem: 'Produto ou cliente não encontrado' });
       return;
     }
     throw e;

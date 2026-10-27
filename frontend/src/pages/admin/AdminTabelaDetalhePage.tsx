@@ -6,13 +6,11 @@ import { Modal } from '../../components/Modal';
 import { Aviso } from '../../components/Aviso';
 import * as tabelasApi from '../../lib/tabelasApi';
 import {
-  CATEGORIAS,
-  CATEGORIA_LABEL,
-  type Categoria,
   type TabelaDetalhe,
   type TabelaPreco,
   type TabelaProduto,
 } from '../../lib/types';
+import { useCategorias } from '../../lib/categoriasApi';
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500';
@@ -32,7 +30,8 @@ export function AdminTabelaDetalhePage() {
   const [dados, setDados] = useState<TabelaDetalhe | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState('');
-  const [filtro, setFiltro] = useState<Categoria | 'TODAS'>('TODAS');
+  const [filtro, setFiltro] = useState<string>('TODAS');
+  const { categorias, nomeDe } = useCategorias();
   const [mostrarClientes, setMostrarClientes] = useState(false);
   const [modalAberto, setModalAberto] = useState(false);
 
@@ -152,13 +151,13 @@ export function AdminTabelaDetalhePage() {
       />
       <select
         value={filtro}
-        onChange={(e) => setFiltro(e.target.value as Categoria | 'TODAS')}
+        onChange={(e) => setFiltro(e.target.value)}
         className={`${inputCls} mb-4`}
       >
         <option value="TODAS">Todas as categorias</option>
-        {CATEGORIAS.map((c) => (
+        {categorias.map(({ id: c }) => (
           <option key={c} value={c}>
-            {CATEGORIA_LABEL[c]}
+            {nomeDe(c)}
           </option>
         ))}
       </select>

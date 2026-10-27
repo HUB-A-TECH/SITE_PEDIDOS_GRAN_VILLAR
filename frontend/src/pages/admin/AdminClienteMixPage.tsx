@@ -5,11 +5,9 @@ import { Aviso } from '../../components/Aviso';
 import * as clientesApi from '../../lib/clientesApi';
 import * as produtosApi from '../../lib/produtosApi';
 import {
-  CATEGORIAS,
-  CATEGORIA_LABEL,
-  type Categoria,
   type Produto,
 } from '../../lib/types';
+import { useCategorias } from '../../lib/categoriasApi';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -19,7 +17,8 @@ export function AdminClienteMixPage() {
   const [catalogo, setCatalogo] = useState<Produto[]>([]);
   const [mixIds, setMixIds] = useState<Set<string>>(new Set());
   const [carregando, setCarregando] = useState(true);
-  const [filtro, setFiltro] = useState<Categoria | 'TODAS'>('TODAS');
+  const [filtro, setFiltro] = useState<string>('TODAS');
+  const { categorias, nomeDe } = useCategorias();
   const [busca, setBusca] = useState('');
   const [processando, setProcessando] = useState<string | null>(null);
   // Tabela do cliente + preços dela, para o admin ver o que o vendedor verá.
@@ -92,12 +91,12 @@ export function AdminClienteMixPage() {
 
       <div className="mb-4 flex flex-wrap gap-2">
         <Chip ativa={filtro === 'TODAS'} onClick={() => setFiltro('TODAS')} label="Todas" />
-        {CATEGORIAS.map((c) => (
+        {categorias.map(({ id: c }) => (
           <Chip
             key={c}
             ativa={filtro === c}
             onClick={() => setFiltro(c)}
-            label={CATEGORIA_LABEL[c]}
+            label={nomeDe(c)}
           />
         ))}
       </div>
@@ -118,7 +117,7 @@ export function AdminClienteMixPage() {
                 <div>
                   <p className="font-semibold text-slate-800">{p.nome}</p>
                   <p className="text-xs text-slate-500">
-                    {p.codigo} · {CATEGORIA_LABEL[p.categoria]}
+                    {p.codigo} · {nomeDe(p.categoria)}
                   </p>
                   {noMix && precos.has(p.id) && (
                     <p className="text-xs font-medium text-brand-700">
