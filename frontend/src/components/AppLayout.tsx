@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { iniciais } from '../lib/contato';
 import { useAuth } from '../context/AuthContext';
 
 interface Props {
@@ -51,16 +52,54 @@ export function AppLayout({
           <p className="text-xs text-brand-100">{usuario?.username}</p>
         </div>
         {acao}
-        <button
-          onClick={() => logout()}
-          className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm hover:bg-brand-800"
-        >
-          Sair
-        </button>
+        <MenuConta nome={usuario?.username ?? ''} onSair={() => logout()} />
       </header>
       <main className={`mx-auto max-w-md p-4 ${largo ? 'layout-largo lg:max-w-6xl lg:p-6' : ''}`}>
         {children}
       </main>
+    </div>
+  );
+}
+
+/** Rostinho com as iniciais no canto: abre "Minha Conta" e "Sair". */
+function MenuConta({ nome, onSair }: { nome: string; onSair: () => void }) {
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Fecha ao tocar fora do menu.
+  useEffect(() => {
+    if (!aberto) return;
+    const fechar = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setAberto(false);
+    };
+    document.addEventListener('mousedown', fechar);
+    return () => document.removeEventListener('mousedown', fechar);
+  }, [aberto]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setAberto((a) => !a)}
+        aria-label="Minha conta"
+        aria-expanded={aberto}
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-brand-700 ring-2 ring-brand-300 hover:ring-white"
+      >
+        {iniciais(nome)}
+      </button>
+      {aberto && (
+        <div className="absolute right-0 top-11 z-20 w-48 overflow-hidden rounded-xl bg-white text-slate-700 shadow-lg ring-1 ring-slate-200">
+          <p className="truncate border-b border-slate-100 px-4 py-2.5 text-xs text-slate-500">{nome}</p>
+          <Link to="/minha-conta" className="block px-4 py-2.5 text-sm hover:bg-slate-50">
+            Minha Conta
+          </Link>
+          <button
+            onClick={onSair}
+            className="block w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50"
+          >
+            Sair
+          </button>
+        </div>
+      )}
     </div>
   );
 }
