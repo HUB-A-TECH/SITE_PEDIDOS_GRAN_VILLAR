@@ -293,7 +293,7 @@ export async function mixListar(req: Request, res: Response): Promise<void> {
       id: cp.produto.id,
       codigo: cp.produto.codigo,
       nome: cp.produto.nome,
-      categoria: cp.produto.categoria,
+      categoria: cp.produto.categoriaId,
       ativo: cp.produto.ativo,
       preco: precos.precoEfetivo(cp.produto, mapa),
     })),

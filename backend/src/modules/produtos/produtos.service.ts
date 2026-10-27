@@ -1,9 +1,13 @@
 import { prisma } from '../../lib/prisma';
-import { Categoria, type Produto } from '@prisma/client';
+import type { Produto } from '@prisma/client';
 
-export function listCategoriaValues(): string[] {
-  return Object.values(Categoria);
-}
+// Ordem do pedido: categoria (na ordem do admin; sem categoria vai pro fim) e,
+// dentro dela, nome em ordem alfabética.
+const ordemCatalogo = [{ categoria: { ordem: 'asc' } }, { nome: 'asc' }] as const;
+const ordemMix = [
+  { produto: { categoria: { ordem: 'asc' } } },
+  { produto: { nome: 'asc' } },
+] as const;
 
 export function getClienteById(clienteId: string) {
   return prisma.cliente.findUnique({ where: { id: clienteId } });
@@ -12,16 +16,16 @@ export function getClienteById(clienteId: string) {
 /** Produtos ativos do mix daquele cliente (RN-10), opcionalmente por categoria. */
 export async function listMixDoCliente(
   clienteId: string,
-  categoria?: Categoria,
+  categoriaId?: string,
 ): Promise<Produto[]> {
   const itens = await prisma.clienteProduto.findMany({
     where: {
       clienteId,
       ativo: true,
-      produto: { ativo: true, ...(categoria ? { categoria } : {}) },
+      produto: { ativo: true, ...(categoriaId ? { categoriaId } : {}) },
     },
     include: { produto: true },
-    orderBy: { produto: { nome: 'asc' } },
+    orderBy: [...ordemMix],
   });
   return itens.map((cp) => cp.produto);
 }
@@ -44,7 +48,7 @@ export async function buscarNoMix(
       },
     },
     include: { produto: true },
-    orderBy: { produto: { nome: 'asc' } },
+    orderBy: [...ordemMix],
   });
   return itens.map((cp) => cp.produto);
 }
@@ -52,22 +56,22 @@ export async function buscarNoMix(
 // ---- Admin (catálogo completo) ----
 
 export function listCatalogo(filtros: {
-  categoria?: Categoria;
+  categoriaId?: string;
   ativo?: boolean;
 }): Promise<Produto[]> {
   return prisma.produto.findMany({
     where: {
-      ...(filtros.categoria ? { categoria: filtros.categoria } : {}),
+      ...(filtros.categoriaId ? { categoriaId: filtros.categoriaId } : {}),
       ...(filtros.ativo !== undefined ? { ativo: filtros.ativo } : {}),
     },
-    orderBy: [{ categoria: 'asc' }, { nome: 'asc' }],
+    orderBy: [...ordemCatalogo],
   });
 }
 
 export function criarProduto(data: {
   codigo: string;
   nome: string;
-  categoria: Categoria;
+  categoriaId: string | null;
   descricao?: string;
   preco: number;
   unidadeMedida: string;
@@ -80,7 +84,7 @@ export function atualizarProduto(
   data: Partial<{
     codigo: string;
     nome: string;
-    categoria: Categoria;
+    categoriaId: string | null;
     descricao: string;
     preco: number;
     unidadeMedida: string;

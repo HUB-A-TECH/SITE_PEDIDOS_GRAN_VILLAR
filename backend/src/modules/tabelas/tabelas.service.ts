@@ -59,7 +59,7 @@ export function listarProdutosDaTabela(tabelaId: string) {
   return prisma.produto.findMany({
     where: { ativo: true },
     include: { tabelaPrecoItens: { where: { tabelaId }, select: { preco: true } } },
-    orderBy: [{ categoria: 'asc' }, { nome: 'asc' }],
+    orderBy: [{ categoria: { ordem: 'asc' } }, { nome: 'asc' }],
   });
 }
 

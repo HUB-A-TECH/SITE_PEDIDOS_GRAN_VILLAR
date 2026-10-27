@@ -36,7 +36,7 @@ function serialize(p: PedidoComItens) {
       produto: {
         codigo: i.produto.codigo,
         nome: i.produto.nome,
-        categoria: i.produto.categoria,
+        categoria: i.produto.categoriaId,
         unidadeMedida: i.produto.unidadeMedida,
       },
       quantidade: Number(i.quantidade),
@@ -611,7 +611,7 @@ function serializeAdmin(p: PedidoAdminComItens) {
       produto: {
         codigo: i.produto.codigo,
         nome: i.produto.nome,
-        categoria: i.produto.categoria,
+        categoria: i.produto.categoriaId,
         unidadeMedida: i.produto.unidadeMedida,
       },
       quantidade: Number(i.quantidade),
