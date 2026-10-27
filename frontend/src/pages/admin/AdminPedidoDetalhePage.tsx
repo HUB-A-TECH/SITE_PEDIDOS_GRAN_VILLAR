@@ -113,6 +113,8 @@ export function AdminPedidoDetalhePage() {
 
   const podeEditar = pedido.status === 'CONFIRMADO';
   const comAlteracoes = pedido.alteracoesComercial.length > 0;
+  // Itens com preço abaixo da tabela do cliente (desconto dado no pedido).
+  const comDesconto = pedido.itens.filter((i) => i.precoUnitario < i.precoTabela - 0.001);
   const est = estiloStatus(pedido.status, pedido.revisao, comAlteracoes);
   const precisaRevisao = pedido.revisao === 'PENDENTE' || pedido.revisao === 'ALTERADO';
 
@@ -249,6 +251,15 @@ export function AdminPedidoDetalhePage() {
           )
         )}
 
+        {comDesconto.length > 0 && (
+          <Aviso tom="atencao" titulo="Preço alterado no pedido" className="mb-4">
+            {comDesconto.length === 1
+              ? '1 item está'
+              : `${comDesconto.length} itens estão`}{' '}
+            com preço abaixo da tabela do cliente. Confira os itens marcados abaixo.
+          </Aviso>
+        )}
+
         {podeEditar && (
           <p className="mb-2 text-xs text-slate-500">
             Mude quantidades e preços à vontade: nada é gravado até você confirmar. Quantidade
@@ -287,6 +298,11 @@ export function AdminPedidoDetalhePage() {
                     ) : (
                       <p className="text-xs text-slate-500">
                         {brl(a.precoUnitario)} / {it.produto.unidadeMedida}
+                      </p>
+                    )}
+                    {!removido && a.precoUnitario < it.precoTabela - 0.001 && (
+                      <p className="mt-0.5 inline-block rounded-md bg-orange-50 px-1.5 py-0.5 text-[11px] font-medium text-orange-800">
+                        abaixo da tabela ({brl(it.precoTabela)})
                       </p>
                     )}
                     {mudou && !removido && b.precoUnitario !== a.precoUnitario && (
