@@ -215,6 +215,10 @@ model Setor {
   id           String   @id @default(uuid())
   nome         String
   localId      String   @map("local_id")
+  // Cor do setor (VERMELHO, AMARELO, VERDE, AZUL...): o vendedor escolhe a
+  // região pelo cartão colorido no Novo Pedido. Ordem = posição dos cartões.
+  cor          String   @default("AZUL")
+  ordem        Int      @default(0)
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 

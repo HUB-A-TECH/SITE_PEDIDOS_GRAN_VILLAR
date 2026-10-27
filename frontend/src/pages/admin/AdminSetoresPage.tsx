@@ -6,6 +6,7 @@ import { Aviso } from '../../components/Aviso';
 import { useDialogo } from '../../context/DialogoContext';
 import * as clientesApi from '../../lib/clientesApi';
 import * as setoresApi from '../../lib/setoresApi';
+import { CORES_INICIAIS, paleta } from '../../lib/coresSetor';
 import type { Local, Setor } from '../../lib/types';
 
 const inputCls =
@@ -53,7 +54,10 @@ export function AdminSetoresPage() {
     });
     if (!nome) return;
     try {
-      const setor = await setoresApi.criar({ nome, localId });
+      // Cor inicial segue o rodízio (vermelho, amarelo, verde, azul); o admin
+      // troca na tela do setor.
+      const cor = CORES_INICIAIS[setores.length % CORES_INICIAIS.length];
+      const setor = await setoresApi.criar({ nome, localId, cor });
       navigate(`/admin/setores/${setor.id}`);
     } catch (e) {
       await avisar({
@@ -64,6 +68,21 @@ export function AdminSetoresPage() {
             ? e.response.data.mensagem
             : 'Tente novamente.',
       });
+    }
+  }
+
+  /** Troca o setor de lugar com o vizinho (cima = -1, baixo = +1). */
+  async function mover(indice: number, direcao: -1 | 1) {
+    const destino = indice + direcao;
+    if (destino < 0 || destino >= setores.length) return;
+    const nova = [...setores];
+    [nova[indice], nova[destino]] = [nova[destino], nova[indice]];
+    setSetores(nova);
+    try {
+      setSetores(await setoresApi.reordenar(localId, nova.map((s) => s.id)));
+    } catch {
+      setSetores(setores);
+      await avisar({ titulo: 'Não foi possível mudar a ordem', tom: 'erro', mensagem: 'Tente novamente.' });
     }
   }
 
@@ -97,8 +116,8 @@ export function AdminSetoresPage() {
       )}
 
       <Aviso className="mb-4">
-        Cada setor é uma região de visitas. O vendedor vê os clientes de todos os
-        setores em que está.
+        Cada setor é uma região de visitas, com uma cor. No Novo Pedido o vendedor
+        vê os cartões dos seus setores nesta ordem — use as setas para mudar.
       </Aviso>
 
       {!carregando && semSetor > 0 && (
@@ -117,20 +136,22 @@ export function AdminSetoresPage() {
         </p>
       ) : (
         <ul className="space-y-2">
-          {setores.map((s) => {
+          {setores.map((s, i) => {
             const semVendedor = s.vendedores.length === 0;
+            const p = paleta(s.cor);
             return (
               <li
                 key={s.id}
-                className={`rounded-xl border-l-4 bg-white p-4 shadow-sm ${
-                  semVendedor ? 'border-brandYellow-400' : 'border-brand-500'
-                }`}
+                className={`flex items-stretch gap-2 rounded-xl border-l-8 bg-white p-4 shadow-sm ${p.borda}`}
               >
                 <button
                   onClick={() => navigate(`/admin/setores/${s.id}`)}
-                  className="w-full text-left"
+                  className="min-w-0 flex-1 text-left"
                 >
-                  <p className="font-semibold text-slate-800">{s.nome}</p>
+                  <p className="font-semibold text-slate-800">
+                    {i + 1}. {s.nome}{' '}
+                    <span className="text-xs font-normal text-slate-500">· {p.nome}</span>
+                  </p>
                   <p className="text-xs text-slate-500">
                     {s.totalClientes === 1 ? '1 cliente' : `${s.totalClientes} clientes`}
                   </p>
@@ -144,6 +165,24 @@ export function AdminSetoresPage() {
                       : `Vendedor: ${s.vendedores.map((v) => v.nomeCompleto).join(', ')}`}
                   </p>
                 </button>
+                <div className="flex flex-col justify-center gap-1">
+                  <button
+                    onClick={() => mover(i, -1)}
+                    disabled={i === 0}
+                    aria-label={`Subir ${s.nome}`}
+                    className="rounded border border-slate-300 px-2 text-slate-600 hover:bg-slate-100 disabled:opacity-30"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => mover(i, 1)}
+                    disabled={i === setores.length - 1}
+                    aria-label={`Descer ${s.nome}`}
+                    className="rounded border border-slate-300 px-2 text-slate-600 hover:bg-slate-100 disabled:opacity-30"
+                  >
+                    ↓
+                  </button>
+                </div>
               </li>
             );
           })}

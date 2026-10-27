@@ -12,8 +12,9 @@ setoresAdminRoutes.use(
 );
 setoresAdminRoutes.get('/', asyncHandler(controller.listar));
 setoresAdminRoutes.post('/', asyncHandler(controller.criar));
+setoresAdminRoutes.put('/ordem', asyncHandler(controller.reordenar));
 setoresAdminRoutes.get('/:id', asyncHandler(controller.detalhe));
-setoresAdminRoutes.put('/:id', asyncHandler(controller.renomear));
+setoresAdminRoutes.put('/:id', asyncHandler(controller.atualizar));
 setoresAdminRoutes.delete('/:id', asyncHandler(controller.excluir));
 
 // Quem atende o setor

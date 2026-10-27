@@ -26,7 +26,7 @@ export function getById(id: string): Promise<Cliente | null> {
 export function getByIdComSetor(id: string) {
   return prisma.cliente.findUnique({
     where: { id },
-    include: { setor: { select: { id: true, nome: true } } },
+    include: { setor: { select: { id: true, nome: true, cor: true, ordem: true } } },
   });
 }
 

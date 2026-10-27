@@ -101,7 +101,7 @@ export interface Cliente {
   setorId: string | null;
   ativo: boolean;
   /** Setor (região) do cliente — vem na lista do vendedor, que agrupa por ele. */
-  setor?: { id: string; nome: string } | null;
+  setor?: { id: string; nome: string; cor?: string; ordem?: number } | null;
 }
 
 /** Cliente com os vínculos — só o admin recebe esta versão. */
@@ -116,6 +116,9 @@ export interface ClienteCompleto extends Cliente {
 export interface Setor {
   id: string;
   nome: string;
+  /** Cor do cartão no Novo Pedido (ver lib/coresSetor). */
+  cor: string;
+  ordem: number;
   localId: string;
   vendedores: VendedorOpcao[];
   totalClientes: number;
