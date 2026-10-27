@@ -43,7 +43,7 @@ export async function clientesDoUsuarioVendedor(
       ...(apenasAtivos ? { ativo: true } : {}),
       ...doSetorDoVendedor(vendedor.id),
     },
-    include: { setor: { select: { id: true, nome: true } } },
+    include: { setor: { select: { id: true, nome: true, cor: true, ordem: true } } },
     orderBy: { nome: 'asc' },
   });
 }
