@@ -3,6 +3,7 @@ import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Modal } from '../../components/Modal';
 import { Aviso } from '../../components/Aviso';
+import { EnviarProdutoClientes } from '../../components/EnviarProdutoClientes';
 import * as produtosApi from '../../lib/produtosApi';
 import {
   UNIDADES,
@@ -55,9 +56,17 @@ export function AdminProdutosPage() {
     setEditando(p);
     setModalAberto(true);
   }
-  async function aoSalvar() {
-    setModalAberto(false);
+  // Produto recém-criado: o modal passa para "enviar para quais clientes".
+  const [enviando, setEnviando] = useState<Produto | null>(null);
+
+  async function aoSalvar(criado?: Produto) {
+    if (criado) setEnviando(criado);
+    else setModalAberto(false);
     await carregar();
+  }
+  function fecharModal() {
+    setModalAberto(false);
+    setEnviando(null);
   }
 
   return (
@@ -135,11 +144,15 @@ export function AdminProdutosPage() {
       )}
 
       <Modal
-        titulo={editando ? 'Editar Produto' : 'Novo Produto'}
+        titulo={enviando ? 'Enviar para clientes' : editando ? 'Editar Produto' : 'Novo Produto'}
         aberto={modalAberto}
-        onFechar={() => setModalAberto(false)}
+        onFechar={fecharModal}
       >
-        <ProdutoForm produto={editando} onSalvar={aoSalvar} />
+        {enviando ? (
+          <EnviarProdutoClientes produto={enviando} onConcluir={fecharModal} />
+        ) : (
+          <ProdutoForm produto={editando} onSalvar={aoSalvar} />
+        )}
       </Modal>
     </AppLayout>
   );
@@ -150,7 +163,8 @@ function ProdutoForm({
   onSalvar,
 }: {
   produto: Produto | null;
-  onSalvar: () => void;
+  /** Recebe o produto quando ele acabou de ser criado. */
+  onSalvar: (criado?: Produto) => void;
 }) {
   const [codigo, setCodigo] = useState(produto?.codigo ?? '');
   const [nome, setNome] = useState(produto?.nome ?? '');
@@ -189,10 +203,10 @@ function ProdutoForm({
       };
       if (produto) {
         await produtosApi.adminAtualizar(produto.id, { ...dados, ativo });
+        onSalvar();
       } else {
-        await produtosApi.adminCriar(dados);
+        onSalvar(await produtosApi.adminCriar(dados));
       }
-      onSalvar();
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.data?.mensagem) {
         setErro(err.response.data.mensagem);

@@ -93,3 +93,32 @@ export function atualizarProduto(
 ): Promise<Produto> {
   return prisma.produto.update({ where: { id }, data });
 }
+
+/**
+ * Coloca o produto no mix dos clientes escolhidos (ou de todos os ativos).
+ * Quem já tinha o produto desativado no mix volta a tê-lo. Devolve quantos
+ * clientes receberam.
+ */
+export async function enviarParaClientes(
+  produtoId: string,
+  alvo: { todos: true } | { clienteIds: string[] },
+): Promise<number> {
+  const clienteIds =
+    'todos' in alvo
+      ? (await prisma.cliente.findMany({ where: { ativo: true }, select: { id: true } })).map(
+          (c) => c.id,
+        )
+      : alvo.clienteIds;
+  if (clienteIds.length === 0) return 0;
+  await prisma.$transaction([
+    prisma.clienteProduto.updateMany({
+      where: { produtoId, clienteId: { in: clienteIds } },
+      data: { ativo: true },
+    }),
+    prisma.clienteProduto.createMany({
+      data: clienteIds.map((clienteId) => ({ clienteId, produtoId })),
+      skipDuplicates: true,
+    }),
+  ]);
+  return clienteIds.length;
+}
