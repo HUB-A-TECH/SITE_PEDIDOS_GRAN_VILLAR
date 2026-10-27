@@ -35,6 +35,8 @@ export function PedidoPage() {
   const [foraDoMix, setForaDoMix] = useState<Produto[]>([]);
   const [extras, setExtras] = useState<Set<string>>(new Set());
   const [foraAberto, setForaAberto] = useState(false);
+  // Muda para o campo de preço voltar ao valor salvo quando o vendedor desiste.
+  const [desfazerPreco, setDesfazerPreco] = useState(0);
   const [buscaFora, setBuscaFora] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [categoria, setCategoria] = useState<string>('TODAS');
@@ -309,10 +311,37 @@ export function PedidoPage() {
     }
   }
 
-  async function definirPreco(produtoId: string, precoUnitario: number) {
+  async function definirPreco(produto: Produto, precoUnitario: number) {
     if (!pedido) return;
+    const produtoId = produto.id;
     const item = itemPorProduto.get(produtoId);
     if (!item) return;
+    // Só desconto: nunca acima do preço da tabela do cliente.
+    if (precoUnitario > produto.preco + 0.001) {
+      await dialogo.avisar({
+        titulo: 'Preço não permitido',
+        tom: 'atencao',
+        mensagem: `O preço só pode ser reduzido. O máximo para este produto é ${brl(produto.preco)}.`,
+      });
+      setDesfazerPreco((n) => n + 1);
+      return;
+    }
+    const ok = await dialogo.confirmar({
+      titulo: 'Alterar preço',
+      tom: 'atencao',
+      textoConfirmar: 'Sim, alterar',
+      mensagem: (
+        <>
+          Deseja realmente alterar o preço de <strong>{produto.nome}</strong> de{' '}
+          <strong>{brl(item.precoUnitario)}</strong> para{' '}
+          <strong>{brl(precoUnitario)}</strong>? Vale só para este pedido.
+        </>
+      ),
+    });
+    if (!ok) {
+      setDesfazerPreco((n) => n + 1);
+      return;
+    }
     setProcessando((s) => new Set(s).add(produtoId));
     try {
       const atualizado = await pedidosApi.atualizarPrecoItem(pedido.id, item.id, precoUnitario);
@@ -434,11 +463,12 @@ export function PedidoPage() {
                     )}
                     {qtd > 0 && item ? (
                       <PrecoItem
+                        key={`${p.id}-${desfazerPreco}`}
                         precoCatalogo={p.preco}
                         precoAtual={item.precoUnitario}
                         unidade={p.unidadeMedida}
                         desabilitado={ocupado}
-                        onChange={(v) => definirPreco(p.id, v)}
+                        onChange={(v) => definirPreco(p, v)}
                       />
                     ) : (
                       <p className="text-xs text-slate-500">

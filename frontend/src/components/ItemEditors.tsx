@@ -103,7 +103,13 @@ export function PrecoItem({
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           onBlur={commit}
-          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return;
+            // Sem isso o mesmo Enter "aperta" o botão da confirmação que abre
+            // em seguida, e o preço muda sem o vendedor ver a pergunta.
+            e.preventDefault();
+            e.currentTarget.blur();
+          }}
           inputMode="decimal"
           disabled={desabilitado}
           className="h-7 w-20 rounded-md border border-brandYellow-300 bg-brandYellow-50 px-1 text-sm text-brandYellow-800 outline-none focus:border-brandYellow-500"

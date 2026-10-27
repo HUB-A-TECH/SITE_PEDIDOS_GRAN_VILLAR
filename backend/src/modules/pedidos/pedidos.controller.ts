@@ -327,6 +327,19 @@ export async function atualizarPreco(req: Request, res: Response): Promise<void>
     return;
   }
 
+  // O vendedor só pode baixar o preço (desconto), nunca passar do preço da
+  // tabela do cliente (ou do catálogo, se a tabela não tiver o produto).
+  const produto = await service.getProduto(item.produtoId);
+  const precoTabela = produto
+    ? await precos.precoDoProdutoParaCliente(pedido.clienteId, produto)
+    : Number(item.precoUnitario);
+  if (parsed.data.preco_unitario > precoTabela + 0.001) {
+    res.status(400).json({
+      mensagem: `O preço só pode ser reduzido (máximo R$ ${precoTabela.toFixed(2).replace('.', ',')}).`,
+    });
+    return;
+  }
+
   await service.atualizarPrecoItem(item, parsed.data.preco_unitario);
   await responderPedidoAtualizado(pedido.id, vendedor.id, req.user!.sub, res);
 }
@@ -598,7 +611,11 @@ type PedidoAdminComItens = NonNullable<
   Awaited<ReturnType<typeof service.getPedidoParaAdmin>>
 >;
 
-function serializeAdmin(p: PedidoAdminComItens) {
+/**
+ * `precoTabela` = preço da tabela do cliente (ou do catálogo) hoje. Só a tela
+ * web usa, para avisar o comercial de item vendido abaixo dele; PDF e TXT não.
+ */
+function serializeAdmin(p: PedidoAdminComItens, mapa: precos.MapaPrecos = new Map()) {
   return {
     id: p.id,
     numeroPedido: p.numeroPedido,
@@ -628,9 +645,14 @@ function serializeAdmin(p: PedidoAdminComItens) {
       },
       quantidade: Number(i.quantidade),
       precoUnitario: Number(i.precoUnitario),
+      precoTabela: precos.precoEfetivo(i.produto, mapa),
       subtotal: Number(i.subtotal),
     })),
   };
+}
+
+async function serializeAdminComTabela(p: PedidoAdminComItens) {
+  return serializeAdmin(p, await precos.mapaPrecosDoCliente(p.clienteId));
 }
 
 /** Carrega um pedido CONFIRMADO para edição pelo admin (comercial/TI). */
@@ -656,7 +678,7 @@ export async function adminObterPedido(req: Request, res: Response): Promise<voi
     res.status(404).json({ mensagem: 'Pedido não encontrado' });
     return;
   }
-  res.json({ pedido: serializeAdmin(pedido) });
+  res.json({ pedido: await serializeAdminComTabela(pedido) });
 }
 
 /**
@@ -668,7 +690,7 @@ export async function adminAprovar(req: Request, res: Response): Promise<void> {
   if (!pedido) return;
   await service.registrarEdicaoAdmin(pedido.id, req.user!.sub);
   const atualizado = await service.getPedidoParaAdmin(pedido.id);
-  res.json({ pedido: atualizado ? serializeAdmin(atualizado) : null });
+  res.json({ pedido: atualizado ? await serializeAdminComTabela(atualizado) : null });
 }
 
 const revisaoSchema = z.object({
@@ -772,5 +794,5 @@ export async function adminRevisar(req: Request, res: Response): Promise<void> {
     throw e;
   }
   const atualizado = await service.getPedidoParaAdmin(pedido.id);
-  res.json({ pedido: atualizado ? serializeAdmin(atualizado) : null });
+  res.json({ pedido: atualizado ? await serializeAdminComTabela(atualizado) : null });
 }

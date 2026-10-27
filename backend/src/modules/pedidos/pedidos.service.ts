@@ -17,6 +17,7 @@ const pedidoInclude = {
           nome: true,
           categoriaId: true,
           unidadeMedida: true,
+          preco: true,
         },
       },
     },

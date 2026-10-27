@@ -216,7 +216,8 @@ export interface PedidoAdminDetalhe {
   ultimaAlteracaoEm: string | null;
   revisao: Revisao;
   alteracoesComercial: AlteracaoComercial[];
-  itens: ItemPedido[];
+  /** precoTabela: preço da tabela do cliente hoje (para o aviso de desconto). */
+  itens: (ItemPedido & { precoTabela: number })[];
 }
 
 export async function adminObterPedido(pedidoId: string): Promise<PedidoAdminDetalhe> {
