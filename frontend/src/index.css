@@ -1,3 +1,50 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Modelo de tela grande para a administração (só local, ainda não publicado).
+ * Listas de cartões viram grade; formulários e avisos ocupam a largura toda.
+ */
+@media (min-width: 1024px) {
+  .layout-largo > ul.space-y-2:not(.sem-grade),
+  .layout-largo > div > ul.space-y-2:not(.sem-grade),
+  .layout-largo .grid.grid-cols-1 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+  .layout-largo > ul.space-y-2:not(.sem-grade) > * + *,
+  .layout-largo > div > ul.space-y-2:not(.sem-grade) > * + * {
+    margin-top: 0;
+  }
+}
+@media (min-width: 1280px) {
+  .layout-largo > ul.space-y-2:not(.sem-grade),
+  .layout-largo > div > ul.space-y-2:not(.sem-grade),
+  .layout-largo .grid.grid-cols-1 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Categorias e setores (com setas de ordem) seguem em uma coluna, mais larga. */
+@media (min-width: 1024px) {
+  .layout-largo ul.sem-grade:not(.lista-pedido) {
+    max-width: 48rem;
+  }
+  /* Revisão do pedido: uma linha por item, como uma tabela. */
+  .layout-largo .lista-pedido > li {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.625rem 1rem;
+  }
+  .layout-largo .lista-pedido > li > div:first-child {
+    flex: 1;
+    min-width: 0;
+  }
+  .layout-largo .lista-pedido > li > div + div {
+    margin-top: 0 !important;
+    min-width: 16rem;
+  }
+}

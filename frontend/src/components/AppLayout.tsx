@@ -25,6 +25,8 @@ export function AppLayout({
   const { usuario, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  // Modelo (só local): admin em tela grande usa a largura toda do computador.
+  const largo = usuario?.type === 'ADMIN_COMERCIAL' || usuario?.type === 'ADMIN_TI';
 
   function voltar() {
     // key "default" = primeira página aberta nesta aba: não há para onde voltar.
@@ -56,7 +58,9 @@ export function AppLayout({
           Sair
         </button>
       </header>
-      <main className="mx-auto max-w-md p-4">{children}</main>
+      <main className={`mx-auto max-w-md p-4 ${largo ? 'layout-largo lg:max-w-6xl lg:p-6' : ''}`}>
+        {children}
+      </main>
     </div>
   );
 }
