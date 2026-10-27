@@ -108,7 +108,7 @@ export function AdminCategoriasPage() {
           Nenhuma categoria. Toque em "+ Nova" para criar a primeira.
         </p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="sem-grade space-y-2">
           {categorias.map((c, i) => (
             <li key={c.id} className="flex items-center gap-2 rounded-xl bg-white p-4 shadow-sm">
               <div className="min-w-0 flex-1">
