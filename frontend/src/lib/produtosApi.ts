@@ -53,3 +53,12 @@ export async function adminAtualizar(
   const res = await api.put<Produto>(`/admin/produtos/${id}`, data);
   return res.data;
 }
+
+/** Coloca o produto no mix de todos os clientes ou dos escolhidos. */
+export async function enviarParaClientes(
+  produtoId: string,
+  alvo: { todos: true } | { clienteIds: string[] },
+): Promise<number> {
+  const res = await api.post<{ total: number }>(`/admin/produtos/${produtoId}/clientes`, alvo);
+  return res.data.total;
+}

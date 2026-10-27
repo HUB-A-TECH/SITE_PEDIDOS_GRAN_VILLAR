@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import type { Produto } from '@prisma/client';
+import { Prisma, type Produto } from '@prisma/client';
 import * as service from './produtos.service';
 import * as precos from '../precos/precos.service';
 import * as carteira from '../../lib/carteira';
@@ -160,6 +160,31 @@ export async function adminAtualizar(req: Request, res: Response): Promise<void>
     }
     if (isUniqueConstraintError(e)) {
       res.status(409).json({ mensagem: 'Já existe um produto com esse código' });
+      return;
+    }
+    throw e;
+  }
+}
+
+/** Produto novo: enviar para todos os clientes ou só para os escolhidos. */
+export async function adminEnviarParaClientes(req: Request, res: Response): Promise<void> {
+  const parsed = z
+    .union([
+      z.object({ todos: z.literal(true) }),
+      z.object({ clienteIds: z.array(z.string().uuid()).min(1, 'Escolha pelo menos um cliente') }),
+    ])
+    .safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'Escolha para quais clientes enviar' });
+    return;
+  }
+  try {
+    const total = await service.enviarParaClientes(req.params.id, parsed.data);
+    res.json({ total });
+  } catch (e) {
+    // FK: produto ou cliente inexistente.
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+      res.status(404).json({ mensagem: 'Produto ou cliente não encontrado' });
       return;
     }
     throw e;

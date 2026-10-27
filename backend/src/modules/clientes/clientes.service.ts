@@ -50,7 +50,17 @@ export function criar(data: {
   tabelaPrecoId?: string;
   setorId?: string | null;
 }): Promise<Cliente> {
-  return prisma.cliente.create({ data });
+  // Cliente novo já nasce com todos os produtos ativos no mix; depois o admin
+  // (ou o vendedor) tira o que aquele mercado não compra.
+  return prisma.$transaction(async (tx) => {
+    const cliente = await tx.cliente.create({ data });
+    const produtos = await tx.produto.findMany({ where: { ativo: true }, select: { id: true } });
+    await tx.clienteProduto.createMany({
+      data: produtos.map((p) => ({ clienteId: cliente.id, produtoId: p.id })),
+      skipDuplicates: true,
+    });
+    return cliente;
+  });
 }
 
 export function atualizar(
