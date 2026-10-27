@@ -34,6 +34,13 @@ enum CategoriaLegada {
   @@map("Categoria")
 }
 
+// O que mudou no mix do cliente (aparece no histórico do cliente).
+enum AcaoMix {
+  ADICIONADO_NO_PEDIDO // entrou só naquele pedido, o mix não mudou
+  ADICIONADO_AO_MIX
+  REMOVIDO_DO_MIX
+}
+
 enum StatusPedido {
   RASCUNHO
   CONFIRMADO
@@ -79,6 +86,7 @@ model User {
   pedidosEditados  Pedido[]        @relation("PedidoEditadoPor")
   pedidosAlterados Pedido[]        @relation("PedidoUltimaAlteracao")
   revisoesFeitas   RevisaoPedido[]
+  alteracoesMix    AlteracaoMix[]
 
   @@map("usuarios")
 }
@@ -145,6 +153,7 @@ model Cliente {
   setor           Setor?           @relation(fields: [setorId], references: [id], onDelete: SetNull)
   clienteProdutos ClienteProduto[]
   pedidos         Pedido[]
+  alteracoesMix   AlteracaoMix[]
 
   @@map("clientes")
 }
@@ -167,6 +176,7 @@ model Produto {
   clienteProdutos  ClienteProduto[]
   tabelaPrecoItens TabelaPrecoItem[]
   itensPedido      ItemPedido[]
+  alteracoesMix    AlteracaoMix[]
 
   @@index([categoriaId])
   @@map("produtos")
@@ -199,6 +209,25 @@ model ClienteProduto {
 
   @@unique([clienteId, produtoId])
   @@map("clientes_produtos")
+}
+
+// Histórico do mix: quem pôs ou tirou cada produto, e quando. pedidoId fica
+// sem chave estrangeira para o registro sobreviver a um rascunho descartado.
+model AlteracaoMix {
+  id        String   @id @default(uuid())
+  clienteId String   @map("cliente_id")
+  produtoId String   @map("produto_id")
+  acao      AcaoMix
+  usuarioId String?  @map("usuario_id")
+  pedidoId  String?  @map("pedido_id")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  produto Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  usuario User?   @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([clienteId, criadoEm])
+  @@map("alteracoes_mix")
 }
 
 // Tabela de preco: um mesmo produto pode ter valores diferentes por grupo de

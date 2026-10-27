@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { Cliente, ClienteCompleto, Local, MixProduto } from './types';
+import type { Cliente, ClienteCompleto, Local, MixProduto, Produto } from './types';
 
 export interface ClienteInput {
   codigo: string;
@@ -134,4 +134,37 @@ export async function atualizarLocal(
 ): Promise<Local> {
   const res = await api.put<Local>(`/locais/${id}`, data);
   return res.data;
+}
+
+// ---- Mix pelo vendedor (tela de pedido) e histórico do mix ----
+
+/** Produtos ativos que o cliente não tem no mix (com o preço da tabela dele). */
+export async function foraDoMix(clienteId: string): Promise<Produto[]> {
+  const res = await api.get<{ produtos: Produto[] }>(`/clientes/${clienteId}/fora-do-mix`);
+  return res.data.produtos;
+}
+
+export async function vendedorAdicionarAoMix(clienteId: string, produtoId: string): Promise<void> {
+  await api.post(`/clientes/${clienteId}/mix`, { produto_id: produtoId });
+}
+
+export async function vendedorRemoverDoMix(clienteId: string, produtoId: string): Promise<void> {
+  await api.delete(`/clientes/${clienteId}/mix/${produtoId}`);
+}
+
+export type AcaoMix = 'ADICIONADO_NO_PEDIDO' | 'ADICIONADO_AO_MIX' | 'REMOVIDO_DO_MIX';
+
+export interface AlteracaoMix {
+  id: string;
+  acao: AcaoMix;
+  produto: string;
+  /** Nome de quem fez (null se o usuário foi apagado). */
+  quem: string | null;
+  pedidoId: string | null;
+  data: string;
+}
+
+export async function historicoMix(clienteId: string): Promise<AlteracaoMix[]> {
+  const res = await api.get<{ alteracoes: AlteracaoMix[] }>(`/clientes/${clienteId}/historico-mix`);
+  return res.data.alteracoes;
 }

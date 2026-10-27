@@ -6,7 +6,7 @@ import { Aviso } from '../../components/Aviso';
 import { useAuth } from '../../context/AuthContext';
 import * as clientesApi from '../../lib/clientesApi';
 import * as pedidosApi from '../../lib/pedidosApi';
-import type { PerfilCliente } from '../../lib/clientesApi';
+import type { AlteracaoMix, PerfilCliente } from '../../lib/clientesApi';
 import { iniciais, linkMapa, linkTelefone, linkWhatsApp } from '../../lib/contato';
 
 const brl = (v: number) =>
@@ -34,6 +34,7 @@ export function PerfilClientePage() {
   const [perfil, setPerfil] = useState<PerfilCliente | null>(null);
   const [erro, setErro] = useState('');
   const [abrindoPedido, setAbrindoPedido] = useState(false);
+  const [mudancasMix, setMudancasMix] = useState<AlteracaoMix[]>([]);
 
   useEffect(() => {
     setPerfil(null);
@@ -48,6 +49,7 @@ export function PerfilClientePage() {
             : 'Não foi possível abrir o perfil.',
         ),
       );
+    clientesApi.historicoMix(clienteId).then(setMudancasMix).catch(() => setMudancasMix([]));
   }, [clienteId]);
 
   const voltarPara = ehVendedor ? '/meus-clientes' : '/admin/clientes';
@@ -277,7 +279,47 @@ export function PerfilClientePage() {
           </Link>
         </Secao>
       )}
+
+      {/* ---- Mudanças no mix ---- */}
+      {mudancasMix.length > 0 && <HistoricoMix alteracoes={mudancasMix} />}
     </AppLayout>
+  );
+}
+
+const TEXTO_ACAO: Record<AlteracaoMix['acao'], { texto: string; cor: string }> = {
+  ADICIONADO_AO_MIX: { texto: 'Colocado no mix', cor: 'text-brand-700' },
+  REMOVIDO_DO_MIX: { texto: 'Tirado do mix', cor: 'text-red-600' },
+  ADICIONADO_NO_PEDIDO: { texto: 'Pedido só uma vez (fora do mix)', cor: 'text-brandYellow-800' },
+};
+
+/** Quem pôs ou tirou produtos do mix, e os pedidos avulsos fora do mix. */
+function HistoricoMix({ alteracoes }: { alteracoes: AlteracaoMix[] }) {
+  const [tudo, setTudo] = useState(false);
+  const mostrar = tudo ? alteracoes : alteracoes.slice(0, 5);
+  return (
+    <Secao titulo="Mudanças no mix" subtitulo="mais recentes primeiro">
+      <ul className="divide-y divide-slate-100">
+        {mostrar.map((a) => (
+          <li key={a.id} className="py-2 text-sm">
+            <p className="text-slate-800">{a.produto}</p>
+            <p className="text-xs text-slate-500">
+              <span className={`font-medium ${TEXTO_ACAO[a.acao].cor}`}>{TEXTO_ACAO[a.acao].texto}</span>
+              {' · '}
+              {dataBR(a.data)}
+              {a.quem ? ` · ${a.quem}` : ''}
+            </p>
+          </li>
+        ))}
+      </ul>
+      {alteracoes.length > 5 && (
+        <button
+          onClick={() => setTudo((t) => !t)}
+          className="mt-2 block w-full rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
+        >
+          {tudo ? 'Mostrar menos' : `Ver todas (${alteracoes.length})`}
+        </button>
+      )}
+    </Secao>
   );
 }
 
