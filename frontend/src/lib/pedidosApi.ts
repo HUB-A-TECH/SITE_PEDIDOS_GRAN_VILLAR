@@ -53,10 +53,13 @@ export async function adicionarItem(
   pedidoId: string,
   produtoId: string,
   quantidade: number,
+  /** Produto fora do mix, só para este pedido (o mix não muda). */
+  soNestePedido = false,
 ): Promise<Pedido> {
   const res = await api.post<{ pedido: Pedido }>(`/pedidos/${pedidoId}/itens`, {
     produto_id: produtoId,
     quantidade,
+    ...(soNestePedido ? { so_neste_pedido: true } : {}),
   });
   return res.data.pedido;
 }

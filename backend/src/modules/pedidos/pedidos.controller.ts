@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { Vendedor } from '@prisma/client';
+import * as clientes from '../clientes/clientes.service';
 import * as service from './pedidos.service';
 import * as historico from '../historico/historico.service';
 import * as precos from '../precos/precos.service';
@@ -247,6 +248,8 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
     .object({
       produto_id: z.string().uuid(),
       quantidade: z.number().positive(),
+      // Produto fora do mix, pedido só desta vez (o mix não muda).
+      so_neste_pedido: z.boolean().optional(),
     })
     .safeParse(req.body);
   if (!parsed.success) {
@@ -255,7 +258,7 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
   }
 
   const noMix = await service.produtoNoMix(pedido.clienteId, parsed.data.produto_id);
-  if (!noMix) {
+  if (!noMix && !parsed.data.so_neste_pedido) {
     res.status(400).json({ mensagem: 'Produto não está no mix deste cliente' });
     return;
   }
@@ -268,6 +271,15 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
   // Preço da tabela do cliente (cai no catálogo se a tabela não tiver o item).
   const preco = await precos.precoDoProdutoParaCliente(pedido.clienteId, produto);
   await service.definirItem(pedido.id, produto, parsed.data.quantidade, preco);
+  if (!noMix) {
+    await clientes.registrarAlteracaoMix({
+      clienteId: pedido.clienteId,
+      produtoId: produto.id,
+      usuarioId: req.user!.sub,
+      acao: 'ADICIONADO_NO_PEDIDO',
+      pedidoId: pedido.id,
+    });
+  }
   await responderPedidoAtualizado(pedido.id, vendedor.id, req.user!.sub, res);
 }
 

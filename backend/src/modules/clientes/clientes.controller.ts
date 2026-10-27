@@ -150,6 +150,78 @@ export async function historicoItensCliente(
   res.json({ historico: historicoItens });
 }
 
+// ---- Mix pelo vendedor (tela de pedido) ----
+
+/** Produtos que o cliente não tem no mix, com o preço da tabela dele. */
+export async function foraDoMix(req: Request, res: Response): Promise<void> {
+  const cliente = await clienteAcessivel(req, res);
+  if (!cliente) return;
+  const [produtos, mapa] = await Promise.all([
+    service.produtosForaDoMix(cliente.id),
+    precos.mapaPrecosDoCliente(cliente.id),
+  ]);
+  res.json({
+    produtos: produtos.map((p) => ({
+      id: p.id,
+      codigo: p.codigo,
+      nome: p.nome,
+      categoria: p.categoriaId,
+      descricao: p.descricao,
+      preco: precos.precoEfetivo(p, mapa),
+      unidadeMedida: p.unidadeMedida,
+      ativo: p.ativo,
+    })),
+  });
+}
+
+/** Vendedor coloca um produto no mix do cliente ("para os próximos pedidos"). */
+export async function vendedorAddMix(req: Request, res: Response): Promise<void> {
+  const cliente = await clienteAcessivel(req, res);
+  if (!cliente) return;
+  const parsed = z.object({ produto_id: z.string().uuid() }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'produto_id é obrigatório' });
+    return;
+  }
+  const produto = await service.produtoExiste(parsed.data.produto_id);
+  if (!produto || !produto.ativo) {
+    res.status(404).json({ mensagem: 'Produto não encontrado' });
+    return;
+  }
+  await service.addAoMix(cliente.id, produto.id, req.user!.sub);
+  res.status(201).json({ mensagem: 'Produto adicionado ao mix' });
+}
+
+export async function vendedorRemoverMix(req: Request, res: Response): Promise<void> {
+  const cliente = await clienteAcessivel(req, res);
+  if (!cliente) return;
+  const count = await service.removerDoMix(cliente.id, req.params.produtoId, req.user!.sub);
+  if (count === 0) {
+    res.status(404).json({ mensagem: 'Produto não estava no mix do cliente' });
+    return;
+  }
+  res.json({ mensagem: 'Produto removido do mix' });
+}
+
+/** Histórico do mix (quem pôs ou tirou o quê). Vendedor e admin. */
+export async function historicoMix(req: Request, res: Response): Promise<void> {
+  const cliente = await clienteAcessivel(req, res);
+  if (!cliente) return;
+  const lista = await service.alteracoesMix(cliente.id);
+  res.json({
+    alteracoes: lista.map((a) => ({
+      id: a.id,
+      acao: a.acao,
+      produto: a.produto.nome,
+      quem: a.usuario
+        ? a.usuario.vendedor?.nomeCompleto ?? a.usuario.username
+        : null,
+      pedidoId: a.pedidoId,
+      data: a.criadoEm,
+    })),
+  });
+}
+
 // ---- Admin ----
 
 const clienteCreateSchema = z.object({
@@ -316,7 +388,7 @@ export async function mixAdicionar(req: Request, res: Response): Promise<void> {
     res.status(404).json({ mensagem: 'Produto não encontrado' });
     return;
   }
-  await service.addAoMix(req.params.id, parsed.data.produto_id);
+  await service.addAoMix(req.params.id, parsed.data.produto_id, req.user!.sub);
   res.status(201).json({
     clienteId: req.params.id,
     produtoId: parsed.data.produto_id,
@@ -325,7 +397,7 @@ export async function mixAdicionar(req: Request, res: Response): Promise<void> {
 }
 
 export async function mixRemover(req: Request, res: Response): Promise<void> {
-  const count = await service.removerDoMix(req.params.id, req.params.produtoId);
+  const count = await service.removerDoMix(req.params.id, req.params.produtoId, req.user!.sub);
   if (count === 0) {
     res.status(404).json({ mensagem: 'Produto não estava no mix do cliente' });
     return;
