@@ -267,7 +267,7 @@ export function AdminPedidoDetalhePage() {
           </p>
         )}
 
-        <ul className="space-y-2">
+        <ul className="sem-grade lista-pedido space-y-2">
           {pedido.itens.map((it) => {
             const b = base[it.id];
             const a = atual[it.id];
@@ -397,7 +397,7 @@ export function AdminPedidoDetalhePage() {
       {/* ---- Painel fixo da revisão ---- */}
       {mostraPainel && (
         <div className="fixed inset-x-0 bottom-0 z-10 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur">
-          <div className="mx-auto max-w-md space-y-2">
+          <div className="mx-auto max-w-md space-y-2 lg:max-w-6xl">
             <div
               className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 ${
                 temMudancas ? 'bg-brandYellow-50 text-brandYellow-800' : 'bg-slate-50 text-slate-600'

@@ -135,7 +135,7 @@ export function AdminSetoresPage() {
           Nenhum setor ainda. Toque em "+ Novo" para criar o primeiro.
         </p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="sem-grade space-y-2">
           {setores.map((s, i) => {
             const semVendedor = s.vendedores.length === 0;
             const p = paleta(s.cor);
