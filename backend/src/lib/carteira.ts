@@ -22,11 +22,13 @@ function doSetorDoVendedor(vendedorId: string) {
 export async function vendedorAtendeCliente(
   usuarioId: string,
   clienteId: string,
+  /** Se a requisição já carregou o vendedor (req.vendedor), evita nova consulta. */
+  vendedorId?: string,
 ): Promise<boolean> {
-  const vendedor = await getVendedorDoUsuario(usuarioId);
-  if (!vendedor) return false;
+  const id = vendedorId ?? (await getVendedorDoUsuario(usuarioId))?.id;
+  if (!id) return false;
   const total = await prisma.cliente.count({
-    where: { id: clienteId, ...doSetorDoVendedor(vendedor.id) },
+    where: { id: clienteId, ...doSetorDoVendedor(id) },
   });
   return total > 0;
 }

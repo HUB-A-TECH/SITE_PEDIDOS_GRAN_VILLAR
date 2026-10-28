@@ -29,15 +29,18 @@ async function resolverClienteAcessivel(
   req: Request,
   clienteId: string,
 ): Promise<{ ok: true } | { ok: false; status: number; msg: string }> {
-  const cliente = await service.getClienteById(clienteId);
+  // As duas checagens são independentes: vão juntas, numa ida só ao banco.
+  const [cliente, atende] = await Promise.all([
+    service.getClienteById(clienteId),
+    req.user!.type === 'VENDEDOR'
+      ? carteira.vendedorAtendeCliente(req.user!.sub, clienteId, req.vendedor?.id)
+      : Promise.resolve(true),
+  ]);
   if (!cliente || !cliente.ativo) {
     return { ok: false, status: 404, msg: 'Cliente não encontrado' };
   }
-  if (req.user!.type === 'VENDEDOR') {
-    const atende = await carteira.vendedorAtendeCliente(req.user!.sub, cliente.id);
-    if (!atende) {
-      return { ok: false, status: 403, msg: 'Cliente não está nos seus setores' };
-    }
+  if (!atende) {
+    return { ok: false, status: 403, msg: 'Cliente não está nos seus setores' };
   }
   return { ok: true };
 }

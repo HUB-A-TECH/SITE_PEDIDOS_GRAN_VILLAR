@@ -5,7 +5,9 @@
 // Setores (regioes de visita): Setor, SetorVendedor — substituiram a carteira.
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Carrega pedido + cliente + itens + produtos numa consulta só (menos idas ao banco).
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

@@ -41,16 +41,21 @@ export async function precoDoProdutoParaCliente(
   clienteId: string,
   produto: Produto,
 ): Promise<number> {
-  const cliente = await prisma.cliente.findUnique({
-    where: { id: clienteId },
-    select: { tabelaPrecoId: true },
-  });
-  if (!cliente?.tabelaPrecoId) return Number(produto.preco);
-  const item = await prisma.tabelaPrecoItem.findUnique({
-    where: {
-      tabelaId_produtoId: { tabelaId: cliente.tabelaPrecoId, produtoId: produto.id },
-    },
+  return (await precoNaTabelaDoCliente(clienteId, produto.id)) ?? Number(produto.preco);
+}
+
+/**
+ * Preço do produto na tabela do cliente, numa consulta só (null = cliente sem
+ * tabela ou tabela sem linha para o produto → vale o preço do catálogo).
+ * Não depende do produto, então pode rodar em paralelo com a busca dele.
+ */
+export async function precoNaTabelaDoCliente(
+  clienteId: string,
+  produtoId: string,
+): Promise<number | null> {
+  const item = await prisma.tabelaPrecoItem.findFirst({
+    where: { produtoId, tabela: { clientes: { some: { id: clienteId } } } },
     select: { preco: true },
   });
-  return item ? Number(item.preco) : Number(produto.preco);
+  return item ? Number(item.preco) : null;
 }

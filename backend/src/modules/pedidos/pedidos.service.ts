@@ -30,6 +30,7 @@ export function getRascunhoPorCliente(vendedorId: string, clienteId: string) {
   return prisma.pedido.findFirst({
     where: { vendedorId, clienteId, status: 'RASCUNHO' },
     orderBy: { criadoEm: 'desc' },
+    relationLoadStrategy: 'join',
     include: pedidoInclude,
   });
 }
@@ -37,6 +38,7 @@ export function getRascunhoPorCliente(vendedorId: string, clienteId: string) {
 export function getPedidoDoVendedor(id: string, vendedorId: string) {
   return prisma.pedido.findFirst({
     where: { id, vendedorId },
+    relationLoadStrategy: 'join',
     include: pedidoInclude,
   });
 }
@@ -71,6 +73,7 @@ const pedidoAdminInclude = {
 export function getPedidoParaAdmin(id: string) {
   return prisma.pedido.findUnique({
     where: { id },
+    relationLoadStrategy: 'join',
     include: pedidoAdminInclude,
   });
 }
@@ -255,6 +258,7 @@ export function criarRascunho(
 ) {
   return prisma.pedido.create({
     data: { vendedorId, localId, clienteId, status: 'RASCUNHO' },
+    relationLoadStrategy: 'join',
     include: pedidoInclude,
   });
 }
@@ -341,15 +345,17 @@ export function excluirItem(itemId: string): Promise<unknown> {
   return prisma.itemPedido.delete({ where: { id: itemId } });
 }
 
-/** Recalcula subtotal/total do pedido a partir dos itens. */
+/**
+ * Recalcula subtotal/total do pedido a partir dos itens, dentro do banco e numa
+ * consulta só: mais rápido (uma ida em vez de duas) e seguro quando duas
+ * gravações do mesmo pedido chegam juntas (a soma sempre vê os itens atuais).
+ */
 export async function recomputarTotais(pedidoId: string): Promise<void> {
-  const itens = await prisma.itemPedido.findMany({ where: { pedidoId } });
-  const soma = itens.reduce((s, i) => s + Number(i.subtotal), 0);
-  const total = Math.round(soma * 100) / 100;
-  await prisma.pedido.update({
-    where: { id: pedidoId },
-    data: { subtotal: total, total },
-  });
+  await prisma.$executeRaw`
+    UPDATE pedidos
+    SET subtotal = COALESCE((SELECT ROUND(SUM(subtotal), 2) FROM itens_pedido WHERE pedido_id = ${pedidoId}), 0),
+        total = COALESCE((SELECT ROUND(SUM(subtotal), 2) FROM itens_pedido WHERE pedido_id = ${pedidoId}), 0)
+    WHERE id = ${pedidoId}`;
 }
 
 export function atualizarObservacoes(pedidoId: string, observacoes: string) {
@@ -419,6 +425,7 @@ export function cancelarPedido(pedidoId: string, motivo: string | null) {
 export function getPedidoCompleto(id: string) {
   return prisma.pedido.findUnique({
     where: { id },
+    relationLoadStrategy: 'join',
     include: {
       local: { select: { codigo: true, nome: true, telefone: true } },
       vendedor: { select: { nomeCompleto: true } },
