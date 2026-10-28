@@ -47,9 +47,22 @@ app.use('/api/locais', locaisRoutes);
 // da API, o que evita CORS e mantém o cookie de sessão "same-origin".
 if (env.nodeEnv === 'production') {
   const frontendDir = path.resolve(__dirname, '../../frontend/dist');
-  app.use(express.static(frontendDir));
+  // Arquivos em /assets têm hash no nome (mudam a cada build): cache de 1 ano.
+  // O resto (index.html, logos) é sempre revalidado para o deploy novo chegar.
+  app.use(
+    express.static(frontendDir, {
+      setHeaders: (res, filePath) => {
+        const cacheavel = filePath.includes(`${path.sep}assets${path.sep}`);
+        res.setHeader(
+          'Cache-Control',
+          cacheavel ? 'public, max-age=31536000, immutable' : 'no-cache',
+        );
+      },
+    }),
+  );
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(frontendDir, 'index.html'));
   });
 }
