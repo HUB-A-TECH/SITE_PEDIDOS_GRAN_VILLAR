@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { app } from '../src/app';
 import { prisma } from '../src/lib/prisma';
@@ -52,6 +53,43 @@ export async function limparPedidosDeTeste() {
   await prisma.alteracaoMix.deleteMany({ where: { pedidoId: { in: pedidosCriados } } });
   await prisma.pedido.deleteMany({
     where: { id: { in: pedidosCriados }, clienteId: MERCADO_X_ID },
+  });
+}
+
+// ---- usuários descartáveis (só existem durante o teste; prefixo TESTE_zz_) ----
+export const SENHA_TESTE = 'Teste#zz-12345';
+const criadosUsuarios: string[] = [];
+
+export async function criarUsuarioTemporario(
+  sufixo: string,
+  type: 'VENDEDOR' | 'ADMIN_COMERCIAL' | 'ADMIN_TI',
+) {
+  const username = `TESTE_zz_${sufixo}`;
+  const vendedor2 = await prisma.vendedor.findFirst({ where: { usuario: { username: 'vendedor2' } } });
+  const user = await prisma.user.create({
+    data: {
+      username,
+      email: `${username.toLowerCase()}@teste.invalid`,
+      passwordHash: await bcrypt.hash(SENHA_TESTE, 4),
+      type,
+      localId: type === 'VENDEDOR' ? vendedor2!.localId : null,
+      ...(type === 'VENDEDOR'
+        ? { vendedor: { create: { nomeCompleto: `Teste ${sufixo}`, localId: vendedor2!.localId } } }
+        : {}),
+    },
+  });
+  criadosUsuarios.push(user.id);
+  const agente = request.agent(app);
+  const r = await agente.post('/api/auth/login').send({ username, password: SENHA_TESTE });
+  if (r.status !== 200) throw new Error(`login do usuário temporário ${sufixo} falhou (${r.status})`);
+  return { agente, user };
+}
+
+export async function apagarUsuariosTemporarios() {
+  if (criadosUsuarios.length === 0) return;
+  await prisma.tokenRevogado.deleteMany({ where: { usuarioId: { in: criadosUsuarios } } });
+  await prisma.user.deleteMany({
+    where: { id: { in: criadosUsuarios }, username: { startsWith: 'TESTE_zz_' } },
   });
 }
 

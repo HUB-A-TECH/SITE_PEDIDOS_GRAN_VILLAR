@@ -262,7 +262,7 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
   const parsed = z
     .object({
       produto_id: z.string().uuid(),
-      quantidade: z.number().positive(),
+      quantidade: z.number().positive().max(1_000_000),
       // Produto fora do mix, pedido só desta vez (o mix não muda).
       so_neste_pedido: z.boolean().optional(),
     })
@@ -309,7 +309,7 @@ export async function atualizarItem(req: Request, res: Response): Promise<void> 
   if (!pedido) return;
 
   const parsed = z
-    .object({ quantidade: z.number().positive() })
+    .object({ quantidade: z.number().positive().max(1_000_000) })
     .safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ mensagem: 'quantidade (> 0) é obrigatória' });
