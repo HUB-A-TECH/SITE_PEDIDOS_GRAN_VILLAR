@@ -42,11 +42,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   conectado.current = usuario !== null;
 
   useEffect(() => {
-    api
-      .get<{ usuario: Usuario }>('/auth/me')
-      .then((res) => setUsuario(res.data.usuario))
-      .catch(() => setUsuario(null))
-      .finally(() => setCarregando(false));
+    // Só 401 significa "não está logado". Falha de rede/servidor dormindo não
+    // pode jogar o vendedor no login: tenta de novo algumas vezes antes.
+    let cancelado = false;
+    async function verificarSessao() {
+      for (let tentativa = 0; tentativa < 4 && !cancelado; tentativa++) {
+        try {
+          const res = await api.get<{ usuario: Usuario }>('/auth/me');
+          if (!cancelado) setUsuario(res.data.usuario);
+          break;
+        } catch (erro) {
+          const semSessao = axios.isAxiosError(erro) && erro.response?.status === 401;
+          if (semSessao) break;
+          if (tentativa < 3) await new Promise((r) => setTimeout(r, 4000));
+        }
+      }
+      if (!cancelado) setCarregando(false);
+    }
+    verificarSessao();
+    return () => {
+      cancelado = true;
+    };
   }, []);
 
   // Sessão que cai no meio do uso (senha trocada em outro aparelho, conta

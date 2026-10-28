@@ -76,9 +76,12 @@ export function PerfilClientePage() {
       return;
     }
     setAbrindoPedido(true);
+    setErro('');
     try {
       const pedido = await pedidosApi.criar(c.id);
       navigate(`/pedido/${pedido.id}`);
+    } catch {
+      setErro('Não foi possível abrir o pedido. Verifique o sinal e tente de novo.');
     } finally {
       setAbrindoPedido(false);
     }
@@ -138,6 +141,12 @@ export function PerfilClientePage() {
       </div>
 
       <AnotacoesFixadas anotacoes={anotacoes} className="mb-3" />
+
+      {erro && (
+        <Aviso tom="erro" className="mb-3">
+          {erro}
+        </Aviso>
+      )}
 
       {/* ---- Ações rápidas ---- */}
       <div className="mb-4 grid grid-cols-2 gap-2">

@@ -376,14 +376,24 @@ export async function confirmarPedido(pedidoId: string): Promise<string> {
         });
         const seq = ultimo ? Number(ultimo.numeroPedido!.split('-')[1]) + 1 : 1;
         const numero = `${ano}-${String(seq).padStart(6, '0')}`;
-        await tx.pedido.update({
-          where: { id: pedidoId },
+        // Só confirma se ainda for rascunho: dois envios ao mesmo tempo (clique
+        // duplo, sinal ruim) não renumeram o pedido, o segundo devolve o número já gerado.
+        const r = await tx.pedido.updateMany({
+          where: { id: pedidoId, status: 'RASCUNHO' },
           data: {
             status: 'CONFIRMADO',
             numeroPedido: numero,
             confirmadoEm: new Date(),
           },
         });
+        if (r.count === 0) {
+          const atual = await tx.pedido.findUnique({
+            where: { id: pedidoId },
+            select: { numeroPedido: true },
+          });
+          if (atual?.numeroPedido) return atual.numeroPedido;
+          throw new Error('Pedido não está mais em rascunho');
+        }
         return numero;
       });
     } catch (e) {
