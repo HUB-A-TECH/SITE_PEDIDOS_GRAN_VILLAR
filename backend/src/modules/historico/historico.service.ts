@@ -52,7 +52,18 @@ export async function historicoPorProduto(
   maxPorProduto = 12,
 ): Promise<Record<string, { data: Date; quantidade: number }[]>> {
   // Últimos 60 pedidos garantem 12 compras de cada produto mesmo em mix grande.
-  const pedidos = await pedidosConfirmadosDoCliente(clienteId, 60);
+  // Só o que o cálculo usa (produto, quantidade, data), numa consulta só.
+  const pedidos = await prisma.pedido.findMany({
+    where: { clienteId, status: 'CONFIRMADO' },
+    relationLoadStrategy: 'join',
+    select: {
+      confirmadoEm: true,
+      criadoEm: true,
+      itens: { select: { produtoId: true, quantidade: true } },
+    },
+    orderBy: { confirmadoEm: 'desc' },
+    take: 60,
+  });
   const mapa: Record<string, { data: Date; quantidade: number }[]> = {};
   for (const p of pedidos) {
     const data = p.confirmadoEm ?? p.criadoEm;
@@ -94,6 +105,7 @@ export async function resumoDoCliente(clienteId: string) {
       take: 5,
     }),
     prisma.pedido.findMany({
+      relationLoadStrategy: 'join',
       where: {
         ...confirmado,
         OR: [

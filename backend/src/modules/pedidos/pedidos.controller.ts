@@ -192,9 +192,11 @@ export async function criar(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const [cliente, atende] = await Promise.all([
+  // Cliente, permissão e pedido salvo já existente: independentes, uma ida só.
+  const [cliente, atende, existente] = await Promise.all([
     service.getCliente(parsed.data.cliente_id),
     carteira.vendedorAtendeCliente(req.user!.sub, parsed.data.cliente_id, vendedor.id),
+    service.getRascunhoPorCliente(vendedor.id, parsed.data.cliente_id),
   ]);
   if (!cliente || !cliente.ativo) {
     res.status(404).json({ mensagem: 'Cliente não encontrado' });
@@ -207,19 +209,19 @@ export async function criar(req: Request, res: Response): Promise<void> {
 
   // Retoma o pedido salvo (ainda não enviado) para este cliente, se existir —
   // o vendedor pode ter vários pedidos salvos ao mesmo tempo, um por cliente.
-  const existente = await service.getRascunhoPorCliente(vendedor.id, cliente.id);
   if (existente) {
     res.status(200).json({ pedido: serialize(existente) });
     return;
   }
 
   try {
-    const pedido = await service.criarRascunho(
+    const criado = await service.criarRascunho(
       vendedor.id,
       vendedor.localId,
       cliente.id,
     );
-    res.status(201).json({ pedido: serialize(pedido) });
+    // Pedido novo não tem itens e o cliente já está em mãos: dispensa reler.
+    res.status(201).json({ pedido: serialize({ ...criado, cliente, itens: [] }) });
   } catch (e) {
     // Corrida: outra requisição criou ao mesmo tempo para o mesmo cliente.
     if (isUniqueConstraintError(e)) {
@@ -408,7 +410,11 @@ export async function confirmar(req: Request, res: Response): Promise<void> {
   if (!vendedor) return;
   // Reenvio (resposta perdida no 3G, clique duplo): devolve o mesmo número.
   const existente = await service.getPedidoDoVendedor(req.params.id, vendedor.id);
-  if (existente?.status === 'CONFIRMADO' && existente.numeroPedido) {
+  if (!existente) {
+    res.status(404).json({ mensagem: 'Pedido não encontrado' });
+    return;
+  }
+  if (existente.status === 'CONFIRMADO' && existente.numeroPedido) {
     res.json({
       pedidoId: existente.id,
       numeroPedido: existente.numeroPedido,
@@ -417,10 +423,14 @@ export async function confirmar(req: Request, res: Response): Promise<void> {
     });
     return;
   }
-  const pedido = await carregarRascunho(req.params.id, vendedor.id, res);
-  if (!pedido) return;
+  if (existente.status !== 'RASCUNHO') {
+    res.status(409).json({ mensagem: 'O pedido não é mais um rascunho' });
+    return;
+  }
+  const pedido = existente;
 
-  const totalItens = await service.contarItens(pedido.id);
+  // Os itens já vieram com o pedido: dispensa contar de novo.
+  const totalItens = pedido.itens.length;
   if (totalItens === 0) {
     res.status(400).json({ mensagem: 'Não é possível enviar um pedido sem itens' });
     return;
