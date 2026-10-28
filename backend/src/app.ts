@@ -51,14 +51,20 @@ app.use('/api/locais', locaisRoutes);
 if (env.nodeEnv === 'production') {
   const frontendDir = path.resolve(__dirname, '../../frontend/dist');
   // Arquivos em /assets têm hash no nome (mudam a cada build): cache de 1 ano.
-  // O resto (index.html, logos) é sempre revalidado para o deploy novo chegar.
+  // O index.html é sempre revalidado para o deploy novo chegar; imagens soltas ficam 1 dia.
   app.use(
     express.static(frontendDir, {
       setHeaders: (res, filePath) => {
         const cacheavel = filePath.includes(`${path.sep}assets${path.sep}`);
+        // Imagens soltas (logo) não têm hash no nome: 1 dia de cache basta.
+        const imagem = /\.(png|webp|jpg|jpeg|svg|ico)$/i.test(filePath);
         res.setHeader(
           'Cache-Control',
-          cacheavel ? 'public, max-age=31536000, immutable' : 'no-cache',
+          cacheavel
+            ? 'public, max-age=31536000, immutable'
+            : imagem
+              ? 'public, max-age=86400'
+              : 'no-cache',
         );
       },
     }),

@@ -266,6 +266,7 @@ export function MeusPedidosPage() {
                   </button>
                   <Link
                     to={`/pedido/${p.pedidoId}`}
+                    state={{ clienteId: p.cliente.id }}
                     className="block rounded-lg border border-brand-600 py-2 text-center text-sm font-medium text-brand-700 hover:bg-brand-50"
                   >
                     Continuar editando
@@ -292,6 +293,7 @@ export function MeusPedidosPage() {
                   {p.status === 'CONFIRMADO' && (
                     <Link
                       to={`/pedido/${p.pedidoId}`}
+                      state={{ clienteId: p.cliente.id }}
                       className="mt-2 block rounded-lg border border-brand-600 py-2 text-center text-sm font-medium text-brand-700 hover:bg-brand-50"
                     >
                       Editar pedido

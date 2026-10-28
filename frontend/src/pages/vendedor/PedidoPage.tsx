@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
 import { CampoQuantidade, PrecoItem } from '../../components/ItemEditors';
 import { Aviso } from '../../components/Aviso';
@@ -28,6 +28,14 @@ function diaMes(iso: string): string {
 export function PedidoPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Dados que a tela anterior já tinha (o pedido recém-criado e/ou o cliente):
+  // permitem não buscar o pedido de novo e começar a carregar o mix junto.
+  // Valem só na 1ª abertura — são limpos do histórico para o "voltar" não
+  // mostrar um pedido desatualizado.
+  const veioDe = useRef(
+    (location.state ?? null) as { pedido?: Pedido; clienteId?: string } | null,
+  );
   const dialogo = useDialogo();
   const [pedido, setPedido] = useState<Pedido | null>(null);
   // Recados fixados do cliente, lembrados na hora de montar o pedido.
@@ -64,6 +72,23 @@ export function PedidoPage() {
     window.setTimeout(() => setSalvo(false), 1500);
   }
 
+  const [recarregando, setRecarregando] = useState(false);
+
+  // Refaz só o histórico e os produtos de fora do mix, sem apagar a tela nem o
+  // que o vendedor já digitou.
+  async function recarregarSecundarios() {
+    if (!pedido) return;
+    setRecarregando(true);
+    const [hist, fora] = await Promise.all([
+      historicoApi.historicoItens(pedido.clienteId).catch(() => null),
+      clientesApi.foraDoMix(pedido.clienteId).catch(() => null),
+    ]);
+    if (hist) setHistProdutos(hist);
+    if (fora) setForaDoMix(fora);
+    setAvisoSecundario(!hist || !fora);
+    setRecarregando(false);
+  }
+
   function toggleHistorico(produtoId: string) {
     setHistFechado((s) => {
       const n = new Set(s);
@@ -89,8 +114,23 @@ export function PedidoPage() {
     setCarregando(true);
     setErroCarga(false);
     setAvisoSecundario(false);
-    pedidosApi
-      .obterPedido(id)
+    const antecipado = tentativa === 0 ? veioDe.current : null;
+    const pedidoPronto = antecipado?.pedido?.id === id ? antecipado.pedido : null;
+    const clienteAntecipado = pedidoPronto?.clienteId ?? antecipado?.clienteId ?? null;
+    if (antecipado) {
+      veioDe.current = null;
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    const carregarListas = (clienteId: string) =>
+      Promise.all([
+        produtosApi.listarPorMix(clienteId),
+        historicoApi.historicoItens(clienteId).catch(() => null),
+        clientesApi.foraDoMix(clienteId).catch(() => null),
+      ]);
+    // Se já sabemos o cliente, mix/histórico/fora-do-mix saem junto com o pedido.
+    const listasAntecipadas = clienteAntecipado ? carregarListas(clienteAntecipado) : null;
+    listasAntecipadas?.catch(() => undefined);
+    (pedidoPronto ? Promise.resolve(pedidoPronto) : pedidosApi.obterPedido(id))
       .then(async (p) => {
         if (!p || p.status === 'CANCELADO') {
           // Não encontrado ou cancelado: não é editável. Rascunho e pedido já
@@ -103,11 +143,9 @@ export function PedidoPage() {
         // Mix e histórico por produto em paralelo (mais rápido). Só o mix é
         // essencial: se histórico ou "fora do mix" falharem, a lista aparece
         // mesmo assim e o vendedor pode tentar de novo.
-        const [mix, hist, fora] = await Promise.all([
-          produtosApi.listarPorMix(p.clienteId),
-          historicoApi.historicoItens(p.clienteId).catch(() => null),
-          clientesApi.foraDoMix(p.clienteId).catch(() => null),
-        ]);
+        const [mix, hist, fora] = await (listasAntecipadas && clienteAntecipado === p.clienteId
+          ? listasAntecipadas
+          : carregarListas(p.clienteId));
         setProdutos(mix);
         if (hist) setHistProdutos(hist);
         if (fora) setForaDoMix(fora);
@@ -501,10 +539,11 @@ export function PedidoPage() {
           <div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-brandYellow-50 p-3 text-xs text-brandYellow-800">
             <span>Parte das informações (histórico ou produtos fora do mix) não carregou.</span>
             <button
-              onClick={() => setTentativa((n) => n + 1)}
-              className="shrink-0 rounded-md bg-white px-2 py-1 font-semibold ring-1 ring-brandYellow-300"
+              onClick={recarregarSecundarios}
+              disabled={recarregando}
+              className="shrink-0 rounded-md bg-white px-2 py-1 font-semibold ring-1 ring-brandYellow-300 disabled:opacity-60"
             >
-              Tentar de novo
+              {recarregando ? 'Carregando…' : 'Tentar de novo'}
             </button>
           </div>
         )}

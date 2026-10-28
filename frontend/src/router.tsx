@@ -1,28 +1,56 @@
+import { lazy } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MinhaContaPage } from './pages/MinhaContaPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleRoute } from './components/RoleRoute';
+import { PaginaLazy } from './components/PaginaLazy';
 import { SelecionarClientePage } from './pages/vendedor/SelecionarClientePage';
 import { PedidoPage } from './pages/vendedor/PedidoPage';
 import { HistoricoClientePage } from './pages/vendedor/HistoricoClientePage';
 import { MeusPedidosPage } from './pages/vendedor/MeusPedidosPage';
 import { MeusClientesPage } from './pages/vendedor/MeusClientesPage';
 import { PerfilClientePage } from './pages/vendedor/PerfilClientePage';
-import { AdminProdutosPage } from './pages/admin/AdminProdutosPage';
-import { AdminClientesPage } from './pages/admin/AdminClientesPage';
-import { AdminClienteMixPage } from './pages/admin/AdminClienteMixPage';
-import { AdminTabelasPage } from './pages/admin/AdminTabelasPage';
-import { AdminFiliaisPage } from './pages/admin/AdminFiliaisPage';
-import { AdminTabelaDetalhePage } from './pages/admin/AdminTabelaDetalhePage';
-import { AdminSetoresPage } from './pages/admin/AdminSetoresPage';
-import { AdminCategoriasPage } from './pages/admin/AdminCategoriasPage';
-import { AdminSetorDetalhePage } from './pages/admin/AdminSetorDetalhePage';
-import { AdminPedidosPage } from './pages/admin/AdminPedidosPage';
-import { AdminPedidoDetalhePage } from './pages/admin/AdminPedidoDetalhePage';
-import { AdminUsuariosPage } from './pages/admin/AdminUsuariosPage';
 import type { UserType } from './lib/types';
+
+// Telas de administração: só baixam quando alguém abre (o vendedor nunca paga esse peso).
+const AdminProdutosPage = lazy(() =>
+  import('./pages/admin/AdminProdutosPage').then((m) => ({ default: m.AdminProdutosPage })),
+);
+const AdminClientesPage = lazy(() =>
+  import('./pages/admin/AdminClientesPage').then((m) => ({ default: m.AdminClientesPage })),
+);
+const AdminClienteMixPage = lazy(() =>
+  import('./pages/admin/AdminClienteMixPage').then((m) => ({ default: m.AdminClienteMixPage })),
+);
+const AdminTabelasPage = lazy(() =>
+  import('./pages/admin/AdminTabelasPage').then((m) => ({ default: m.AdminTabelasPage })),
+);
+const AdminFiliaisPage = lazy(() =>
+  import('./pages/admin/AdminFiliaisPage').then((m) => ({ default: m.AdminFiliaisPage })),
+);
+const AdminTabelaDetalhePage = lazy(() =>
+  import('./pages/admin/AdminTabelaDetalhePage').then((m) => ({ default: m.AdminTabelaDetalhePage })),
+);
+const AdminSetoresPage = lazy(() =>
+  import('./pages/admin/AdminSetoresPage').then((m) => ({ default: m.AdminSetoresPage })),
+);
+const AdminCategoriasPage = lazy(() =>
+  import('./pages/admin/AdminCategoriasPage').then((m) => ({ default: m.AdminCategoriasPage })),
+);
+const AdminSetorDetalhePage = lazy(() =>
+  import('./pages/admin/AdminSetorDetalhePage').then((m) => ({ default: m.AdminSetorDetalhePage })),
+);
+const AdminPedidosPage = lazy(() =>
+  import('./pages/admin/AdminPedidosPage').then((m) => ({ default: m.AdminPedidosPage })),
+);
+const AdminPedidoDetalhePage = lazy(() =>
+  import('./pages/admin/AdminPedidoDetalhePage').then((m) => ({ default: m.AdminPedidoDetalhePage })),
+);
+const AdminUsuariosPage = lazy(() =>
+  import('./pages/admin/AdminUsuariosPage').then((m) => ({ default: m.AdminUsuariosPage })),
+);
 
 const ADMIN: UserType[] = ['ADMIN_COMERCIAL', 'ADMIN_TI'];
 const ADMIN_TI: UserType[] = ['ADMIN_TI'];
@@ -99,7 +127,9 @@ export const router = createBrowserRouter([
     path: '/admin/produtos',
     element: (
       <RoleRoute permitido={ADMIN}>
-        <AdminProdutosPage />
+        <PaginaLazy>
+          <AdminProdutosPage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -107,7 +137,9 @@ export const router = createBrowserRouter([
     path: '/admin/clientes',
     element: (
       <RoleRoute permitido={ADMIN}>
-        <AdminClientesPage />
+        <PaginaLazy>
+          <AdminClientesPage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -115,7 +147,9 @@ export const router = createBrowserRouter([
     path: '/admin/clientes/:id/mix',
     element: (
       <RoleRoute permitido={ADMIN}>
-        <AdminClienteMixPage />
+        <PaginaLazy>
+          <AdminClienteMixPage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -123,7 +157,9 @@ export const router = createBrowserRouter([
     path: '/admin/categorias',
     element: (
       <RoleRoute permitido={ADMIN}>
-        <AdminCategoriasPage />
+        <PaginaLazy>
+          <AdminCategoriasPage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -131,7 +167,9 @@ export const router = createBrowserRouter([
     path: '/admin/setores',
     element: (
       <RoleRoute permitido={ADMIN}>
-        <AdminSetoresPage />
+        <PaginaLazy>
+          <AdminSetoresPage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -139,7 +177,9 @@ export const router = createBrowserRouter([
     path: '/admin/setores/:id',
     element: (
       <RoleRoute permitido={ADMIN}>
-        <AdminSetorDetalhePage />
+        <PaginaLazy>
+          <AdminSetorDetalhePage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -147,7 +187,9 @@ export const router = createBrowserRouter([
     path: '/admin/empresa',
     element: (
       <RoleRoute permitido={ADMIN_TI}>
-        <AdminFiliaisPage />
+        <PaginaLazy>
+          <AdminFiliaisPage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -155,7 +197,9 @@ export const router = createBrowserRouter([
     path: '/admin/tabelas',
     element: (
       <RoleRoute permitido={ADMIN}>
-        <AdminTabelasPage />
+        <PaginaLazy>
+          <AdminTabelasPage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -163,7 +207,9 @@ export const router = createBrowserRouter([
     path: '/admin/tabelas/:id',
     element: (
       <RoleRoute permitido={ADMIN}>
-        <AdminTabelaDetalhePage />
+        <PaginaLazy>
+          <AdminTabelaDetalhePage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -171,7 +217,9 @@ export const router = createBrowserRouter([
     path: '/admin/pedidos',
     element: (
       <RoleRoute permitido={ADMIN}>
-        <AdminPedidosPage />
+        <PaginaLazy>
+          <AdminPedidosPage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -179,7 +227,9 @@ export const router = createBrowserRouter([
     path: '/admin/pedidos/:id',
     element: (
       <RoleRoute permitido={ADMIN}>
-        <AdminPedidoDetalhePage />
+        <PaginaLazy>
+          <AdminPedidoDetalhePage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
@@ -187,7 +237,9 @@ export const router = createBrowserRouter([
     path: '/admin/usuarios',
     element: (
       <RoleRoute permitido={ADMIN_TI}>
-        <AdminUsuariosPage />
+        <PaginaLazy>
+          <AdminUsuariosPage />
+        </PaginaLazy>
       </RoleRoute>
     ),
   },
