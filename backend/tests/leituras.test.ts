@@ -81,3 +81,25 @@ describe('leituras otimizadas devolvem o mesmo que o cálculo direto no banco (s
     );
   });
 });
+
+describe('resumo do menu do vendedor (chamada leve)', () => {
+  it('traz só os dois números, iguais à contagem direta no banco', async () => {
+    const r = await vendedor.get('/api/pedidos/resumo-menu');
+    expect(r.status).toBe(200);
+    const v = await prisma.vendedor.findFirst({ where: { usuario: { username: 'vendedor2' } } });
+    const aConfirmar = await prisma.pedido.count({ where: { vendedorId: v!.id, status: 'RASCUNHO' } });
+    const alteracoes = await prisma.revisaoPedido.count({
+      where: {
+        superadaEm: null,
+        vistoPeloVendedorEm: null,
+        pedido: { vendedorId: v!.id, status: 'CONFIRMADO' },
+      },
+    });
+    expect(r.body).toEqual({ aConfirmar, alteracoes });
+  });
+
+  it('administração não usa este resumo (403)', async () => {
+    const adm = await entrar('admin');
+    expect((await adm.get('/api/pedidos/resumo-menu')).status).toBe(403);
+  });
+});

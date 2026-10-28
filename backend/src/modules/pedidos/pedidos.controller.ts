@@ -154,6 +154,17 @@ export async function alteracoesNaoVistas(req: Request, res: Response): Promise<
   res.json({ total: await service.contarAlteracoesNaoVistas(vendedor.id) });
 }
 
+/** Os dois avisos do menu numa chamada leve (só números, sem baixar a lista de pedidos). */
+export async function resumoMenu(req: Request, res: Response): Promise<void> {
+  const vendedor = await exigirVendedor(req, res);
+  if (!vendedor) return;
+  const [aConfirmar, alteracoes] = await Promise.all([
+    service.contarAConfirmar(vendedor.id),
+    service.contarAlteracoesNaoVistas(vendedor.id),
+  ]);
+  res.json({ aConfirmar, alteracoes });
+}
+
 /** O vendedor abriu Meus Pedidos e viu as alterações desses pedidos. */
 export async function marcarAlteracoesVistas(req: Request, res: Response): Promise<void> {
   const vendedor = await exigirVendedor(req, res);

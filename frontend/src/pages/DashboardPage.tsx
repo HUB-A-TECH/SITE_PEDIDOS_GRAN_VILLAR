@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { AppLayout } from '../components/AppLayout';
 import { Aviso } from '../components/Aviso';
 import { useAuth } from '../context/AuthContext';
-import * as historicoApi from '../lib/historicoApi';
 import * as pedidosApi from '../lib/pedidosApi';
 import type { UserType } from '../lib/types';
 
@@ -32,14 +31,16 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (!ehVendedor) return;
-    historicoApi
-      .meuHistorico('tudo')
-      .then((ps) => setAConfirmar(ps.filter((p) => p.status === 'RASCUNHO').length))
-      .catch(() => setAConfirmar(0));
     pedidosApi
-      .alteracoesNaoVistas()
-      .then(setAlteracoes)
-      .catch(() => setAlteracoes(0));
+      .resumoMenu()
+      .then((r) => {
+        setAConfirmar(r.aConfirmar);
+        setAlteracoes(r.alteracoes);
+      })
+      .catch(() => {
+        setAConfirmar(0);
+        setAlteracoes(0);
+      });
   }, [ehVendedor]);
 
   if (!usuario) return null;
