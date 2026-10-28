@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyToken, type JwtPayload } from '../utils/jwt';
+import type { Vendedor } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 
 export const COOKIE_NAME = 'gv_token';
@@ -9,6 +10,8 @@ declare global {
   namespace Express {
     interface Request {
       user?: JwtPayload;
+      /** Vendedor do usuário logado (já carregado junto com a sessão; só para perfil VENDEDOR). */
+      vendedor?: Vendedor | null;
     }
   }
 }
@@ -26,12 +29,16 @@ export async function authenticate(
 
   try {
     const payload = verifyToken(token);
-    const [revogado, usuario] = await Promise.all([
+    const [revogado, usuario, vendedor] = await Promise.all([
       prisma.tokenRevogado.findUnique({ where: { jti: payload.jti } }),
       prisma.user.findUnique({
         where: { id: payload.sub },
         select: { ativo: true, senhaAlteradaEm: true },
       }),
+      // Na mesma ida ao banco: quase toda ação do vendedor precisa dele.
+      payload.type === 'VENDEDOR'
+        ? prisma.vendedor.findUnique({ where: { usuarioId: payload.sub } })
+        : Promise.resolve(null),
     ]);
     if (revogado) {
       res.status(401).json({ mensagem: 'Sessão encerrada' });
@@ -53,6 +60,7 @@ export async function authenticate(
       return;
     }
     req.user = payload;
+    req.vendedor = vendedor;
     next();
   } catch {
     res.status(401).json({ mensagem: 'Token inválido ou expirado' });

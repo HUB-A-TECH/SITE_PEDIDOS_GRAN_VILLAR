@@ -56,7 +56,7 @@ async function exigirVendedor(
     res.status(403).json({ mensagem: 'Apenas vendedores podem criar pedidos' });
     return null;
   }
-  const vendedor = await service.getVendedorByUsuario(req.user!.sub);
+  const vendedor = req.vendedor ?? (await service.getVendedorByUsuario(req.user!.sub));
   if (!vendedor || !vendedor.ativo) {
     res.status(403).json({ mensagem: 'Vendedor não encontrado ou inativo' });
     return null;
@@ -192,12 +192,14 @@ export async function criar(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  const cliente = await service.getCliente(parsed.data.cliente_id);
+  const [cliente, atende] = await Promise.all([
+    service.getCliente(parsed.data.cliente_id),
+    carteira.vendedorAtendeCliente(req.user!.sub, parsed.data.cliente_id, vendedor.id),
+  ]);
   if (!cliente || !cliente.ativo) {
     res.status(404).json({ mensagem: 'Cliente não encontrado' });
     return;
   }
-  const atende = await carteira.vendedorAtendeCliente(req.user!.sub, cliente.id);
   if (!atende) {
     res.status(403).json({ mensagem: 'Cliente não está nos seus setores' });
     return;
@@ -257,19 +259,23 @@ export async function adicionarItem(req: Request, res: Response): Promise<void> 
     return;
   }
 
-  const noMix = await service.produtoNoMix(pedido.clienteId, parsed.data.produto_id);
+  // Três consultas independentes, numa ida só ao banco.
+  const [noMix, produto, precoTabela] = await Promise.all([
+    service.produtoNoMix(pedido.clienteId, parsed.data.produto_id),
+    service.getProduto(parsed.data.produto_id),
+    precos.precoNaTabelaDoCliente(pedido.clienteId, parsed.data.produto_id),
+  ]);
   if (!noMix && !parsed.data.so_neste_pedido) {
     res.status(400).json({ mensagem: 'Produto não está no mix deste cliente' });
     return;
   }
-  const produto = await service.getProduto(parsed.data.produto_id);
   if (!produto || !produto.ativo) {
     res.status(404).json({ mensagem: 'Produto não encontrado' });
     return;
   }
 
   // Preço da tabela do cliente (cai no catálogo se a tabela não tiver o item).
-  const preco = await precos.precoDoProdutoParaCliente(pedido.clienteId, produto);
+  const preco = precoTabela ?? Number(produto.preco);
   await service.definirItem(pedido.id, produto, parsed.data.quantidade, preco);
   if (!noMix) {
     await clientes.registrarAlteracaoMix({
@@ -297,8 +303,9 @@ export async function atualizarItem(req: Request, res: Response): Promise<void> 
     return;
   }
 
-  const item = await service.getItem(req.params.itemId);
-  if (!item || item.pedidoId !== pedido.id) {
+  // O item vem do pedido já carregado: sem nova ida ao banco.
+  const item = pedido.itens.find((i) => i.id === req.params.itemId);
+  if (!item) {
     res.status(404).json({ mensagem: 'Item não encontrado no pedido' });
     return;
   }
@@ -321,17 +328,21 @@ export async function atualizarPreco(req: Request, res: Response): Promise<void>
     return;
   }
 
-  const item = await service.getItem(req.params.itemId);
-  if (!item || item.pedidoId !== pedido.id) {
+  // O item vem do pedido já carregado: sem nova ida ao banco.
+  const item = pedido.itens.find((i) => i.id === req.params.itemId);
+  if (!item) {
     res.status(404).json({ mensagem: 'Item não encontrado no pedido' });
     return;
   }
 
   // O vendedor só pode baixar o preço (desconto), nunca passar do preço da
   // tabela do cliente (ou do catálogo, se a tabela não tiver o produto).
-  const produto = await service.getProduto(item.produtoId);
+  const [produto, precoNaTabela] = await Promise.all([
+    service.getProduto(item.produtoId),
+    precos.precoNaTabelaDoCliente(pedido.clienteId, item.produtoId),
+  ]);
   const precoTabela = produto
-    ? await precos.precoDoProdutoParaCliente(pedido.clienteId, produto)
+    ? (precoNaTabela ?? Number(produto.preco))
     : Number(item.precoUnitario);
   if (parsed.data.preco_unitario > precoTabela + 0.001) {
     res.status(400).json({
@@ -350,8 +361,9 @@ export async function removerItem(req: Request, res: Response): Promise<void> {
   const pedido = await carregarEditavel(req.params.id, vendedor.id, res);
   if (!pedido) return;
 
-  const item = await service.getItem(req.params.itemId);
-  if (!item || item.pedidoId !== pedido.id) {
+  // O item vem do pedido já carregado: sem nova ida ao banco.
+  const item = pedido.itens.find((i) => i.id === req.params.itemId);
+  if (!item) {
     res.status(404).json({ mensagem: 'Item não encontrado no pedido' });
     return;
   }
@@ -470,7 +482,7 @@ async function carregarExportavel(
     return null;
   }
   if (!isAdmin) {
-    const vendedor = await service.getVendedorByUsuario(req.user!.sub);
+    const vendedor = req.vendedor ?? (await service.getVendedorByUsuario(req.user!.sub));
     if (!vendedor || pedido.vendedorId !== vendedor.id) {
       res.status(404).json({ mensagem: 'Pedido não encontrado' });
       return null;

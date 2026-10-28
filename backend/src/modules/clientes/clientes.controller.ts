@@ -83,17 +83,20 @@ export async function clienteAcessivel(
   req: Request,
   res: Response,
 ) {
-  const cliente = await service.getByIdComSetor(req.params.id);
+  // Cliente e "o vendedor atende?" são independentes: uma ida só ao banco.
+  const [cliente, atende] = await Promise.all([
+    service.getByIdComSetor(req.params.id),
+    req.user!.type === 'VENDEDOR'
+      ? carteira.vendedorAtendeCliente(req.user!.sub, req.params.id, req.vendedor?.id)
+      : Promise.resolve(true),
+  ]);
   if (!cliente) {
     res.status(404).json({ mensagem: 'Cliente não encontrado' });
     return null;
   }
-  if (req.user!.type === 'VENDEDOR') {
-    const atende = await carteira.vendedorAtendeCliente(req.user!.sub, cliente.id);
-    if (!atende) {
-      res.status(403).json({ mensagem: 'Cliente não está nos seus setores' });
-      return null;
-    }
+  if (!atende) {
+    res.status(403).json({ mensagem: 'Cliente não está nos seus setores' });
+    return null;
   }
   return cliente;
 }
@@ -130,7 +133,7 @@ export async function perfilCliente(req: Request, res: Response): Promise<void> 
   const ehVendedor = req.user!.type === 'VENDEDOR';
   const [resumo, vendedor] = await Promise.all([
     historico.resumoDoCliente(cliente.id),
-    ehVendedor ? carteira.getVendedorDoUsuario(req.user!.sub) : null,
+    ehVendedor ? (req.vendedor ?? carteira.getVendedorDoUsuario(req.user!.sub)) : null,
   ]);
   res.json({
     cliente: { ...serialize(cliente), setor: cliente.setor },
