@@ -79,7 +79,7 @@ export async function listar(req: Request, res: Response): Promise<void> {
 // ---- Histórico (vendedor/admin) ----
 
 /** Garante que o vendedor só acesse clientes da própria carteira. */
-async function clienteAcessivel(
+export async function clienteAcessivel(
   req: Request,
   res: Response,
 ) {
@@ -394,6 +394,65 @@ export async function mixAdicionar(req: Request, res: Response): Promise<void> {
     produtoId: parsed.data.produto_id,
     mensagem: 'Produto adicionado ao mix',
   });
+}
+
+/** categoria: ausente = todas; "sem" = sem categoria; uuid = aquela categoria. */
+const todosSchema = z.object({
+  categoria: z.union([z.literal('sem'), z.string().uuid()]).optional(),
+});
+const filtroCategoria = (c?: string) => (c === undefined ? undefined : c === 'sem' ? null : c);
+
+/** Quantos produtos o "adicionar/remover todos" vai afetar (para a confirmação). */
+export async function mixContarTodos(req: Request, res: Response): Promise<void> {
+  const parsed = todosSchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'Categoria inválida' });
+    return;
+  }
+  const cliente = await service.getById(req.params.id);
+  if (!cliente) {
+    res.status(404).json({ mensagem: 'Cliente não encontrado' });
+    return;
+  }
+  res.json(await service.contarParaTodos(cliente.id, filtroCategoria(parsed.data.categoria)));
+}
+
+export async function mixAdicionarTodos(req: Request, res: Response): Promise<void> {
+  const parsed = todosSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'Categoria inválida' });
+    return;
+  }
+  const cliente = await service.getById(req.params.id);
+  if (!cliente) {
+    res.status(404).json({ mensagem: 'Cliente não encontrado' });
+    return;
+  }
+  const total = await service.adicionarTodosAoMix(
+    cliente.id,
+    req.user!.sub,
+    filtroCategoria(parsed.data.categoria),
+  );
+  res.json({ adicionados: total });
+}
+
+export async function mixRemoverTodos(req: Request, res: Response): Promise<void> {
+  const parsed = todosSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'Categoria inválida' });
+    return;
+  }
+  const cliente = await service.getById(req.params.id);
+  if (!cliente) {
+    res.status(404).json({ mensagem: 'Cliente não encontrado' });
+    return;
+  }
+  const total = await service.removerTodosDoMix(
+    cliente.id,
+    req.user!.sub,
+    filtroCategoria(parsed.data.categoria),
+  );
+  res.json({ removidos: total });
 }
 
 export async function mixRemover(req: Request, res: Response): Promise<void> {

@@ -190,6 +190,107 @@ export async function removerDoMix(
   });
 }
 
+/**
+ * Filtro de categoria do "todos": undefined = todas; null = "Sem categoria";
+ * string = aquela categoria.
+ */
+type FiltroCategoria = string | null | undefined;
+const porCategoria = (categoriaId: FiltroCategoria) =>
+  categoriaId === undefined ? {} : { categoriaId };
+
+/** Quantos produtos ativos ainda faltam no mix / estão no mix (para confirmar). */
+export async function contarParaTodos(clienteId: string, categoriaId: FiltroCategoria) {
+  const [faltam, noMix] = await Promise.all([
+    prisma.produto.count({
+      where: {
+        ativo: true,
+        ...porCategoria(categoriaId),
+        clienteProdutos: { none: { clienteId, ativo: true } },
+      },
+    }),
+    prisma.clienteProduto.count({
+      where: { clienteId, ativo: true, produto: porCategoria(categoriaId) },
+    }),
+  ]);
+  return { faltam, noMix };
+}
+
+/**
+ * Coloca no mix todos os produtos ativos que faltam (da categoria, se houver),
+ * de uma vez, e registra cada um no histórico do mix.
+ */
+export function adicionarTodosAoMix(
+  clienteId: string,
+  usuarioId: string,
+  categoriaId: FiltroCategoria,
+): Promise<number> {
+  return prisma.$transaction(
+    async (tx) => {
+      const faltam = await tx.produto.findMany({
+        where: {
+          ativo: true,
+          ...porCategoria(categoriaId),
+          clienteProdutos: { none: { clienteId, ativo: true } },
+        },
+        select: { id: true },
+      });
+      if (faltam.length === 0) return 0;
+      const ids = faltam.map((p) => p.id);
+      // Os que já estiveram no mix (ativo=false) voltam; os outros são criados.
+      await tx.clienteProduto.updateMany({
+        where: { clienteId, produtoId: { in: ids } },
+        data: { ativo: true },
+      });
+      await tx.clienteProduto.createMany({
+        data: ids.map((produtoId) => ({ clienteId, produtoId, ativo: true })),
+        skipDuplicates: true,
+      });
+      await tx.alteracaoMix.createMany({
+        data: ids.map((produtoId) => ({
+          clienteId,
+          produtoId,
+          usuarioId,
+          acao: 'ADICIONADO_AO_MIX' as const,
+        })),
+      });
+      return ids.length;
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
+}
+
+/** Tira do mix todos os produtos (da categoria, se houver), com histórico. */
+export function removerTodosDoMix(
+  clienteId: string,
+  usuarioId: string,
+  categoriaId: FiltroCategoria,
+): Promise<number> {
+  return prisma.$transaction(
+    async (tx) => {
+      const noMix = await tx.clienteProduto.findMany({
+        where: { clienteId, ativo: true, produto: porCategoria(categoriaId) },
+        select: { produtoId: true },
+      });
+      if (noMix.length === 0) return 0;
+      const ids = noMix.map((cp) => cp.produtoId);
+      await tx.clienteProduto.updateMany({
+        where: { clienteId, produtoId: { in: ids } },
+        data: { ativo: false },
+      });
+      await tx.alteracaoMix.createMany({
+        data: ids.map((produtoId) => ({
+          clienteId,
+          produtoId,
+          usuarioId,
+          acao: 'REMOVIDO_DO_MIX' as const,
+        })),
+      });
+      return ids.length;
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
+}
+
 export function registrarAlteracaoMix(data: {
   clienteId: string;
   produtoId: string;

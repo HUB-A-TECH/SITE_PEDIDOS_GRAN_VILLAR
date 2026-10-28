@@ -87,6 +87,7 @@ model User {
   pedidosAlterados Pedido[]        @relation("PedidoUltimaAlteracao")
   revisoesFeitas   RevisaoPedido[]
   alteracoesMix    AlteracaoMix[]
+  anotacoes        AnotacaoCliente[]
 
   @@map("usuarios")
 }
@@ -154,6 +155,7 @@ model Cliente {
   clienteProdutos ClienteProduto[]
   pedidos         Pedido[]
   alteracoesMix   AlteracaoMix[]
+  anotacoes       AnotacaoCliente[]
 
   @@map("clientes")
 }
@@ -228,6 +230,25 @@ model AlteracaoMix {
 
   @@index([clienteId, criadoEm])
   @@map("alteracoes_mix")
+}
+
+// Anotações de visita no perfil do cliente ("só atende de manhã"). Quem pode
+// ver o cliente lê; cada um edita/apaga as suas, a administração apaga qualquer
+// uma. Fixadas aparecem no topo do perfil e na tela do pedido.
+model AnotacaoCliente {
+  id           String    @id @default(uuid())
+  clienteId    String    @map("cliente_id")
+  autorId      String?   @map("autor_id")
+  texto        String
+  fixada       Boolean   @default(false)
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  editadoEm    DateTime? @map("editado_em")
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  autor   User?   @relation(fields: [autorId], references: [id], onDelete: SetNull)
+
+  @@index([clienteId, criadoEm])
+  @@map("anotacoes_cliente")
 }
 
 // Tabela de preco: um mesmo produto pode ter valores diferentes por grupo de

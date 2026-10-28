@@ -66,6 +66,45 @@ export async function perfil(clienteId: string): Promise<PerfilCliente> {
   return res.data;
 }
 
+// ---- Anotações de visita (perfil do cliente) ----
+
+export interface Anotacao {
+  id: string;
+  texto: string;
+  fixada: boolean;
+  criadoEm: string;
+  editadoEm: string | null;
+  autor: string;
+  podeEditar: boolean;
+  podeApagar: boolean;
+}
+
+export async function listarAnotacoes(clienteId: string): Promise<Anotacao[]> {
+  const res = await api.get<{ anotacoes: Anotacao[] }>(`/clientes/${clienteId}/anotacoes`);
+  return res.data.anotacoes;
+}
+
+export async function criarAnotacao(
+  clienteId: string,
+  data: { texto: string; fixada: boolean },
+): Promise<Anotacao> {
+  const res = await api.post<Anotacao>(`/clientes/${clienteId}/anotacoes`, data);
+  return res.data;
+}
+
+export async function atualizarAnotacao(
+  clienteId: string,
+  id: string,
+  data: { texto?: string; fixada?: boolean },
+): Promise<Anotacao> {
+  const res = await api.put<Anotacao>(`/clientes/${clienteId}/anotacoes/${id}`, data);
+  return res.data;
+}
+
+export async function apagarAnotacao(clienteId: string, id: string): Promise<void> {
+  await api.delete(`/clientes/${clienteId}/anotacoes/${id}`);
+}
+
 // ---- Admin ----
 
 export async function adminListar(localId: string): Promise<ClienteCompleto[]> {
@@ -107,6 +146,46 @@ export async function adicionarAoMix(
   await api.post(`/admin/clientes/${clienteId}/produtos`, {
     produto_id: produtoId,
   });
+}
+
+/**
+ * "Adicionar/remover todos" no mix. categoria: undefined = todas; null = sem
+ * categoria; id = aquela categoria.
+ */
+const paramCategoria = (categoria: string | null | undefined) =>
+  categoria === undefined ? {} : { categoria: categoria ?? 'sem' };
+
+export async function contarParaTodos(
+  clienteId: string,
+  categoria: string | null | undefined,
+): Promise<{ faltam: number; noMix: number }> {
+  const res = await api.get<{ faltam: number; noMix: number }>(
+    `/admin/clientes/${clienteId}/produtos/todos`,
+    { params: paramCategoria(categoria) },
+  );
+  return res.data;
+}
+
+export async function adicionarTodosAoMix(
+  clienteId: string,
+  categoria: string | null | undefined,
+): Promise<number> {
+  const res = await api.post<{ adicionados: number }>(
+    `/admin/clientes/${clienteId}/produtos/todos`,
+    paramCategoria(categoria),
+  );
+  return res.data.adicionados;
+}
+
+export async function removerTodosDoMix(
+  clienteId: string,
+  categoria: string | null | undefined,
+): Promise<number> {
+  const res = await api.delete<{ removidos: number }>(
+    `/admin/clientes/${clienteId}/produtos/todos`,
+    { data: paramCategoria(categoria) },
+  );
+  return res.data.removidos;
 }
 
 export async function removerDoMix(

@@ -8,6 +8,7 @@ import * as clientesApi from '../../lib/clientesApi';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { AlteracaoMix, PerfilCliente } from '../../lib/clientesApi';
 import { iniciais, linkMapa, linkTelefone, linkWhatsApp } from '../../lib/contato';
+import { AnotacoesFixadas, SecaoAnotacoes, useAnotacoes } from '../../components/AnotacoesCliente';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -35,6 +36,7 @@ export function PerfilClientePage() {
   const [erro, setErro] = useState('');
   const [abrindoPedido, setAbrindoPedido] = useState(false);
   const [mudancasMix, setMudancasMix] = useState<AlteracaoMix[]>([]);
+  const { anotacoes, recarregar: recarregarAnotacoes } = useAnotacoes(clienteId);
 
   useEffect(() => {
     setPerfil(null);
@@ -135,6 +137,8 @@ export function PerfilClientePage() {
         </div>
       </div>
 
+      <AnotacoesFixadas anotacoes={anotacoes} className="mb-3" />
+
       {/* ---- Ações rápidas ---- */}
       <div className="mb-4 grid grid-cols-2 gap-2">
         {ehVendedor && c.ativo && (
@@ -190,6 +194,8 @@ export function PerfilClientePage() {
           </div>
         )}
       </Secao>
+
+      <SecaoAnotacoes clienteId={c.id} anotacoes={anotacoes} recarregar={recarregarAnotacoes} />
 
       {r.maisComprados.length > 0 && (
         <Secao titulo="Mais comprados" subtitulo="últimos 12 meses">
