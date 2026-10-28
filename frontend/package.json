@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "orcamento": "node scripts/orcamento.mjs"
   },
   "dependencies": {
     "axios": "^1.7.7",

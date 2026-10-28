@@ -12,17 +12,18 @@ export interface LoginResult {
   };
 }
 
+// Hash de uma senha que ninguém usa: serve só para gastar o mesmo tempo do bcrypt
+// quando o usuário não existe ou está inativo (não dá para descobrir quem existe
+// medindo o tempo da resposta).
+const HASH_FALSO = '$2a$10$1qCzLuwAjYOwbR5PCeCgKOFchpt0W3cmewh5m6HRusmgVfYbQarNG';
+
 export async function login(
   username: string,
   password: string,
 ): Promise<LoginResult | null> {
   const user = await prisma.user.findUnique({ where: { username } });
-  if (!user || !user.ativo) {
-    return null;
-  }
-
-  const senhaOk = await verifyPassword(password, user.passwordHash);
-  if (!senhaOk) {
+  const senhaOk = await verifyPassword(password, user?.passwordHash ?? HASH_FALSO);
+  if (!user || !user.ativo || !senhaOk) {
     return null;
   }
 
