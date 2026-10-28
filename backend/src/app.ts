@@ -20,6 +20,9 @@ import { contaRoutes } from './modules/conta/conta.routes';
 
 export const app = express();
 
+// Atrás do proxy do Render: sem isso o IP de todo mundo seria o do proxy (limite de tentativas).
+app.set('trust proxy', 1);
+
 app.use(helmet());
 app.use(cors({ origin: env.frontendOrigin, credentials: true }));
 app.use(express.json());
