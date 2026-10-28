@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useDialogo } from '../../context/DialogoContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
 import { ListaClientesPorSetor } from '../../components/ListaClientesPorSetor';
@@ -27,6 +28,7 @@ export function SelecionarClientePage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [iniciando, setIniciando] = useState<string | null>(null);
+  const dialogo = useDialogo();
 
   useEffect(() => {
     clientesApi
@@ -65,7 +67,14 @@ export function SelecionarClientePage() {
     try {
       // Retoma o pedido salvo desse cliente, se houver, ou cria um novo.
       const pedido = await pedidosApi.criar(cliente.id);
-      navigate(`/pedido/${pedido.id}`);
+      // O pedido já vem na resposta: a próxima tela não precisa buscá-lo de novo.
+      navigate(`/pedido/${pedido.id}`, { state: { pedido } });
+    } catch {
+      await dialogo.avisar({
+        titulo: 'Não abriu o pedido',
+        tom: 'atencao',
+        mensagem: 'Não foi possível abrir o pedido. Verifique o sinal e tente de novo.',
+      });
     } finally {
       setIniciando(null);
     }

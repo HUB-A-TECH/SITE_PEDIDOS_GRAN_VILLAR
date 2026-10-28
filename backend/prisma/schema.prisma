@@ -159,6 +159,8 @@ model Cliente {
   alteracoesMix   AlteracaoMix[]
   anotacoes       AnotacaoCliente[]
 
+  @@index([setorId])
+  @@index([localId])
   @@map("clientes")
 }
 
@@ -315,6 +317,7 @@ model SetorVendedor {
   vendedor Vendedor @relation(fields: [vendedorId], references: [id], onDelete: Cascade)
 
   @@unique([setorId, vendedorId])
+  @@index([vendedorId])
   @@map("setores_vendedores")
 }
 
@@ -348,6 +351,9 @@ model Pedido {
   editadoPor         User?           @relation("PedidoEditadoPor", fields: [editadoPorId], references: [id])
   ultimaAlteracaoPor User?           @relation("PedidoUltimaAlteracao", fields: [ultimaAlteracaoPorId], references: [id])
 
+  @@index([vendedorId, status])
+  @@index([clienteId, status])
+  @@index([status, confirmadoEm])
   @@map("pedidos")
 }
 
@@ -389,5 +395,7 @@ model ItemPedido {
   pedido  Pedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
   produto Produto @relation(fields: [produtoId], references: [id])
 
+  @@index([pedidoId])
+  @@index([produtoId])
   @@map("itens_pedido")
 }

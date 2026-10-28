@@ -72,14 +72,14 @@ export function PerfilClientePage() {
 
   async function fazerPedido() {
     if (perfil?.pedidoSalvoId) {
-      navigate(`/pedido/${perfil.pedidoSalvoId}`);
+      navigate(`/pedido/${perfil.pedidoSalvoId}`, { state: { clienteId: c.id } });
       return;
     }
     setAbrindoPedido(true);
     setErro('');
     try {
       const pedido = await pedidosApi.criar(c.id);
-      navigate(`/pedido/${pedido.id}`);
+      navigate(`/pedido/${pedido.id}`, { state: { pedido } });
     } catch {
       setErro('Não foi possível abrir o pedido. Verifique o sinal e tente de novo.');
     } finally {
