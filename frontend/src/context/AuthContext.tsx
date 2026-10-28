@@ -11,6 +11,13 @@ import { api } from '../lib/api';
 
 export type UserType = 'VENDEDOR' | 'ADMIN_COMERCIAL' | 'ADMIN_TI';
 
+declare global {
+  interface Window {
+    /** Preenchido por public/pre-sessao.js antes do site terminar de carregar. */
+    __sessao?: Promise<{ status: number; usuario?: Usuario } | null>;
+  }
+}
+
 export interface Usuario {
   id: string;
   username: string;
@@ -46,6 +53,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // pode jogar o vendedor no login: tenta de novo algumas vezes antes.
     let cancelado = false;
     async function verificarSessao() {
+      // Resposta que o index.html já foi buscar (public/pre-sessao.js), em paralelo
+      // com o download do site. Só vale na 1ª vez.
+      const pre = window.__sessao;
+      window.__sessao = undefined;
+      if (pre) {
+        const r = await pre;
+        if (cancelado) return;
+        if (r?.status === 200 && r.usuario) {
+          setUsuario(r.usuario);
+          setCarregando(false);
+          return;
+        }
+        if (r?.status === 401) {
+          setCarregando(false);
+          return;
+        }
+      }
       for (let tentativa = 0; tentativa < 4 && !cancelado; tentativa++) {
         try {
           const res = await api.get<{ usuario: Usuario }>('/auth/me');

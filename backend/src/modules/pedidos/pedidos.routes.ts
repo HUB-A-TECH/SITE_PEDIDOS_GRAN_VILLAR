@@ -9,6 +9,7 @@ export const pedidosRoutes = Router();
 pedidosRoutes.use(asyncHandler(authenticate));
 
 pedidosRoutes.get('/historico', asyncHandler(controller.meuHistorico));
+pedidosRoutes.get('/resumo-menu', asyncHandler(controller.resumoMenu));
 // Alterações do comercial: aviso no menu e "já vi".
 pedidosRoutes.get('/alteracoes/nao-vistas', asyncHandler(controller.alteracoesNaoVistas));
 pedidosRoutes.post('/alteracoes/vistas', asyncHandler(controller.marcarAlteracoesVistas));

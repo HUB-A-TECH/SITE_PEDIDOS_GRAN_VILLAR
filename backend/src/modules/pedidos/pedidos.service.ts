@@ -239,6 +239,11 @@ export function contarAlteracoesNaoVistas(vendedorId: string) {
   });
 }
 
+/** Pedidos salvos que o vendedor ainda não enviou (aviso "a confirmar" no menu). */
+export function contarAConfirmar(vendedorId: string) {
+  return prisma.pedido.count({ where: { vendedorId, status: 'RASCUNHO' } });
+}
+
 /** Marca como vistas as revisões desses pedidos (só os do próprio vendedor). */
 export function marcarAlteracoesVistas(vendedorId: string, pedidoIds: string[]) {
   return prisma.revisaoPedido.updateMany({

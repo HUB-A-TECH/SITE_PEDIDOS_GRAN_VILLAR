@@ -165,6 +165,12 @@ export async function alteracoesNaoVistas(): Promise<number> {
   return res.data.total;
 }
 
+/** Avisos do menu do vendedor numa chamada só: pedidos a confirmar e alterações não vistas. */
+export async function resumoMenu(): Promise<{ aConfirmar: number; alteracoes: number }> {
+  const res = await api.get<{ aConfirmar: number; alteracoes: number }>('/pedidos/resumo-menu');
+  return res.data;
+}
+
 export async function marcarAlteracoesVistas(pedidoIds: string[]): Promise<void> {
   await api.post('/pedidos/alteracoes/vistas', { pedidoIds });
 }

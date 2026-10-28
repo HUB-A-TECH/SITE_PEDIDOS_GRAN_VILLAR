@@ -58,13 +58,16 @@ if (env.nodeEnv === 'production') {
         const cacheavel = filePath.includes(`${path.sep}assets${path.sep}`);
         // Imagens soltas (logo) não têm hash no nome: 1 dia de cache basta.
         const imagem = /\.(png|webp|jpg|jpeg|svg|ico)$/i.test(filePath);
+        const preSessao = filePath.endsWith('pre-sessao.js'); // mini-script estável: 1 hora
         res.setHeader(
           'Cache-Control',
           cacheavel
             ? 'public, max-age=31536000, immutable'
             : imagem
               ? 'public, max-age=86400'
-              : 'no-cache',
+              : preSessao
+                ? 'public, max-age=3600'
+                : 'no-cache',
         );
       },
     }),
