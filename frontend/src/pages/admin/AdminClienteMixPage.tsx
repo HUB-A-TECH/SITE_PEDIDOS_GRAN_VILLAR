@@ -8,6 +8,7 @@ import {
   type Produto,
 } from '../../lib/types';
 import { useCategorias } from '../../lib/categoriasApi';
+import { useDialogo } from '../../context/DialogoContext';
 
 const brl = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -24,17 +25,70 @@ export function AdminClienteMixPage() {
   // Tabela do cliente + preços dela, para o admin ver o que o vendedor verá.
   const [tabelaPreco, setTabelaPreco] = useState<{ nome: string } | null>(null);
   const [precos, setPrecos] = useState<Map<string, number>>(new Map());
+  const [emLote, setEmLote] = useState(false);
+  const dialogo = useDialogo();
+
+  function aplicarMix(mix: clientesApi.MixResposta) {
+    setMixIds(new Set(mix.produtos.map((m) => m.id)));
+    setTabelaPreco(mix.tabelaPreco);
+    setPrecos(new Map(mix.produtos.map((m) => [m.id, m.preco])));
+  }
 
   useEffect(() => {
     Promise.all([produtosApi.adminListar(), clientesApi.listarMix(id)])
       .then(([produtos, mix]) => {
         setCatalogo(produtos.filter((p) => p.ativo));
-        setMixIds(new Set(mix.produtos.map((m) => m.id)));
-        setTabelaPreco(mix.tabelaPreco);
-        setPrecos(new Map(mix.produtos.map((m) => [m.id, m.preco])));
+        aplicarMix(mix);
       })
       .finally(() => setCarregando(false));
   }, [id]);
+
+  /**
+   * Adicionar/remover todos de uma vez — da categoria escolhida no filtro, ou
+   * do catálogo inteiro em "Todas". Sempre pergunta antes, com o número exato.
+   */
+  async function todos(acao: 'adicionar' | 'remover') {
+    const categoria = filtro === 'TODAS' ? undefined : filtro;
+    const qual = categoria === undefined ? 'produtos' : `produtos de "${nomeDe(categoria)}"`;
+    setEmLote(true);
+    try {
+      const { faltam, noMix } = await clientesApi.contarParaTodos(id, categoria);
+      const afetados = acao === 'adicionar' ? faltam : noMix;
+      if (afetados === 0) {
+        await dialogo.avisar({
+          titulo: acao === 'adicionar' ? 'Nada para adicionar' : 'Nada para remover',
+          mensagem:
+            acao === 'adicionar'
+              ? `Todos os ${qual} já estão no mix deste cliente.`
+              : `Nenhum dos ${qual} está no mix deste cliente.`,
+        });
+        return;
+      }
+      const ok = await dialogo.confirmar({
+        titulo: acao === 'adicionar' ? 'Adicionar todos' : 'Remover todos',
+        destrutivo: acao === 'remover',
+        tom: acao === 'adicionar' ? 'info' : 'atencao',
+        textoConfirmar:
+          acao === 'adicionar' ? `Adicionar ${afetados}` : `Remover ${afetados}`,
+        mensagem:
+          acao === 'adicionar'
+            ? `Adicionar ${afetados === 1 ? 'o produto que falta' : `os ${afetados} ${qual} que faltam`} no mix deste cliente? O vendedor passa a vê-${afetados === 1 ? 'lo' : 'los'} no pedido.`
+            : `Remover ${afetados === 1 ? 'o produto' : `os ${afetados} ${qual}`} do mix deste cliente? O vendedor deixa de vê-${afetados === 1 ? 'lo' : 'los'} no pedido.`,
+      });
+      if (!ok) return;
+      if (acao === 'adicionar') await clientesApi.adicionarTodosAoMix(id, categoria);
+      else await clientesApi.removerTodosDoMix(id, categoria);
+      aplicarMix(await clientesApi.listarMix(id));
+    } catch {
+      await dialogo.avisar({
+        titulo: 'Não foi possível',
+        tom: 'erro',
+        mensagem: 'Tente novamente em alguns instantes.',
+      });
+    } finally {
+      setEmLote(false);
+    }
+  }
 
   async function alternar(produtoId: string, noMix: boolean) {
     setProcessando(produtoId);
@@ -100,6 +154,25 @@ export function AdminClienteMixPage() {
           />
         ))}
       </div>
+
+      {!carregando && (
+        <div className="mb-4 flex gap-2">
+          <button
+            onClick={() => todos('adicionar')}
+            disabled={emLote}
+            className="flex-1 rounded-lg bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-500 disabled:opacity-60"
+          >
+            {filtro === 'TODAS' ? 'Adicionar todos' : `Adicionar todos de ${nomeDe(filtro)}`}
+          </button>
+          <button
+            onClick={() => todos('remover')}
+            disabled={emLote}
+            className="flex-1 rounded-lg border border-red-200 bg-white py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+          >
+            {filtro === 'TODAS' ? 'Remover todos' : `Remover todos de ${nomeDe(filtro)}`}
+          </button>
+        </div>
+      )}
 
       {carregando ? (
         <p className="text-center text-slate-500">Carregando…</p>
