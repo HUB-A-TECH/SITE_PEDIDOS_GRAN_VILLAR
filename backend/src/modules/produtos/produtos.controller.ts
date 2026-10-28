@@ -60,11 +60,11 @@ export async function listarPorMix(req: Request, res: Response): Promise<void> {
     res.status(acesso.status).json({ mensagem: acesso.msg });
     return;
   }
-  const produtos = await service.listMixDoCliente(
-    parsed.data.cliente_id,
-    parsed.data.categoria,
-  );
-  const mapa = await precos.mapaPrecosDoCliente(parsed.data.cliente_id);
+  // Mix e preços da tabela do cliente são independentes: numa ida só.
+  const [produtos, mapa] = await Promise.all([
+    service.listMixDoCliente(parsed.data.cliente_id, parsed.data.categoria),
+    precos.mapaPrecosDoCliente(parsed.data.cliente_id),
+  ]);
   res.json({
     produtos: produtos.map((p) => serialize(p, precos.precoEfetivo(p, mapa))),
   });

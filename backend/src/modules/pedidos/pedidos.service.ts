@@ -256,10 +256,9 @@ export function criarRascunho(
   localId: string,
   clienteId: string,
 ) {
+  // Sem include: uma única gravação (o controller já tem o cliente e sabe que não há itens).
   return prisma.pedido.create({
     data: { vendedorId, localId, clienteId, status: 'RASCUNHO' },
-    relationLoadStrategy: 'join',
-    include: pedidoInclude,
   });
 }
 
@@ -279,10 +278,6 @@ export function produtoNoMix(clienteId: string, produtoId: string) {
   return prisma.clienteProduto.findFirst({
     where: { clienteId, produtoId, ativo: true },
   });
-}
-
-export function getItem(itemId: string): Promise<ItemPedido | null> {
-  return prisma.itemPedido.findUnique({ where: { id: itemId } });
 }
 
 function calcularSubtotal(quantidade: number, preco: number): number {

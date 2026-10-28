@@ -14,12 +14,12 @@ export type MapaPrecos = Map<string, number>;
 
 /** Preços da tabela do cliente, indexados por produtoId. */
 export async function mapaPrecosDoCliente(clienteId: string): Promise<MapaPrecos> {
-  const cliente = await prisma.cliente.findUnique({
-    where: { id: clienteId },
-    select: { tabelaPrecoId: true },
+  // Uma consulta só: as linhas da tabela do cliente (sem tabela = nenhuma linha).
+  const itens = await prisma.tabelaPrecoItem.findMany({
+    where: { tabela: { clientes: { some: { id: clienteId } } } },
+    select: { produtoId: true, preco: true },
   });
-  if (!cliente?.tabelaPrecoId) return new Map();
-  return mapaPrecosDaTabela(cliente.tabelaPrecoId);
+  return new Map(itens.map((i) => [i.produtoId, Number(i.preco)]));
 }
 
 /** Preços de uma tabela, indexados por produtoId. */

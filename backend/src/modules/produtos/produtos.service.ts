@@ -24,6 +24,7 @@ export async function listMixDoCliente(
       ativo: true,
       produto: { ativo: true, ...(categoriaId ? { categoriaId } : {}) },
     },
+    relationLoadStrategy: 'join',
     include: { produto: true },
     orderBy: [...ordemMix],
   });
