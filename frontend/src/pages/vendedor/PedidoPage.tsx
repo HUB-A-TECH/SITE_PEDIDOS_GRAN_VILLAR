@@ -48,11 +48,18 @@ export function PedidoPage() {
   const [processando, setProcessando] = useState<Set<string>>(new Set());
   const [obs, setObs] = useState('');
   const [salvo, setSalvo] = useState(false);
+  // Última gravação falhou (sem sinal etc.): fica visível até a próxima dar certo.
+  const [erroSalvar, setErroSalvar] = useState(false);
+  // Falha ao abrir o pedido ou ao carregar histórico / produtos de fora do mix.
+  const [erroCarga, setErroCarga] = useState(false);
+  const [avisoSecundario, setAvisoSecundario] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
   const [histProdutos, setHistProdutos] = useState<Record<string, ItemHistoricoProduto[]>>({});
   const [histFechado, setHistFechado] = useState<Set<string>>(new Set());
 
   function aplicarPedido(p: Pedido) {
     setPedido(p);
+    setErroSalvar(false);
     setSalvo(true);
     window.setTimeout(() => setSalvo(false), 1500);
   }
@@ -79,6 +86,9 @@ export function PedidoPage() {
       navigate('/meus-pedidos', { replace: true });
       return;
     }
+    setCarregando(true);
+    setErroCarga(false);
+    setAvisoSecundario(false);
     pedidosApi
       .obterPedido(id)
       .then(async (p) => {
@@ -90,18 +100,22 @@ export function PedidoPage() {
         }
         setPedido(p);
         setObs(p.observacoes ?? '');
-        // Mix e histórico por produto em paralelo (mais rápido).
+        // Mix e histórico por produto em paralelo (mais rápido). Só o mix é
+        // essencial: se histórico ou "fora do mix" falharem, a lista aparece
+        // mesmo assim e o vendedor pode tentar de novo.
         const [mix, hist, fora] = await Promise.all([
           produtosApi.listarPorMix(p.clienteId),
-          historicoApi.historicoItens(p.clienteId),
-          clientesApi.foraDoMix(p.clienteId),
+          historicoApi.historicoItens(p.clienteId).catch(() => null),
+          clientesApi.foraDoMix(p.clienteId).catch(() => null),
         ]);
         setProdutos(mix);
-        setHistProdutos(hist);
-        setForaDoMix(fora);
+        if (hist) setHistProdutos(hist);
+        if (fora) setForaDoMix(fora);
+        if (!hist || !fora) setAvisoSecundario(true);
       })
+      .catch(() => setErroCarga(true))
       .finally(() => setCarregando(false));
-  }, [id, navigate]);
+  }, [id, navigate, tentativa]);
 
   const itemPorProduto = useMemo(() => {
     const m = new Map<string, Pedido['itens'][number]>();
@@ -296,6 +310,8 @@ export function PedidoPage() {
         );
       }
       aplicarPedido(atualizado);
+    } catch {
+      setErroSalvar(true);
     } finally {
       setProcessando((s) => {
         const n = new Set(s);
@@ -349,6 +365,8 @@ export function PedidoPage() {
     try {
       const atualizado = await pedidosApi.atualizarPrecoItem(pedido.id, item.id, precoUnitario);
       aplicarPedido(atualizado);
+    } catch {
+      setErroSalvar(true);
     } finally {
       setProcessando((s) => {
         const n = new Set(s);
@@ -369,8 +387,12 @@ export function PedidoPage() {
 
   async function salvarObs() {
     if (!pedido || obs === (pedido.observacoes ?? '')) return;
-    const atualizado = await pedidosApi.atualizarObservacoes(pedido.id, obs);
-    aplicarPedido(atualizado);
+    try {
+      const atualizado = await pedidosApi.atualizarObservacoes(pedido.id, obs);
+      aplicarPedido(atualizado);
+    } catch {
+      setErroSalvar(true);
+    }
   }
 
   async function descartar() {
@@ -387,8 +409,33 @@ export function PedidoPage() {
       ),
     });
     if (!ok) return;
-    await pedidosApi.descartar(pedido.id);
+    try {
+      await pedidosApi.descartar(pedido.id);
+    } catch {
+      await dialogo.avisar({
+        titulo: 'Não descartou',
+        tom: 'atencao',
+        mensagem: 'Não foi possível descartar o pedido. Verifique o sinal e tente de novo.',
+      });
+      return;
+    }
     navigate('/meus-pedidos', { replace: true });
+  }
+
+  if (erroCarga) {
+    return (
+      <AppLayout titulo="Pedido" voltarPara="/meus-pedidos">
+        <div className="text-center">
+          <p className="text-slate-600">Não foi possível abrir o pedido. Verifique o sinal.</p>
+          <button
+            onClick={() => setTentativa((n) => n + 1)}
+            className="mt-3 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-500"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      </AppLayout>
+    );
   }
 
   if (carregando || !pedido) {
@@ -412,7 +459,13 @@ export function PedidoPage() {
       voltarPara="/meus-pedidos"
       acao={
         <div className="flex items-center gap-2">
-          {salvo && <span className="text-xs text-brand-100">Salvo ✓</span>}
+          {erroSalvar ? (
+            <span className="text-xs font-semibold text-red-200">Não salvou</span>
+          ) : processando.size > 0 ? (
+            <span className="text-xs text-brand-100">Salvando…</span>
+          ) : (
+            salvo && <span className="text-xs text-brand-100">Salvo ✓</span>
+          )}
           <Link
             to={`/clientes/${pedido.clienteId}`}
             className="rounded-lg bg-brand-700 px-2.5 py-1.5 text-xs hover:bg-brand-800"
@@ -443,6 +496,18 @@ export function PedidoPage() {
             />
           ))}
         </div>
+
+        {avisoSecundario && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-brandYellow-50 p-3 text-xs text-brandYellow-800">
+            <span>Parte das informações (histórico ou produtos fora do mix) não carregou.</span>
+            <button
+              onClick={() => setTentativa((n) => n + 1)}
+              className="shrink-0 rounded-md bg-white px-2 py-1 font-semibold ring-1 ring-brandYellow-300"
+            >
+              Tentar de novo
+            </button>
+          </div>
+        )}
 
         <ul className="space-y-2">
           {visiveis.map((p) => {
@@ -724,7 +789,16 @@ export function PedidoPage() {
           <div className="flex items-center gap-3">
             <div className="flex-1">
               <p className="text-xs text-slate-500">
-                {totalItens} {totalItens === 1 ? 'item' : 'itens'} · salvo automaticamente
+                {totalItens} {totalItens === 1 ? 'item' : 'itens'} ·{' '}
+                {erroSalvar ? (
+                  <span className="font-semibold text-red-600">
+                    última alteração NÃO salvou — verifique o sinal e tente de novo
+                  </span>
+                ) : processando.size > 0 ? (
+                  'salvando…'
+                ) : (
+                  'salvo'
+                )}
               </p>
               <p className="text-lg font-bold text-slate-800">{brl(pedido.total)}</p>
             </div>

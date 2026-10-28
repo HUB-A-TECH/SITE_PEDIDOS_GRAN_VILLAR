@@ -394,6 +394,17 @@ export async function atualizarObservacoes(
 export async function confirmar(req: Request, res: Response): Promise<void> {
   const vendedor = await exigirVendedor(req, res);
   if (!vendedor) return;
+  // Reenvio (resposta perdida no 3G, clique duplo): devolve o mesmo número.
+  const existente = await service.getPedidoDoVendedor(req.params.id, vendedor.id);
+  if (existente?.status === 'CONFIRMADO' && existente.numeroPedido) {
+    res.json({
+      pedidoId: existente.id,
+      numeroPedido: existente.numeroPedido,
+      status: 'CONFIRMADO',
+      txtDisponivel: true,
+    });
+    return;
+  }
   const pedido = await carregarRascunho(req.params.id, vendedor.id, res);
   if (!pedido) return;
 
