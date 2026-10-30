@@ -9,10 +9,8 @@ import * as pedidosApi from '../../lib/pedidosApi';
 import type { AlteracaoMix, PerfilCliente } from '../../lib/clientesApi';
 import { iniciais, linkMapa, linkTelefone, linkWhatsApp } from '../../lib/contato';
 import { AnotacoesFixadas, SecaoAnotacoes, useAnotacoes } from '../../components/AnotacoesCliente';
+import { brl, dataBR } from '../../lib/formatar';
 
-const brl = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const dataBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
 
 /** "hoje", "ontem" ou "há N dias", contando dias do calendário. */

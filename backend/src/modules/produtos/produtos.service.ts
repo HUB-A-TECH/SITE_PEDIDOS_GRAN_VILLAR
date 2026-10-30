@@ -31,29 +31,6 @@ export async function listMixDoCliente(
   return itens.map((cp) => cp.produto);
 }
 
-/** Busca por nome/código restrita ao mix do cliente (RN-11). */
-export async function buscarNoMix(
-  clienteId: string,
-  termo: string,
-): Promise<Produto[]> {
-  const itens = await prisma.clienteProduto.findMany({
-    where: {
-      clienteId,
-      ativo: true,
-      produto: {
-        ativo: true,
-        OR: [
-          { nome: { contains: termo, mode: 'insensitive' } },
-          { codigo: { contains: termo, mode: 'insensitive' } },
-        ],
-      },
-    },
-    include: { produto: true },
-    orderBy: [...ordemMix],
-  });
-  return itens.map((cp) => cp.produto);
-}
-
 // ---- Admin (catálogo completo) ----
 
 export function listCatalogo(filtros: {

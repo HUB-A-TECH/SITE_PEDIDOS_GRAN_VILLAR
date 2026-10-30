@@ -1,7 +1,7 @@
 import { api } from './api';
 import type { Cliente, ClienteCompleto, Local, MixProduto, Produto } from './types';
 
-export interface ClienteInput {
+interface ClienteInput {
   codigo: string;
   nome: string;
   nomeFantasia?: string;

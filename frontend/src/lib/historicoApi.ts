@@ -7,7 +7,7 @@ function limiteParam(l: Limite) {
   return { limite: String(l) };
 }
 
-export interface ItemHistorico {
+interface ItemHistorico {
   codigo: string;
   nome: string;
   quantidade: number;

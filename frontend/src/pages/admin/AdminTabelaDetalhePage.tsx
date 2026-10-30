@@ -11,12 +11,11 @@ import {
   type TabelaProduto,
 } from '../../lib/types';
 import { useCategorias } from '../../lib/categoriasApi';
+import { brl } from '../../lib/formatar';
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500';
 
-const brl = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const campoId = (produtoId: string) => `preco-${produtoId}`;
 

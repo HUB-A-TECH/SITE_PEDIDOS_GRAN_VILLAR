@@ -9,9 +9,8 @@ import {
 } from '../../lib/types';
 import { useCategorias } from '../../lib/categoriasApi';
 import { useDialogo } from '../../context/DialogoContext';
+import { brl } from '../../lib/formatar';
 
-const brl = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export function AdminClienteMixPage() {
   const { id = '' } = useParams();

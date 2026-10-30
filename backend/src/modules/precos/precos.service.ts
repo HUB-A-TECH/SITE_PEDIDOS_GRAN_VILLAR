@@ -22,15 +22,6 @@ export async function mapaPrecosDoCliente(clienteId: string): Promise<MapaPrecos
   return new Map(itens.map((i) => [i.produtoId, Number(i.preco)]));
 }
 
-/** Preços de uma tabela, indexados por produtoId. */
-export async function mapaPrecosDaTabela(tabelaId: string): Promise<MapaPrecos> {
-  const itens = await prisma.tabelaPrecoItem.findMany({
-    where: { tabelaId },
-    select: { produtoId: true, preco: true },
-  });
-  return new Map(itens.map((i) => [i.produtoId, Number(i.preco)]));
-}
-
 /** Aplica o mapa a um produto, caindo no preço do catálogo quando faltar. */
 export function precoEfetivo(produto: Pick<Produto, 'id' | 'preco'>, mapa: MapaPrecos): number {
   return mapa.get(produto.id) ?? Number(produto.preco);

@@ -1,13 +1,9 @@
 import type { AlteracaoComercial, AlteracaoItem } from '../lib/pedidosApi';
+import { brl, qtd, dataHoraBR } from '../lib/formatar';
 
-const brl = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const qtd = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
-const dataHoraBR = (iso: string) =>
-  new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 /** Uma linha legível do que mudou num item. */
-export function descreverAlteracao(a: AlteracaoItem): string {
+function descreverAlteracao(a: AlteracaoItem): string {
   if (a.removido) {
     return `${a.nome}: removido do pedido (era ${qtd(a.quantidadeAntes)} ${a.unidadeMedida})`;
   }

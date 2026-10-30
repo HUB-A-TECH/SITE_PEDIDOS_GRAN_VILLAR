@@ -20,7 +20,7 @@ function serialize(s: SetorComVinculos) {
 const NOME_DUPLICADO = 'Já existe um setor com esse nome nesta filial';
 const nomeSchema = z.string().trim().min(1, 'Informe o nome do setor').max(60);
 // Cores dos cartões no Novo Pedido (o frontend tem a paleta de cada uma).
-export const CORES_SETOR = ['VERMELHO', 'AMARELO', 'VERDE', 'AZUL', 'LARANJA', 'ROXO'] as const;
+const CORES_SETOR = ['VERMELHO', 'AMARELO', 'VERDE', 'AZUL', 'LARANJA', 'ROXO'] as const;
 const corSchema = z.enum(CORES_SETOR, { message: 'Cor inválida' });
 
 export async function listar(req: Request, res: Response): Promise<void> {

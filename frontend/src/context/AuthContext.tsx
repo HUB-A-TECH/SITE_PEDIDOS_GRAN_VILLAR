@@ -8,8 +8,8 @@ import {
 } from 'react';
 import axios from 'axios';
 import { api } from '../lib/api';
+import type { UserType } from '../lib/types';
 
-export type UserType = 'VENDEDOR' | 'ADMIN_COMERCIAL' | 'ADMIN_TI';
 
 declare global {
   interface Window {
