@@ -70,28 +70,6 @@ export async function listarPorMix(req: Request, res: Response): Promise<void> {
   });
 }
 
-export async function buscar(req: Request, res: Response): Promise<void> {
-  const schema = z.object({
-    cliente_id: z.string().uuid(),
-    termo: z.string().min(1),
-  });
-  const parsed = schema.safeParse(req.query);
-  if (!parsed.success) {
-    res.status(400).json({ mensagem: 'Parâmetros inválidos (cliente_id e termo)' });
-    return;
-  }
-  const acesso = await resolverClienteAcessivel(req, parsed.data.cliente_id);
-  if (!acesso.ok) {
-    res.status(acesso.status).json({ mensagem: acesso.msg });
-    return;
-  }
-  const produtos = await service.buscarNoMix(parsed.data.cliente_id, parsed.data.termo);
-  const mapa = await precos.mapaPrecosDoCliente(parsed.data.cliente_id);
-  res.json({
-    produtos: produtos.map((p) => serialize(p, precos.precoEfetivo(p, mapa))),
-  });
-}
-
 // ---- Admin ----
 
 const produtoCreateSchema = z.object({

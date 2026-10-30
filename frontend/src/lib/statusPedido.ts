@@ -1,10 +1,10 @@
-export type StatusPedido = 'RASCUNHO' | 'CONFIRMADO' | 'CANCELADO';
+type StatusPedido = 'RASCUNHO' | 'CONFIRMADO' | 'CANCELADO';
 
 // Estado de revisão do comercial: pendente/alterado precisam de revisão;
 // revisado = aprovado sem mudanças posteriores; null = não enviado.
 export type Revisao = 'PENDENTE' | 'ALTERADO' | 'REVISADO' | null;
 
-export interface EstiloStatus {
+interface EstiloStatus {
   label: string;
   /** Cor do texto do rótulo. */
   textClass: string;
@@ -71,7 +71,7 @@ export function estiloStatus(
 
 export type Grupo = 'A_CONFIRMAR' | 'EM_ANALISE' | 'APROVADOS' | 'CANCELADOS';
 
-export interface DefinicaoGrupo {
+interface DefinicaoGrupo {
   chave: Grupo;
   titulo: string;
   /** Frase curta abaixo do título, explicando o que aquele grupo significa. */

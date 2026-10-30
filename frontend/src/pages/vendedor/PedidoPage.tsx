@@ -15,9 +15,8 @@ import {
 } from '../../lib/types';
 import { useCategorias } from '../../lib/categoriasApi';
 import { AnotacoesFixadas, useAnotacoes } from '../../components/AnotacoesCliente';
+import { brl } from '../../lib/formatar';
 
-const brl = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 function diaMes(iso: string): string {

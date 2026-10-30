@@ -13,7 +13,7 @@ export interface Usuario {
   vendedor: { nomeCompleto: string; telefone: string | null } | null;
 }
 
-export interface CriarUsuarioPayload {
+interface CriarUsuarioPayload {
   tipo: UserType;
   username: string;
   email: string;

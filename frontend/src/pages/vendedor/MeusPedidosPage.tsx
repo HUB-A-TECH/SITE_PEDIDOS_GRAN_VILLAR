@@ -15,12 +15,8 @@ import {
   GRUPOS,
   type Grupo,
 } from '../../lib/statusPedido';
+import { brl, dataBR, dataHoraBR } from '../../lib/formatar';
 
-const brl = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const dataBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
-const dataHoraBR = (iso: string) =>
-  new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
 

@@ -9,13 +9,8 @@ import * as pedidosApi from '../../lib/pedidosApi';
 import type { PedidoAdminDetalhe } from '../../lib/pedidosApi';
 import { estiloStatus } from '../../lib/statusPedido';
 import { useDialogo } from '../../context/DialogoContext';
+import { brl, qtd, dataBR, dataHoraBR } from '../../lib/formatar';
 
-const brl = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const qtd = (v: number) => v.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
-const dataBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
-const dataHoraBR = (iso: string) =>
-  new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 const subtotal = (q: number, p: number) => Math.round(q * p * 100) / 100;
 
 /** Quantidade e preço de cada item (por id) num momento da revisão. */

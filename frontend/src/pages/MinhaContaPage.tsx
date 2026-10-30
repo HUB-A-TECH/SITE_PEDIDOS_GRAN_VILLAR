@@ -1,18 +1,16 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import axios from 'axios';
 import { AppLayout } from '../components/AppLayout';
 import { Aviso } from '../components/Aviso';
 import { useAuth } from '../context/AuthContext';
 import * as contaApi from '../lib/contaApi';
 import type { MinhaConta } from '../lib/contaApi';
+import { mensagemErro } from '../lib/erros';
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500';
 const botaoCls =
   'w-full rounded-lg bg-brand-600 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-60';
 
-const mensagemErro = (e: unknown, padrao: string) =>
-  axios.isAxiosError(e) && e.response?.data?.mensagem ? e.response.data.mensagem : padrao;
 
 type Resultado = { tom: 'dica' | 'erro'; texto: string } | null;
 

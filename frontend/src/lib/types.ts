@@ -19,7 +19,7 @@ export interface CategoriaItem {
   totalProdutos: number;
 }
 
-export type UnidadeMedida = 'UND' | 'KG' | 'G' | 'ML' | 'L';
+type UnidadeMedida = 'UND' | 'KG' | 'G' | 'ML' | 'L';
 
 export interface Produto {
   id: string;
@@ -76,7 +76,7 @@ export interface TabelaDetalhe {
   produtos: TabelaProduto[];
 }
 
-export interface VendedorOpcao {
+interface VendedorOpcao {
   id: string;
   nomeCompleto: string;
 }

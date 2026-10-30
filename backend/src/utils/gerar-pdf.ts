@@ -1,7 +1,5 @@
 // Gera o PDF apresentável do pedido — para o vendedor entregar ao cliente.
-import fs from 'node:fs';
 import path from 'node:path';
-import type PDFDocument from 'pdfkit';
 
 /**
  * Logo da empresa, no canto superior esquerdo da PRIMEIRA página.

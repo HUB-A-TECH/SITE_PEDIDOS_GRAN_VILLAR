@@ -1,7 +1,7 @@
 import { api } from './api';
 import type { Categoria, Produto } from './types';
 
-export interface ProdutoInput {
+interface ProdutoInput {
   codigo: string;
   nome: string;
   categoria: Categoria;
@@ -16,16 +16,6 @@ export async function listarPorMix(
 ): Promise<Produto[]> {
   const res = await api.get<{ produtos: Produto[] }>('/produtos', {
     params: { cliente_id: clienteId, categoria },
-  });
-  return res.data.produtos;
-}
-
-export async function buscarNoMix(
-  clienteId: string,
-  termo: string,
-): Promise<Produto[]> {
-  const res = await api.get<{ produtos: Produto[] }>('/produtos/buscar', {
-    params: { cliente_id: clienteId, termo },
   });
   return res.data.produtos;
 }

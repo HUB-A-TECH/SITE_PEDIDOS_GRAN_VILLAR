@@ -7,12 +7,8 @@ import * as clientesApi from '../../lib/clientesApi';
 import { LIMITE_OPCOES, type Limite } from '../../lib/types';
 import type { Cliente } from '../../lib/types';
 import { estiloStatus } from '../../lib/statusPedido';
+import { brl, dataBR, dataHoraBR } from '../../lib/formatar';
 
-const brl = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const dataBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
-const dataHoraBR = (iso: string) =>
-  new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 
 export function AdminPedidosPage() {
   const [limite, setLimite] = useState<Limite>(12);

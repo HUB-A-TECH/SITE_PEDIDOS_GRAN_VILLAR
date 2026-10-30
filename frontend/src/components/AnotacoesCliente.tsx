@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import axios from 'axios';
 import { Aviso } from './Aviso';
 import { useDialogo } from '../context/DialogoContext';
 import * as clientesApi from '../lib/clientesApi';
 import type { Anotacao } from '../lib/clientesApi';
+import { dataHoraBR } from '../lib/formatar';
+import { mensagemErro } from '../lib/erros';
 
 const LIMITE = 500;
-const dataHoraBR = (iso: string) =>
-  new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-const mensagemErro = (e: unknown, padrao: string) =>
-  axios.isAxiosError(e) && e.response?.data?.mensagem ? e.response.data.mensagem : padrao;
 
 /** Carrega as anotações do cliente (perfil e tela de pedido usam). */
 export function useAnotacoes(clienteId: string) {

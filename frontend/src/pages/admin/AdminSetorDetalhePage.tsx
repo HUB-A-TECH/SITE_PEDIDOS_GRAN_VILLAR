@@ -1,17 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Aviso } from '../../components/Aviso';
 import { useDialogo } from '../../context/DialogoContext';
 import * as setoresApi from '../../lib/setoresApi';
 import { CORES_SETOR, paleta, type CorSetor } from '../../lib/coresSetor';
 import type { ClienteDoSetor, SetorDetalhe } from '../../lib/types';
+import { mensagemErro } from '../../lib/erros';
 
 type Filtro = 'NESTE' | 'SEM' | 'TODOS';
 
-const mensagemErro = (e: unknown, padrao: string) =>
-  axios.isAxiosError(e) && e.response?.data?.mensagem ? e.response.data.mensagem : padrao;
 
 export function AdminSetorDetalhePage() {
   const { id = '' } = useParams();

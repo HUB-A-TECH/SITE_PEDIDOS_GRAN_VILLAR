@@ -9,7 +9,7 @@
  * Nenhuma das duas exige cadastro ou chave de acesso.
  */
 
-export interface EnderecoCep {
+interface EnderecoCep {
   logradouro: string;
   bairro: string;
   cidade: string;

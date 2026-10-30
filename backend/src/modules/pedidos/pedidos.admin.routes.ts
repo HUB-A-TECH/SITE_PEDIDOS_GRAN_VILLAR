@@ -11,8 +11,6 @@ pedidosAdminRoutes.use(
   authorize('ADMIN_COMERCIAL', 'ADMIN_TI'),
 );
 pedidosAdminRoutes.get('/', asyncHandler(controller.adminListar));
-pedidosAdminRoutes.get('/:id/txt', asyncHandler(controller.baixarTxt));
-pedidosAdminRoutes.get('/:id/pdf', asyncHandler(controller.baixarPdf));
 pedidosAdminRoutes.get('/:id', asyncHandler(controller.adminObterPedido));
 pedidosAdminRoutes.post('/:id/aprovar', asyncHandler(controller.adminAprovar));
 // Confirma de uma vez as alterações feitas na tela de revisão.

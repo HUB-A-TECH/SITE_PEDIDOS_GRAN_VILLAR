@@ -10,5 +10,4 @@ export const produtosRoutes = Router();
 
 produtosRoutes.use(asyncHandler(authenticate));
 produtosRoutes.get('/categorias', asyncHandler(categorias.listar));
-produtosRoutes.get('/buscar', asyncHandler(controller.buscar));
 produtosRoutes.get('/', asyncHandler(controller.listarPorMix));

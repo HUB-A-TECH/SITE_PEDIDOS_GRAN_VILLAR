@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
+import { brl } from '../lib/formatar';
 
-const brl = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 /**
  * Campo de quantidade sempre visível (sem botões Adicionar/Remover).

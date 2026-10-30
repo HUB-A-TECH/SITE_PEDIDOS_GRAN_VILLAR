@@ -4,10 +4,8 @@ import { AppLayout } from '../../components/AppLayout';
 import * as historicoApi from '../../lib/historicoApi';
 import type { PedidoHistorico } from '../../lib/historicoApi';
 import { LIMITE_OPCOES, type Limite } from '../../lib/types';
+import { brl, dataBR } from '../../lib/formatar';
 
-const brl = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const dataBR = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
 
 export function HistoricoClientePage() {
   const { clienteId = '' } = useParams();
