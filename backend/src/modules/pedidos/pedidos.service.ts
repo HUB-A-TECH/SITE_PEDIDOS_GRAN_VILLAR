@@ -21,7 +21,11 @@ const pedidoInclude = {
         },
       },
     },
-    orderBy: { produto: { nome: 'asc' } },
+    // Mesma ordem do Novo Pedido: categoria (ordem do admin) e, dentro dela, nome.
+    orderBy: [
+      { produto: { categoria: { ordem: 'asc' } } },
+      { produto: { nome: 'asc' } },
+    ] as Prisma.ItemPedidoOrderByWithRelationInput[],
   },
 } as const;
 
@@ -432,7 +436,10 @@ export function getPedidoCompleto(id: string) {
       cliente: {
         select: { codigo: true, nome: true, nomeFantasia: true, cnpj: true },
       },
-      itens: { include: { produto: true }, orderBy: { produto: { nome: 'asc' } } },
+      itens: {
+        include: { produto: true },
+        orderBy: [{ produto: { categoria: { ordem: 'asc' } } }, { produto: { nome: 'asc' } }],
+      },
     },
   });
 }

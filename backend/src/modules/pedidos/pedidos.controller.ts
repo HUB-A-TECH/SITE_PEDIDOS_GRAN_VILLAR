@@ -561,7 +561,8 @@ export async function baixarPdf(req: Request, res: Response): Promise<void> {
   res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
   // bufferPages: necessário para voltar em cada página no fim e escrever o
   // rodapé com "Página X de Y" (só aí se sabe o total).
-  const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
+  // Margem pequena: o layout (gerar-pdf.ts) usa quase a folha toda.
+  const doc = new PDFDocument({ size: 'A4', margin: 20, bufferPages: true });
   doc.pipe(res);
   desenharPedidoPdf(doc, dadosExport(pedido));
   doc.end();

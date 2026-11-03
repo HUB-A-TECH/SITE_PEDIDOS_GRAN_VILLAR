@@ -1,16 +1,22 @@
-// Gera o PDF apresentável do pedido — para o vendedor entregar ao cliente.
+// Gera o PDF do pedido — vai para o cliente e para quem separa o pedido.
+// Layout enxuto: cabeçalho compacto e tabela de linhas baixas, para caber o
+// máximo de produtos por folha (cerca de 50 numa A4).
 import path from 'node:path';
 
 /**
- * Logo da empresa, no canto superior esquerdo da PRIMEIRA página.
+ * Logo da Gran Villar, no canto direito do cabeçalho.
  *
  * É uma cópia em PNG de verdade: o arquivo do site (`frontend/public`) tem
  * extensão .png mas o conteúdo é WebP — o navegador aceita, o gerador de PDF
- * não. Se o arquivo sumir, o PDF cai no nome escrito e continua sendo gerado.
+ * não. Se o arquivo sumir, o PDF escreve o nome no lugar e continua sendo gerado.
  */
 const LOGO = path.resolve(__dirname, '../../assets/logo-gran-villar.png');
-const LOGO_LARGURA = 110;
-const LOGO_ALTURA = Math.round((LOGO_LARGURA * 270) / 505); // proporção original
+const LOGO_LARGURA = 72;
+const LOGO_ALTURA = (LOGO_LARGURA * 270) / 505; // proporção original
+
+/** Empresa que vende (os produtos são da marca Gran Villar). */
+const EMPRESA = 'PORTOBELO';
+const EMPRESA_RAZAO = 'Comércio de Produtos Alimentícios LTDA.';
 
 export interface PedidoExport {
   numeroPedido: string | null;
@@ -47,186 +53,319 @@ const qtd = (v: number) =>
 
 const dataBR = (d: Date) => d.toLocaleDateString('pt-BR');
 
-const CINZA = '#475569';
+// Cores do site (tailwind.config.js do frontend).
+const VERDE = '#1a8735'; // brand-600
+const VERDE_ESCURO = '#166d2c'; // brand-700
+const AMARELO_TEXTO = '#8a6d00'; // brandYellow-700
+const VERMELHO = '#c51f12'; // brandRed-600
 const ESCURO = '#1e293b';
+const CINZA = '#64748b';
+const LINHA = '#d4dbd6';
+const ZEBRA = '#f3f6f4';
 
-// Colunas da tabela (x inicial e largura).
-const COL = {
-  cod: { x: 50, w: 55 },
-  produto: { x: 105, w: 225 },
-  qtd: { x: 330, w: 45 },
-  un: { x: 375, w: 35 },
-  unit: { x: 410, w: 65 },
-  sub: { x: 475, w: 70 },
-};
-const DIREITA = 545;
+// ---- Página A4 (595,28 × 841,89pt) ----
+const MARGEM = 20;
+const LARGURA = 595.28 - MARGEM * 2;
+const DIREITA = MARGEM + LARGURA;
+/** Última altura utilizável pelo conteúdo; abaixo fica só o "Página X de Y". */
+const LIMITE_CONTEUDO = 818;
+const PAGINA_Y = 826;
 
-// ---- Limites verticais da página A4 (841,89pt de altura) ----
-/** Onde o conteúdo começa nas páginas seguintes à primeira. */
-const TOPO = 50;
-/** Altura do rodapé, fixa em todas as páginas. */
-const RODAPE_Y = 775;
-/**
- * Última altura utilizável pelo conteúdo. Abaixo disso começa a faixa
- * reservada ao rodapé — nada de item ou total pode invadi-la.
- */
-const LIMITE_CONTEUDO = RODAPE_Y - 20;
-/** Altura mínima de uma linha da tabela (nome de produto curto). */
-const ALTURA_LINHA_MIN = 16;
+// Colunas da tabela, da esquerda para a direita (larguras somam LARGURA).
+const COLUNAS = [
+  { chave: 'cod', titulo: 'CÓD.', w: 48, align: 'center' },
+  { chave: 'produto', titulo: 'PRODUTO', w: LARGURA - 48 - 40 - 80 - 90, align: 'left' },
+  { chave: 'qtd', titulo: 'QTD.', w: 40, align: 'center' },
+  { chave: 'unit', titulo: 'PREÇO UNIT.', w: 80, align: 'right' },
+  { chave: 'total', titulo: 'TOTAL', w: 90, align: 'right' },
+] as const;
+type Chave = (typeof COLUNAS)[number]['chave'];
+
+const ALTURA_CAB_TABELA = 16;
+const ALTURA_TOTAL = 22;
+/** Altura mínima de uma linha (nome de produto curto). */
+const ALTURA_LINHA_MIN = 13;
+const FONTE_LINHA = 8.5;
+const PAD = 5;
 
 export function desenharPedidoPdf(doc: PDFKit.PDFDocument, p: PedidoExport): void {
-  const data = p.confirmadoEm ?? p.criadoEm;
-
-  const ehRascunho = p.status === 'RASCUNHO';
-  const statusLabel = ehRascunho
-    ? 'Provisório'
-    : p.status === 'CANCELADO'
-      ? 'Cancelado'
-      : 'Confirmado';
-
-  // ---- Cabeçalho (desenhado uma vez, só na primeira página) ----
-  // A logo à esquerda; se o arquivo faltar, escreve o nome no lugar dela.
-  let baseEsquerda = 50 + LOGO_ALTURA;
-  try {
-    doc.image(LOGO, 50, 45, { width: LOGO_LARGURA });
-    baseEsquerda = 45 + LOGO_ALTURA;
-  } catch {
-    doc.fillColor(ESCURO).font('Helvetica-Bold').fontSize(22).text('GRAN VILLAR', 50, 50);
-    baseEsquerda = 78;
-  }
-  doc
-    .font('Helvetica')
-    .fontSize(10)
-    .fillColor(CINZA)
-    .text(ehRascunho ? 'Proposta de Pedido' : 'Pedido de Venda', 50, baseEsquerda + 6);
-
-  // Dados do pedido à direita: número, data, vendedor e telefone da empresa.
-  const direita = { x: 300, largura: 245 } as const;
-  doc.font('Helvetica-Bold').fontSize(11).fillColor(ESCURO);
-  doc.text(p.numeroPedido ? `Pedido ${p.numeroPedido}` : 'Proposta', direita.x, 48, {
-    width: direita.largura,
-    align: 'right',
-  });
-
-  doc.font('Helvetica').fontSize(9.5).fillColor(CINZA);
-  let yDir = 66;
-  const linhaDireita = (texto: string) => {
-    doc.text(texto, direita.x, yDir, { width: direita.largura, align: 'right' });
-    yDir += 13;
-  };
-  linhaDireita(`Data: ${dataBR(data)}`);
-  linhaDireita(`Vendedor: ${p.vendedor.nomeCompleto}`);
-  // Telefone da empresa (filial), não o do vendedor. Some se não estiver
-  // cadastrado, em vez de imprimir um rótulo vazio.
-  if (p.local.telefone) linhaDireita(`Telefone: ${p.local.telefone}`);
-  linhaDireita(`Status: ${statusLabel}`);
-
-  // Linha divisória logo abaixo do mais alto dos dois blocos.
-  const yLinha = Math.max(baseEsquerda + 22, yDir + 4);
-  doc.moveTo(50, yLinha).lineTo(DIREITA, yLinha).strokeColor('#cbd5e1').stroke();
-
-  // Dados do cliente (o vendedor agora aparece no cabeçalho, não repetir aqui)
-  let y = yLinha + 15;
-  const fantasia = p.cliente.nomeFantasia ? ` (${p.cliente.nomeFantasia})` : '';
-  doc.fillColor(ESCURO).font('Helvetica-Bold').fontSize(10).text('CLIENTE', 50, y);
-  doc.font('Helvetica').fillColor(CINZA);
-  doc.text(`[${p.cliente.codigo}] ${p.cliente.nome}${fantasia}`, 120, y);
-  y += 15;
-  if (p.cliente.cnpj) {
-    doc.font('Helvetica-Bold').fillColor(ESCURO).text('CNPJ', 50, y);
-    doc.font('Helvetica').fillColor(CINZA).text(p.cliente.cnpj, 120, y);
-    y += 15;
-  }
-  doc.font('Helvetica-Bold').fillColor(ESCURO).text('FILIAL', 50, y);
-  doc.font('Helvetica').fillColor(CINZA).text(`[${p.local.codigo}] ${p.local.nome}`, 120, y);
-  y += 25;
-
+  let y = desenharCabecalho(doc, p) + 8;
   y = desenharCabecalhoTabela(doc, y);
 
-  // Itens
-  doc.font('Helvetica').fontSize(9).fillColor(ESCURO);
-  for (const it of p.itens) {
-    // Altura real da linha: nome de produto comprido quebra em duas linhas, e
-    // avançar sempre 16 fazia a linha seguinte escrever por cima dela.
-    const alturaNome = doc.heightOfString(it.produtoNome, { width: COL.produto.w });
-    const alturaLinha = Math.max(ALTURA_LINHA_MIN, alturaNome + 5);
+  p.itens.forEach((it, i) => {
+    doc.font('Helvetica').fontSize(FONTE_LINHA);
+    const largProduto = COLUNAS[1].w - PAD * 2;
+    const alturaNome = doc.heightOfString(it.produtoNome, { width: largProduto });
+    const altura = Math.max(ALTURA_LINHA_MIN, alturaNome + 3);
 
-    if (y + alturaLinha > LIMITE_CONTEUDO) {
+    if (y + altura > LIMITE_CONTEUDO) {
       doc.addPage();
-      y = desenharCabecalhoTabela(doc, TOPO);
-      doc.font('Helvetica').fontSize(9).fillColor(ESCURO);
+      y = desenharCabecalhoTabela(doc, desenharCabecalhoContinuacao(doc, p));
     }
 
-    doc.text(it.produtoCodigo, COL.cod.x, y, { width: COL.cod.w });
-    doc.text(it.produtoNome, COL.produto.x, y, { width: COL.produto.w });
-    doc.text(qtd(it.quantidade), COL.qtd.x, y, { width: COL.qtd.w, align: 'right' });
-    doc.text(it.unidadeMedida, COL.un.x, y, { width: COL.un.w, align: 'center' });
-    doc.text(moeda(it.precoUnitario), COL.unit.x, y, { width: COL.unit.w, align: 'right' });
-    doc.text(moeda(it.subtotal), COL.sub.x, y, { width: COL.sub.w, align: 'right' });
-    y += alturaLinha;
-  }
+    desenharLinha(
+      doc,
+      y,
+      altura,
+      {
+        cod: it.produtoCodigo,
+        produto: it.produtoNome,
+        qtd: qtd(it.quantidade),
+        unit: moeda(it.precoUnitario),
+        total: moeda(it.subtotal),
+      },
+      i % 2 === 1,
+    );
+    y += altura;
+  });
 
-  // Total — não pode ficar sozinho no pé da página, nem cair fora dela.
-  if (y + 45 > LIMITE_CONTEUDO) {
+  // ---- Total e observações, logo abaixo da tabela ----
+  const obs = p.observacoes?.trim() ?? '';
+  doc.font('Helvetica').fontSize(8.5);
+  const largObs = LARGURA - 90;
+  const alturaObs = Math.max(20, obs ? doc.heightOfString(obs, { width: largObs }) + 9 : 0);
+  const alturaRodape = 4 + ALTURA_TOTAL + 4 + alturaObs;
+  if (y + alturaRodape > LIMITE_CONTEUDO) {
     doc.addPage();
-    y = TOPO;
+    y = desenharCabecalhoContinuacao(doc, p) - 4;
   }
-  doc.moveTo(330, y + 2).lineTo(DIREITA, y + 2).strokeColor('#cbd5e1').stroke();
-  y += 10;
-  doc.font('Helvetica-Bold').fontSize(12).fillColor(ESCURO);
-  doc.text('TOTAL', 330, y, { width: 100 });
-  doc.text(moeda(p.total), COL.sub.x - 60, y, { width: COL.sub.w + 60, align: 'right' });
-  y += 30;
-
-  // Observações
-  const obs = p.observacoes?.trim();
-  if (obs) {
-    doc.font('Helvetica').fontSize(10);
-    const alturaObs = doc.heightOfString(obs, { width: DIREITA - 50 }) + 25;
-    if (y + alturaObs > LIMITE_CONTEUDO) {
-      doc.addPage();
-      y = TOPO;
-    }
-    doc.font('Helvetica-Bold').fontSize(10).fillColor(ESCURO).text('Observações', 50, y);
-    doc.font('Helvetica').fontSize(10).fillColor(CINZA).text(obs, 50, y + 15, {
-      width: DIREITA - 50,
-    });
-  }
+  y += 4;
+  desenharTotal(doc, y, p);
+  y += ALTURA_TOTAL + 4;
+  desenharObservacoes(doc, y, alturaObs, obs, largObs);
 
   numerarPaginas(doc);
 }
 
-/**
- * Rodapé em todas as páginas, com "Página X de Y".
- *
- * Feito no fim porque só aqui se sabe o total de páginas. `switchToPage` volta
- * em cada uma para escrever no mesmo lugar — por isso o rodapé fica sempre na
- * mesma altura, e não colado ao fim do conteúdo.
- */
-function numerarPaginas(doc: PDFKit.PDFDocument): void {
-  const total = doc.bufferedPageRange().count;
-  const rodape = `Documento gerado em ${dataBR(new Date())} — sem valor fiscal.`;
-  for (let i = 0; i < total; i++) {
-    doc.switchToPage(i);
-    doc.font('Helvetica').fontSize(8).fillColor('#94a3b8');
-    doc.text(rodape, 50, RODAPE_Y, { width: DIREITA - 50, align: 'center' });
-    if (total > 1) {
-      doc.text(`Página ${i + 1} de ${total}`, 50, RODAPE_Y + 11, {
-        width: DIREITA - 50,
-        align: 'center',
-      });
-    }
+/** Cabeçalho completo (só na primeira página). Devolve onde ele termina. */
+function desenharCabecalho(doc: PDFKit.PDFDocument, p: PedidoExport): number {
+  const topo = MARGEM;
+  const altura = 72;
+  doc
+    .roundedRect(MARGEM, topo, LARGURA, altura, 6)
+    .lineWidth(1)
+    .strokeColor(VERDE)
+    .stroke();
+
+  // Empresa e cliente, à esquerda.
+  const xEsq = MARGEM + 12;
+  const largEsq = 205;
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(VERDE_ESCURO);
+  doc.text(EMPRESA, xEsq, topo + 8, { width: largEsq, lineBreak: false });
+  doc.font('Helvetica').fontSize(7.5).fillColor(ESCURO);
+  doc.text(EMPRESA_RAZAO, xEsq, topo + 23, { width: largEsq, lineBreak: false });
+
+  const fantasia = p.cliente.nomeFantasia?.trim();
+  const principal = fantasia || p.cliente.nome;
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(ESCURO);
+  doc.text(principal, xEsq, topo + 35, { width: largEsq, lineBreak: false, ellipsis: true });
+  if (fantasia && fantasia !== p.cliente.nome) {
+    doc.font('Helvetica').fontSize(9).fillColor(CINZA);
+    doc.text(p.cliente.nome, xEsq, topo + 54, {
+      width: largEsq,
+      lineBreak: false,
+      ellipsis: true,
+    });
   }
+
+  // Código do cliente.
+  const xCod = 240;
+  const largCod = 60;
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(CINZA);
+  doc.text('COD CLT', xCod, topo + 31, { width: largCod, align: 'center', lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(ESCURO);
+  doc.text(p.cliente.codigo, xCod, topo + 42, {
+    width: largCod,
+    align: 'center',
+    lineBreak: false,
+  });
+
+  // Número e data do pedido.
+  const xPed = 312;
+  const xValor = 380;
+  const campo = (rotulo: string, valor: string, yy: number) => {
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(CINZA);
+    doc.text(rotulo, xPed, yy + 1, { lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(ESCURO);
+    doc.text(valor, xValor, yy, { width: 85, lineBreak: false });
+  };
+  campo('Nº do Pedido:', p.numeroPedido ?? 'Proposta', topo + 25);
+  campo('Data do Pedido:', dataBR(p.confirmadoEm ?? p.criadoEm), topo + 41);
+
+  // Aviso só quando o pedido NÃO deve ser separado.
+  const aviso =
+    p.status === 'RASCUNHO'
+      ? { texto: 'PROVISÓRIO — não confirmado', cor: AMARELO_TEXTO }
+      : p.status === 'CANCELADO'
+        ? { texto: 'PEDIDO CANCELADO', cor: VERMELHO }
+        : null;
+  if (aviso) {
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(aviso.cor);
+    doc.text(aviso.texto, xPed, topo + 56, { width: 150, lineBreak: false });
+  }
+
+  // Logo, vendedor e telefone da empresa, à direita.
+  const largDir = 108;
+  const xDir = DIREITA - 12 - largDir;
+  try {
+    doc.image(LOGO, xDir + (largDir - LOGO_LARGURA) / 2, topo + 4, { width: LOGO_LARGURA });
+  } catch {
+    doc.font('Helvetica-Bold').fontSize(14).fillColor(VERDE_ESCURO);
+    doc.text('Gran Villar', xDir, topo + 18, { width: largDir, align: 'center' });
+  }
+  doc.fontSize(8).fillColor(ESCURO).font('Helvetica-Bold');
+  const rotuloVend = 'Vendedor: ';
+  const largRotulo = doc.widthOfString(rotuloVend);
+  doc.text(rotuloVend, xDir, topo + 50, { lineBreak: false });
+  doc.font('Helvetica').text(p.vendedor.nomeCompleto, xDir + largRotulo, topo + 50, {
+    width: largDir - largRotulo,
+    lineBreak: false,
+    ellipsis: true,
+  });
+  // Telefone da empresa (filial), não o do vendedor; some se não cadastrado.
+  if (p.local.telefone) {
+    doc.font('Helvetica').fontSize(8).fillColor(ESCURO);
+    doc.text(`Tel.: ${p.local.telefone}`, xDir, topo + 60, { width: largDir, lineBreak: false });
+  }
+
+  return topo + altura;
+}
+
+/** Nas páginas seguintes: uma linha só identificando o pedido. */
+function desenharCabecalhoContinuacao(doc: PDFKit.PDFDocument, p: PedidoExport): number {
+  const nome = p.cliente.nomeFantasia?.trim() || p.cliente.nome;
+  const numero = p.numeroPedido ? `Pedido ${p.numeroPedido}` : 'Proposta';
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(VERDE_ESCURO);
+  doc.text(`${numero}  ·  ${nome}  ·  COD CLT ${p.cliente.codigo}  (continuação)`, MARGEM, MARGEM, {
+    width: LARGURA,
+    lineBreak: false,
+    ellipsis: true,
+  });
+  return MARGEM + 16;
 }
 
 function desenharCabecalhoTabela(doc: PDFKit.PDFDocument, y: number): number {
-  doc.rect(50, y - 2, DIREITA - 50, 18).fill('#e2e8f0');
-  doc.fillColor(ESCURO).font('Helvetica-Bold').fontSize(9);
-  doc.text('CÓD', COL.cod.x, y + 2, { width: COL.cod.w });
-  doc.text('PRODUTO', COL.produto.x, y + 2, { width: COL.produto.w });
-  doc.text('QTD', COL.qtd.x, y + 2, { width: COL.qtd.w, align: 'right' });
-  doc.text('UN', COL.un.x, y + 2, { width: COL.un.w, align: 'center' });
-  doc.text('UNIT', COL.unit.x, y + 2, { width: COL.unit.w, align: 'right' });
-  doc.text('SUBTOTAL', COL.sub.x, y + 2, { width: COL.sub.w, align: 'right' });
-  return y + 24;
+  doc.rect(MARGEM, y, LARGURA, ALTURA_CAB_TABELA).fill(VERDE_ESCURO);
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
+  let x = MARGEM;
+  for (const c of COLUNAS) {
+    doc.text(c.titulo, x + PAD, y + 4.5, {
+      width: c.w - PAD * 2,
+      align: c.align === 'left' ? 'left' : 'center',
+      lineBreak: false,
+    });
+    x += c.w;
+  }
+  return y + ALTURA_CAB_TABELA;
+}
+
+function desenharLinha(
+  doc: PDFKit.PDFDocument,
+  y: number,
+  altura: number,
+  valores: Record<Chave, string>,
+  zebra: boolean,
+): void {
+  if (zebra) doc.rect(MARGEM, y, LARGURA, altura).fill(ZEBRA);
+
+  // Grade fina: borda da linha e divisões das colunas.
+  doc.lineWidth(0.5).strokeColor(LINHA);
+  doc.rect(MARGEM, y, LARGURA, altura).stroke();
+  let x = MARGEM;
+  for (const c of COLUNAS.slice(0, -1)) {
+    x += c.w;
+    doc.moveTo(x, y).lineTo(x, y + altura).stroke();
+  }
+
+  x = MARGEM;
+  const yTexto = y + (ALTURA_LINHA_MIN - FONTE_LINHA) / 2 + 0.5;
+  for (const c of COLUNAS) {
+    // Quantidade em negrito: é o número que quem separa mais procura.
+    doc
+      .font(c.chave === 'qtd' ? 'Helvetica-Bold' : 'Helvetica')
+      .fontSize(FONTE_LINHA)
+      .fillColor(ESCURO);
+    doc.text(valores[c.chave], x + PAD, yTexto, {
+      width: c.w - PAD * 2,
+      align: c.align,
+      lineBreak: c.chave === 'produto',
+    });
+    x += c.w;
+  }
+}
+
+function desenharTotal(doc: PDFKit.PDFDocument, y: number, p: PedidoExport): void {
+  const altura = ALTURA_TOTAL;
+  const largValor = 130;
+  doc.lineWidth(1).strokeColor(VERDE_ESCURO);
+  doc.rect(MARGEM, y, LARGURA, altura).stroke();
+  doc.rect(DIREITA - largValor, y, largValor, altura).fill(VERDE_ESCURO);
+
+  const qtdItens = p.itens.length;
+  doc.font('Helvetica').fontSize(8.5).fillColor(CINZA);
+  doc.text(`${qtdItens} ${qtdItens === 1 ? 'item' : 'itens'}`, MARGEM + 10, y + 7, {
+    lineBreak: false,
+  });
+
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(ESCURO);
+  doc.text('TOTAL DO PEDIDO', MARGEM, y + 6, {
+    width: LARGURA - largValor - 12,
+    align: 'right',
+    lineBreak: false,
+  });
+  doc.font('Helvetica-Bold').fontSize(13).fillColor('#ffffff');
+  doc.text(moeda(p.total), DIREITA - largValor, y + 5, {
+    width: largValor - 10,
+    align: 'right',
+    lineBreak: false,
+  });
+}
+
+/** Sempre aparece: com o texto do pedido, ou com uma linha para escrever à mão. */
+function desenharObservacoes(
+  doc: PDFKit.PDFDocument,
+  y: number,
+  altura: number,
+  obs: string,
+  largObs: number,
+): void {
+  doc.lineWidth(1).strokeColor(VERDE_ESCURO);
+  doc.roundedRect(MARGEM, y, LARGURA, altura, 4).stroke();
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(ESCURO);
+  doc.text('OBSERVAÇÕES:', MARGEM + 10, y + 6, { lineBreak: false });
+
+  const xTexto = DIREITA - largObs - 10;
+  if (obs) {
+    doc.font('Helvetica').fontSize(8.5).fillColor(ESCURO);
+    doc.text(obs, xTexto, y + 5.5, { width: largObs });
+  } else {
+    doc
+      .lineWidth(0.5)
+      .strokeColor(LINHA)
+      .moveTo(xTexto, y + 14)
+      .lineTo(DIREITA - 10, y + 14)
+      .stroke();
+  }
+}
+
+/**
+ * "Página X de Y" no pé de cada página, quando houver mais de uma.
+ *
+ * Feito no fim porque só aqui se sabe o total de páginas. `switchToPage` volta
+ * em cada uma para escrever no mesmo lugar.
+ */
+function numerarPaginas(doc: PDFKit.PDFDocument): void {
+  const total = doc.bufferedPageRange().count;
+  if (total < 2) return;
+  for (let i = 0; i < total; i++) {
+    doc.switchToPage(i);
+    // O número fica abaixo da margem; sem isto o PDFKit abriria outra página.
+    doc.page.margins.bottom = 0;
+    doc.font('Helvetica').fontSize(7).fillColor('#94a3b8');
+    doc.text(`Página ${i + 1} de ${total}`, MARGEM, PAGINA_Y, {
+      width: LARGURA,
+      align: 'center',
+      lineBreak: false,
+    });
+  }
 }
