@@ -60,8 +60,8 @@ const AMARELO_TEXTO = '#8a6d00'; // brandYellow-700
 const VERMELHO = '#c51f12'; // brandRed-600
 const ESCURO = '#1e293b';
 const CINZA = '#64748b';
-const LINHA = '#d4dbd6';
-const ZEBRA = '#f3f6f4';
+const LINHA = '#9fb2a5'; // grade da tabela: escura o bastante para separar bem
+const ZEBRA = '#e0f2e4'; // verde clarinho (entre brand-50 e brand-100)
 
 // ---- Página A4 (595,28 × 841,89pt) ----
 const MARGEM = 20;
@@ -149,28 +149,27 @@ function desenharCabecalho(doc: PDFKit.PDFDocument, p: PedidoExport): number {
 
   // Empresa e cliente, à esquerda.
   const xEsq = MARGEM + 12;
-  const largEsq = 205;
+  const largEsq = 212;
   doc.font('Helvetica-Bold').fontSize(13).fillColor(VERDE_ESCURO);
   doc.text(EMPRESA, xEsq, topo + 8, { width: largEsq, lineBreak: false });
   doc.font('Helvetica').fontSize(7.5).fillColor(ESCURO);
   doc.text(EMPRESA_RAZAO, xEsq, topo + 23, { width: largEsq, lineBreak: false });
 
+  // Nome fantasia grande e o outro nome pequeno embaixo. Cada um fica numa
+  // linha só: nome comprido diminui a letra (no limite, é cortado com "…"),
+  // em vez de quebrar e cair por cima do outro.
   const fantasia = p.cliente.nomeFantasia?.trim();
   const principal = fantasia || p.cliente.nome;
-  doc.font('Helvetica-Bold').fontSize(16).fillColor(ESCURO);
-  doc.text(principal, xEsq, topo + 35, { width: largEsq, lineBreak: false, ellipsis: true });
+  doc.font('Helvetica-Bold').fillColor(ESCURO);
+  umaLinha(doc, principal, xEsq, topo + 35, largEsq, 16, 10);
   if (fantasia && fantasia !== p.cliente.nome) {
-    doc.font('Helvetica').fontSize(9).fillColor(CINZA);
-    doc.text(p.cliente.nome, xEsq, topo + 54, {
-      width: largEsq,
-      lineBreak: false,
-      ellipsis: true,
-    });
+    doc.font('Helvetica').fillColor(CINZA);
+    umaLinha(doc, p.cliente.nome, xEsq, topo + 55, largEsq, 8.5, 6.5);
   }
 
   // Código do cliente.
-  const xCod = 240;
-  const largCod = 60;
+  const xCod = 250;
+  const largCod = 56;
   doc.font('Helvetica-Bold').fontSize(7.5).fillColor(CINZA);
   doc.text('COD CLT', xCod, topo + 31, { width: largCod, align: 'center', lineBreak: false });
   doc.font('Helvetica-Bold').fontSize(12).fillColor(ESCURO);
@@ -217,11 +216,15 @@ function desenharCabecalho(doc: PDFKit.PDFDocument, p: PedidoExport): number {
   const rotuloVend = 'Vendedor: ';
   const largRotulo = doc.widthOfString(rotuloVend);
   doc.text(rotuloVend, xDir, topo + 50, { lineBreak: false });
-  doc.font('Helvetica').text(p.vendedor.nomeCompleto, xDir + largRotulo, topo + 50, {
-    width: largDir - largRotulo,
-    lineBreak: false,
-    ellipsis: true,
-  });
+  // Nome comprido: fica só o primeiro e o último antes de diminuir a letra.
+  doc.font('Helvetica').fontSize(8);
+  const largVend = largDir - largRotulo;
+  const partes = p.vendedor.nomeCompleto.trim().split(/\s+/);
+  const vendedor =
+    doc.widthOfString(p.vendedor.nomeCompleto) > largVend && partes.length > 2
+      ? `${partes[0]} ${partes[partes.length - 1]}`
+      : p.vendedor.nomeCompleto;
+  umaLinha(doc, vendedor, xDir + largRotulo, topo + 50, largVend, 8, 7);
   // Telefone da empresa (filial), não o do vendedor; some se não cadastrado.
   if (p.local.telefone) {
     doc.font('Helvetica').fontSize(8).fillColor(ESCURO);
@@ -231,16 +234,42 @@ function desenharCabecalho(doc: PDFKit.PDFDocument, p: PedidoExport): number {
   return topo + altura;
 }
 
+/**
+ * Escreve `texto` numa linha só, dentro de `largura`: começa em `max` pt e
+ * diminui até `min`; se ainda não couber, corta com "…". A família e a cor da
+ * fonte já devem estar escolhidas. O texto menor fica centralizado na altura
+ * que o maior ocuparia, para não desalinhar o resto do cabeçalho.
+ */
+function umaLinha(
+  doc: PDFKit.PDFDocument,
+  texto: string,
+  x: number,
+  y: number,
+  largura: number,
+  max: number,
+  min: number,
+): void {
+  let tamanho = max;
+  doc.fontSize(tamanho);
+  while (tamanho > min && doc.widthOfString(texto) > largura) {
+    tamanho -= 0.5;
+    doc.fontSize(tamanho);
+  }
+  let final = texto;
+  if (doc.widthOfString(texto) > largura) {
+    while (final.length > 1 && doc.widthOfString(final + '…') > largura) final = final.slice(0, -1);
+    final = final.trimEnd() + '…';
+  }
+  doc.text(final, x, y + (max - tamanho) / 2, { lineBreak: false });
+}
+
 /** Nas páginas seguintes: uma linha só identificando o pedido. */
 function desenharCabecalhoContinuacao(doc: PDFKit.PDFDocument, p: PedidoExport): number {
   const nome = p.cliente.nomeFantasia?.trim() || p.cliente.nome;
   const numero = p.numeroPedido ? `Pedido ${p.numeroPedido}` : 'Proposta';
-  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(VERDE_ESCURO);
-  doc.text(`${numero}  ·  ${nome}  ·  COD CLT ${p.cliente.codigo}  (continuação)`, MARGEM, MARGEM, {
-    width: LARGURA,
-    lineBreak: false,
-    ellipsis: true,
-  });
+  doc.font('Helvetica-Bold').fillColor(VERDE_ESCURO);
+  const linha = `${numero}  ·  ${nome}  ·  COD CLT ${p.cliente.codigo}  (continuação)`;
+  umaLinha(doc, linha, MARGEM, MARGEM, LARGURA, 8.5, 7);
   return MARGEM + 16;
 }
 
@@ -269,7 +298,7 @@ function desenharLinha(
   if (zebra) doc.rect(MARGEM, y, LARGURA, altura).fill(ZEBRA);
 
   // Grade fina: borda da linha e divisões das colunas.
-  doc.lineWidth(0.5).strokeColor(LINHA);
+  doc.lineWidth(0.7).strokeColor(LINHA);
   doc.rect(MARGEM, y, LARGURA, altura).stroke();
   let x = MARGEM;
   for (const c of COLUNAS.slice(0, -1)) {
