@@ -21,7 +21,9 @@ interface ItemMenu {
 }
 
 export function DashboardPage() {
-  const { usuario } = useAuth();
+  const { usuario, trocarModo } = useAuth();
+  const [trocando, setTrocando] = useState(false);
+  const [erroTroca, setErroTroca] = useState('');
   // Pedidos salvos que ainda não foram enviados. Mostrado aqui para o vendedor
   // não esquecer de confirmar — antes disso, a administração não os vê.
   const [aConfirmar, setAConfirmar] = useState(0);
@@ -69,7 +71,7 @@ export function DashboardPage() {
               },
               {
                 titulo: 'Usuários',
-                desc: 'Cadastrar administradores e vendedores',
+                desc: 'Cadastrar pessoas e escolher o perfil de cada uma',
                 to: '/admin/usuarios',
               },
             ]
@@ -95,6 +97,48 @@ export function DashboardPage() {
 
   return (
     <AppLayout titulo={`Gran Villar · ${TIPO_LABEL[usuario.type]}`}>
+      {usuario.modos && usuario.modos.length > 1 && (
+        <div className="mb-4 rounded-xl bg-white p-3 shadow-sm">
+          <p className="mb-2 text-sm font-medium text-slate-700">Estou trabalhando como</p>
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Modo de trabalho">
+            {usuario.modos.map((modo) => {
+              const ativo = modo === usuario.type;
+              return (
+                <button
+                  key={modo}
+                  type="button"
+                  aria-pressed={ativo}
+                  disabled={trocando}
+                  onClick={async () => {
+                    if (ativo) return;
+                    setErroTroca('');
+                    setTrocando(true);
+                    try {
+                      await trocarModo(modo);
+                    } catch {
+                      setErroTroca('Não foi possível trocar agora. Tente de novo.');
+                    } finally {
+                      setTrocando(false);
+                    }
+                  }}
+                  className={`rounded-lg py-2.5 text-sm font-semibold transition disabled:opacity-60 ${
+                    ativo
+                      ? 'bg-brand-600 text-white'
+                      : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {modo === 'VENDEDOR' ? 'Vendedor' : 'Comercial'}
+                </button>
+              );
+            })}
+          </div>
+          {erroTroca && (
+            <Aviso tom="erro" compacto className="mt-2">
+              {erroTroca}
+            </Aviso>
+          )}
+        </div>
+      )}
       {alteracoes > 0 && (
         <Link to="/meus-pedidos" className="mb-4 block">
           <Aviso

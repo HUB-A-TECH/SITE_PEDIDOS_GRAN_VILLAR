@@ -1,6 +1,8 @@
 import { prisma } from '../../lib/prisma';
 import { verifyPassword } from '../../utils/password';
 import { signToken } from '../../utils/jwt';
+import { modosDaConta } from '../../lib/perfil';
+import type { UserType } from '@prisma/client';
 
 export interface LoginResult {
   token: string;
@@ -9,6 +11,38 @@ export interface LoginResult {
     username: string;
     type: string;
     localId: string | null;
+    modos: string[];
+  };
+}
+
+const sessaoSelect = {
+  id: true,
+  username: true,
+  type: true,
+  localId: true,
+  vendedor: { select: { ativo: true } },
+} as const;
+
+type ContaSessao = {
+  id: string;
+  username: string;
+  type: UserType;
+  localId: string | null;
+  vendedor: { ativo: boolean } | null;
+};
+
+/**
+ * Usuário como o site guarda. `type` é o MODO em que a sessão está (para quem é
+ * Comercial + Vendedor muda com o botão); `modos` diz para quais ele pode trocar.
+ */
+export function usuarioSessao(conta: ContaSessao, modo?: string) {
+  const modos = modosDaConta(conta.type, Boolean(conta.vendedor?.ativo));
+  return {
+    id: conta.id,
+    username: conta.username,
+    type: modo && (modos as string[]).includes(modo) ? modo : modos[0],
+    localId: conta.localId,
+    modos,
   };
 }
 
@@ -21,7 +55,10 @@ export async function login(
   username: string,
   password: string,
 ): Promise<LoginResult | null> {
-  const user = await prisma.user.findUnique({ where: { username } });
+  const user = await prisma.user.findUnique({
+    where: { username },
+    select: { ...sessaoSelect, passwordHash: true, ativo: true },
+  });
   const senhaOk = await verifyPassword(password, user?.passwordHash ?? HASH_FALSO);
   if (!user || !user.ativo || !senhaOk) {
     return null;
@@ -32,29 +69,13 @@ export async function login(
     data: { ultimoAcesso: new Date() },
   });
 
-  const { token } = signToken({
-    id: user.id,
-    username: user.username,
-    type: user.type,
-    localId: user.localId,
-  });
-
-  return {
-    token,
-    usuario: {
-      id: user.id,
-      username: user.username,
-      type: user.type,
-      localId: user.localId,
-    },
-  };
+  const usuario = usuarioSessao(user);
+  const { token } = signToken(usuario);
+  return { token, usuario };
 }
 
 export function getUsuarioSessao(id: string) {
-  return prisma.user.findUnique({
-    where: { id },
-    select: { id: true, username: true, type: true, localId: true },
-  });
+  return prisma.user.findUnique({ where: { id }, select: sessaoSelect });
 }
 
 export async function revokeToken(

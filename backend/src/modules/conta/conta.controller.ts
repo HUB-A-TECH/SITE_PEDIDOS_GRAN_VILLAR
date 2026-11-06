@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import * as service from './conta.service';
 import { cookieOptions } from '../auth/auth.controller';
+import { usuarioSessao } from '../auth/auth.service';
 import { COOKIE_NAME } from '../../middleware/auth';
 import { signToken } from '../../utils/jwt';
 import { isUniqueConstraintError } from '../../utils/prisma-errors';
@@ -24,17 +25,9 @@ function serialize(c: Conta) {
   };
 }
 
-/** Usuário como o AuthContext do site guarda (mesmo formato do login). */
-const usuarioSessao = (c: Conta) => ({
-  id: c.id,
-  username: c.username,
-  type: c.type,
-  localId: c.localId,
-});
-
-/** Emite um token novo para esta sessão (com o usuário atualizado). */
-function renovarSessao(res: Response, c: Conta) {
-  const { token } = signToken(usuarioSessao(c));
+/** Emite um token novo para esta sessão (com o usuário atualizado, no mesmo modo). */
+function renovarSessao(req: Request, res: Response, c: Conta) {
+  const { token } = signToken(usuarioSessao(c, req.user!.type));
   res.cookie(COOKIE_NAME, token, cookieOptions);
 }
 
@@ -128,8 +121,8 @@ export async function trocarUsuario(req: Request, res: Response): Promise<void> 
   const conta = await contaOu404(req, res);
   if (!conta) return;
   // O usuário vai dentro do token da sessão: emite um novo com o nome novo.
-  renovarSessao(res, conta);
-  res.json({ ...serialize(conta), usuario: usuarioSessao(conta) });
+  renovarSessao(req, res, conta);
+  res.json({ ...serialize(conta), usuario: usuarioSessao(conta, req.user!.type) });
 }
 
 const senhaSchema = z
@@ -153,6 +146,6 @@ export async function trocarSenha(req: Request, res: Response): Promise<void> {
   if (!conta) return;
   // A troca derruba todas as sessões antigas — inclusive o token desta. Este
   // aparelho recebe um token novo e continua conectado; os outros caem.
-  renovarSessao(res, conta);
+  renovarSessao(req, res, conta);
   res.json({ mensagem: 'Senha alterada. Os outros aparelhos foram desconectados.' });
 }

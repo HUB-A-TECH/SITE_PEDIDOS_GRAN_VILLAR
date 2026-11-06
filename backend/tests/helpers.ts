@@ -62,8 +62,10 @@ const criadosUsuarios: string[] = [];
 
 export async function criarUsuarioTemporario(
   sufixo: string,
-  type: 'VENDEDOR' | 'ADMIN_COMERCIAL' | 'ADMIN_TI',
+  perfil: 'VENDEDOR' | 'ADMIN_COMERCIAL' | 'ADMIN_TI' | 'COMERCIAL_VENDEDOR',
 ) {
+  const type = perfil === 'COMERCIAL_VENDEDOR' ? 'ADMIN_COMERCIAL' : perfil;
+  const vende = perfil === 'VENDEDOR' || perfil === 'COMERCIAL_VENDEDOR';
   const username = `TESTE_zz_${sufixo}`;
   const vendedor2 = await prisma.vendedor.findFirst({ where: { usuario: { username: 'vendedor2' } } });
   const user = await prisma.user.create({
@@ -72,8 +74,8 @@ export async function criarUsuarioTemporario(
       email: `${username.toLowerCase()}@teste.invalid`,
       passwordHash: await bcrypt.hash(SENHA_TESTE, 4),
       type,
-      localId: type === 'VENDEDOR' ? vendedor2!.localId : null,
-      ...(type === 'VENDEDOR'
+      localId: vende ? vendedor2!.localId : null,
+      ...(vende
         ? { vendedor: { create: { nomeCompleto: `Teste ${sufixo}`, localId: vendedor2!.localId } } }
         : {}),
     },

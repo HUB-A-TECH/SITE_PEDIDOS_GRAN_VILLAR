@@ -9,3 +9,8 @@ export const authRoutes = Router();
 authRoutes.post('/login', limiteLogin, asyncHandler(authController.login));
 authRoutes.post('/logout', asyncHandler(authController.logout));
 authRoutes.get('/me', asyncHandler(authenticate), asyncHandler(authController.me));
+authRoutes.post(
+  '/modo',
+  asyncHandler(authenticate),
+  asyncHandler(authController.trocarModo),
+);

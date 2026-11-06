@@ -5,24 +5,104 @@ import { Modal } from '../../components/Modal';
 import { Aviso } from '../../components/Aviso';
 import { useDialogo } from '../../context/DialogoContext';
 import * as usuariosApi from '../../lib/usuariosApi';
-import type { Usuario } from '../../lib/usuariosApi';
+import type { Perfil, Usuario } from '../../lib/usuariosApi';
 import { listarLocais } from '../../lib/clientesApi';
-import type { Local, UserType } from '../../lib/types';
+import type { Local } from '../../lib/types';
+import { useAuth } from '../../context/AuthContext';
 
-const TIPO_LABEL: Record<UserType, string> = {
+const PERFIL_LABEL: Record<Perfil, string> = {
   VENDEDOR: 'Vendedor',
-  ADMIN_COMERCIAL: 'Admin Comercial',
+  ADMIN_COMERCIAL: 'Comercial',
+  COMERCIAL_VENDEDOR: 'Comercial + Vendedor',
   ADMIN_TI: 'Admin TI',
 };
 
-const TIPO_COR: Record<UserType, string> = {
+const PERFIL_COR: Record<Perfil, string> = {
   VENDEDOR: 'bg-brand-100 text-brand-800',
   ADMIN_COMERCIAL: 'bg-amber-100 text-amber-800',
+  COMERCIAL_VENDEDOR: 'bg-sky-100 text-sky-800',
   ADMIN_TI: 'bg-slate-200 text-slate-700',
 };
 
+const PERFIL_DESC: Record<Perfil, string> = {
+  VENDEDOR: 'Faz pedidos dos clientes do setor dele.',
+  ADMIN_COMERCIAL: 'Aprova pedidos, cuida de clientes, produtos e preços.',
+  COMERCIAL_VENDEDOR:
+    'Uma conta só para as duas funções: troca entre Comercial e Vendedor por um botão na tela inicial.',
+  ADMIN_TI: 'Acesso total, inclusive usuários e dados da empresa.',
+};
+
+const vende = (p: Perfil) => p === 'VENDEDOR' || p === 'COMERCIAL_VENDEDOR';
+
+/** Botões de escolha do perfil (um aceso por vez). */
+function EscolhaPerfil({
+  opcoes,
+  valor,
+  onChange,
+}: {
+  opcoes: Perfil[];
+  valor: Perfil;
+  onChange: (p: Perfil) => void;
+}) {
+  return (
+    <div>
+      <p className="mb-1 block text-sm font-medium text-slate-700">Perfil</p>
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Perfil">
+        {opcoes.map((p) => {
+          const ativo = p === valor;
+          return (
+            <button
+              key={p}
+              type="button"
+              role="radio"
+              aria-checked={ativo}
+              onClick={() => onChange(p)}
+              className={`rounded-lg px-2 py-2 text-sm font-semibold transition ${
+                ativo
+                  ? 'bg-brand-600 text-white'
+                  : 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {PERFIL_LABEL[p]}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-xs text-slate-500">{PERFIL_DESC[valor]}</p>
+    </div>
+  );
+}
+
+function SeletorFilial({
+  locais,
+  valor,
+  onChange,
+}: {
+  locais: Local[];
+  valor: string;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-slate-700">Filial</label>
+      <select
+        value={valor}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 outline-none focus:border-brand-500"
+      >
+        <option value="">Selecione…</option>
+        {locais.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.nome}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 const FORM_VAZIO = {
-  tipo: 'VENDEDOR' as UserType,
+  perfil: 'VENDEDOR' as Perfil,
   username: '',
   email: '',
   senha: '',
@@ -64,15 +144,15 @@ export function AdminUsuariosPage() {
 
   async function salvar() {
     setErro('');
-    const ehVendedor = form.tipo === 'VENDEDOR';
+    const ehVendedor = vende(form.perfil);
     if (ehVendedor && (!form.nomeCompleto.trim() || !form.localId)) {
-      setErro('Para vendedor, informe o nome completo e a filial.');
+      setErro('Para quem vende, informe o nome completo e a filial.');
       return;
     }
     setSalvando(true);
     try {
       await usuariosApi.criarUsuario({
-        tipo: form.tipo,
+        perfil: form.perfil,
         username: form.username.trim(),
         email: form.email.trim(),
         senha: form.senha,
@@ -157,7 +237,7 @@ export function AdminUsuariosPage() {
     }
   }
 
-  const ehVendedor = form.tipo === 'VENDEDOR';
+  const ehVendedor = vende(form.perfil);
 
   return (
     <AppLayout titulo="Usuários" voltarPara="/">
@@ -180,8 +260,8 @@ export function AdminUsuariosPage() {
                     <p className="font-semibold text-slate-800">
                       {u.vendedor?.nomeCompleto ?? u.username}
                     </p>
-                    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${TIPO_COR[u.type]}`}>
-                      {TIPO_LABEL[u.type]}
+                    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${PERFIL_COR[u.perfil]}`}>
+                      {PERFIL_LABEL[u.perfil]}
                     </span>
                     {!u.ativo && (
                       <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
@@ -232,6 +312,7 @@ export function AdminUsuariosPage() {
         {editando && (
           <EditarUsuarioForm
             usuario={editando}
+            locais={locais}
             onSalvar={() => {
               setEditando(null);
               carregar();
@@ -242,18 +323,11 @@ export function AdminUsuariosPage() {
 
       <Modal titulo="Novo usuário" aberto={modalAberto} onFechar={() => setModalAberto(false)}>
         <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Tipo</label>
-            <select
-              value={form.tipo}
-              onChange={(e) => setForm({ ...form, tipo: e.target.value as UserType })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 outline-none focus:border-brand-500"
-            >
-              <option value="VENDEDOR">Vendedor</option>
-              <option value="ADMIN_COMERCIAL">Admin Comercial</option>
-              <option value="ADMIN_TI">Admin TI</option>
-            </select>
-          </div>
+          <EscolhaPerfil
+            opcoes={['VENDEDOR', 'ADMIN_COMERCIAL', 'COMERCIAL_VENDEDOR', 'ADMIN_TI']}
+            valor={form.perfil}
+            onChange={(perfil) => setForm({ ...form, perfil })}
+          />
 
           {ehVendedor && (
             <>
@@ -262,21 +336,11 @@ export function AdminUsuariosPage() {
                 value={form.nomeCompleto}
                 onChange={(v) => setForm({ ...form, nomeCompleto: v })}
               />
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Filial</label>
-                <select
-                  value={form.localId}
-                  onChange={(e) => setForm({ ...form, localId: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 outline-none focus:border-brand-500"
-                >
-                  <option value="">Selecione…</option>
-                  {locais.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SeletorFilial
+                locais={locais}
+                valor={form.localId}
+                onChange={(localId) => setForm({ ...form, localId })}
+              />
             </>
           )}
 
@@ -344,40 +408,77 @@ function Campo({
 /**
  * Correção de dados de quem já está cadastrado.
  *
- * Nome e telefone existem só para vendedor (ficam no cadastro de vendedor).
- * Usuário, perfil e filial ficam de fora de propósito: mudar o usuário tira o
- * acesso da pessoa sem avisar, e mudar o perfil mexe na carteira de clientes e
- * no histórico de pedidos — cada um desses precisa de tratamento próprio.
+ * O perfil pode mudar entre Vendedor, Comercial e Comercial + Vendedor — assim
+ * quem usava uma senha compartilhada passa a ter a própria conta com as duas
+ * funções, sem perder pedidos nem carteira. Admin TI fica de fora (e ninguém
+ * muda o próprio perfil). Usuário de entrada e filial não mudam por aqui.
  */
 function EditarUsuarioForm({
   usuario,
+  locais,
   onSalvar,
 }: {
   usuario: Usuario;
+  locais: Local[];
   onSalvar: () => void;
 }) {
-  const ehVendedor = usuario.type === 'VENDEDOR';
+  const { usuario: eu } = useAuth();
+  const podeMudarPerfil = usuario.perfil !== 'ADMIN_TI' && usuario.id !== eu?.id;
+  const [perfil, setPerfil] = useState<Perfil>(usuario.perfil);
+  const ehVendedor = vende(perfil);
+  // Já teve cadastro de vendedor (mesmo inativo): nome e filial já existem.
+  const temCadastroVendedor = usuario.vendedor !== null;
   const [email, setEmail] = useState(usuario.email);
   const [nomeCompleto, setNomeCompleto] = useState(
     usuario.vendedor?.nomeCompleto ?? '',
   );
   const [telefone, setTelefone] = useState(usuario.vendedor?.telefone ?? '');
+  const [localId, setLocalId] = useState(usuario.local?.id ?? locais[0]?.id ?? '');
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const dialogo = useDialogo();
 
   async function enviar(e: FormEvent) {
     e.preventDefault();
     setErro('');
     if (ehVendedor && !nomeCompleto.trim()) {
-      setErro('O nome completo é obrigatório para vendedor.');
+      setErro('O nome completo é obrigatório para quem vende.');
       return;
+    }
+    if (ehVendedor && !temCadastroVendedor && !localId) {
+      setErro('Escolha a filial de quem vai vender.');
+      return;
+    }
+    const mudouPerfil = perfil !== usuario.perfil;
+    if (mudouPerfil) {
+      const ok = await dialogo.confirmar({
+        titulo: 'Mudar perfil',
+        textoConfirmar: 'Mudar',
+        mensagem: (
+          <>
+            <strong>{usuario.username}</strong> passa de{' '}
+            <strong>{PERFIL_LABEL[usuario.perfil]}</strong> para{' '}
+            <strong>{PERFIL_LABEL[perfil]}</strong>. Se estiver usando o sistema
+            agora, vai precisar entrar de novo.
+          </>
+        ),
+      });
+      if (!ok) return;
     }
     setSalvando(true);
     try {
+      if (mudouPerfil) {
+        await usuariosApi.mudarPerfil(usuario.id, {
+          perfil: perfil as Exclude<Perfil, 'ADMIN_TI'>,
+          ...(ehVendedor && !temCadastroVendedor
+            ? { nomeCompleto: nomeCompleto.trim(), localId }
+            : {}),
+        });
+      }
       await usuariosApi.atualizarUsuario(usuario.id, {
         email: email.trim(),
-        ...(ehVendedor
-          ? { nomeCompleto: nomeCompleto.trim(), telefone: telefone.trim() }
+        ...(ehVendedor || temCadastroVendedor
+          ? { nomeCompleto: nomeCompleto.trim() || undefined, telefone: telefone.trim() }
           : {}),
       });
       onSalvar();
@@ -394,10 +495,19 @@ function EditarUsuarioForm({
 
   return (
     <form onSubmit={enviar} className="space-y-3">
-      <Aviso compacto>
-        Nome de usuário, perfil e filial não mudam por aqui. Para trocar a
-        senha, use <strong>Resetar senha</strong>.
-      </Aviso>
+      {podeMudarPerfil ? (
+        <EscolhaPerfil
+          opcoes={['VENDEDOR', 'ADMIN_COMERCIAL', 'COMERCIAL_VENDEDOR']}
+          valor={perfil}
+          onChange={setPerfil}
+        />
+      ) : (
+        <Aviso compacto>
+          {usuario.id === eu?.id
+            ? 'Você não pode mudar o próprio perfil.'
+            : 'O perfil de Admin TI não muda por aqui.'}
+        </Aviso>
+      )}
 
       {ehVendedor && (
         <>
@@ -407,9 +517,17 @@ function EditarUsuarioForm({
             onChange={setNomeCompleto}
           />
           <Campo label="Telefone" value={telefone} onChange={setTelefone} />
+          {!temCadastroVendedor && (
+            <SeletorFilial locais={locais} valor={localId} onChange={setLocalId} />
+          )}
         </>
       )}
       <Campo label="E-mail" value={email} onChange={setEmail} type="email" />
+
+      <p className="text-xs text-slate-500">
+        Nome de usuário e filial não mudam por aqui. Para trocar a senha, use{' '}
+        <strong>Resetar senha</strong>.
+      </p>
 
       {erro && (
         <Aviso tom="erro" compacto>
