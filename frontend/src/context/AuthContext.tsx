@@ -21,8 +21,11 @@ declare global {
 export interface Usuario {
   id: string;
   username: string;
+  /** Modo em que a sessão está agora (quem é Comercial + Vendedor troca pelo botão). */
   type: UserType;
   localId: string | null;
+  /** Modos que a conta pode usar. Mais de um = mostra o botão de troca. */
+  modos?: UserType[];
 }
 
 interface AuthContextType {
@@ -32,6 +35,8 @@ interface AuthContextType {
   logout: () => Promise<void>;
   /** Atualiza o usuário na tela (ex.: trocou o nome de usuário em Minha Conta). */
   atualizarUsuario: (u: Usuario) => void;
+  /** Comercial + Vendedor: passa a sessão para o outro modo. */
+  trocarModo: (modo: UserType) => Promise<void>;
   /** Por que a sessão caiu sozinha (senha trocada em outro aparelho etc.). */
   avisoSaida: string | null;
 }
@@ -121,6 +126,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(res.data.usuario);
   }
 
+  async function trocarModo(modo: UserType) {
+    const res = await api.post<{ usuario: Usuario }>('/auth/modo', { modo });
+    setUsuario(res.data.usuario);
+  }
+
   async function logout() {
     await api.post('/auth/logout');
     setAvisoSaida(null);
@@ -129,7 +139,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ usuario, carregando, login, logout, atualizarUsuario: setUsuario, avisoSaida }}
+      value={{
+        usuario,
+        carregando,
+        login,
+        logout,
+        atualizarUsuario: setUsuario,
+        trocarModo,
+        avisoSaida,
+      }}
     >
       {children}
     </AuthContext.Provider>

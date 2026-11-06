@@ -10,8 +10,24 @@ cliente no celular; a administração (comercial e TI) acompanha, revisa e aprov
   histórico de compras, escreve anotações de visita, envia o pedido e baixa PDF/TXT.
 - **Admin Comercial:** vê e revisa os pedidos enviados, aprova, administra setores,
   clientes, mix, produtos, categorias e tabelas de preço.
+- **Comercial + Vendedor:** uma conta só para quem faz as duas funções. Na tela
+  inicial há dois botões, **Comercial** e **Vendedor**, para trocar de modo (entra
+  como Comercial). Cada pessoa tem o próprio login, sem senha compartilhada.
 - **Admin TI:** tudo do comercial, mais usuários e "Dados da Empresa" (filiais).
+  Na tela **Usuários** escolhe o perfil de cada pessoa por botões (Vendedor,
+  Comercial, Comercial + Vendedor, Admin TI) e pode mudar o perfil de quem já está
+  cadastrado entre os três primeiros, sem perder pedidos nem carteira.
 - **Minha Conta:** cada pessoa troca seus dados, usuário e senha.
+
+### Como funciona o "Comercial + Vendedor"
+
+Não é um tipo novo no banco: é uma conta `ADMIN_COMERCIAL` com cadastro de vendedor
+**ativo** (`backend/src/lib/perfil.ts`). A sessão está sempre em um modo só
+(o `type` do token), então as permissões continuam as mesmas: no modo vendedor a
+pessoa vê só a carteira dela; no modo comercial, o painel do comercial. A troca é
+`POST /api/auth/modo` e encerra o token anterior. Quando o Admin TI tira a função de
+vendedor, o cadastro de vendedor fica inativo (os pedidos antigos continuam ligados
+a ele) e a sessão aberta no modo que deixou de valer cai na hora.
 
 ## Estrutura
 
@@ -56,7 +72,7 @@ npm run dev                 # http://localhost:5173
 ## Testes e conferências
 
 ```bash
-cd backend && npm test      # permissões, sessão, fluxo do pedido, limites (usa o banco do .env)
+cd backend && npm test      # permissões, sessão, perfis, fluxo do pedido, limites (usa o banco do .env)
 npm run auditar             # (na raiz) build + orçamento de tamanho + todos os testes
 ```
 
@@ -78,9 +94,11 @@ faz uma conferência de leitura no site no ar.
 ## Decisões técnicas
 
 - **Autenticação:** JWT em **cookie HttpOnly** (não localStorage), válido por 8 h.
-  Trocar a senha ou desativar a conta derruba as sessões abertas.
+  Trocar a senha, desativar a conta ou mudar o perfil derruba as sessões abertas.
 - **Logout:** revoga o `jti` do token na tabela `tokens_revogados`.
 - **Senhas:** hash com `bcryptjs`. Limite de tentativas no login e em Minha Conta.
 - **Desempenho em rede fraca:** telas de administração carregam sob demanda, o site
   fica em cache longo, e as rotas do pedido fazem poucas idas ao banco.
+- **Segurança do navegador (CSP):** o site só pode chamar a própria API e as duas
+  fontes de CEP (ViaCEP e BrasilAPI), liberadas em `backend/src/app.ts`.
 - **Dev:** o Vite faz proxy de `/api` para o backend, mantendo o cookie same-origin.

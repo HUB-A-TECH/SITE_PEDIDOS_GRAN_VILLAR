@@ -7,7 +7,7 @@ const contaSelect = {
   email: true,
   type: true,
   localId: true,
-  vendedor: { select: { nomeCompleto: true, telefone: true } },
+  vendedor: { select: { nomeCompleto: true, telefone: true, ativo: true } },
 } as const;
 
 export function getConta(usuarioId: string) {

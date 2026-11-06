@@ -11,5 +11,6 @@ usuariosRoutes.use(asyncHandler(authenticate), authorize('ADMIN_TI'));
 usuariosRoutes.get('/', asyncHandler(controller.listar));
 usuariosRoutes.post('/', asyncHandler(controller.criar));
 usuariosRoutes.put('/:id', asyncHandler(controller.atualizar));
+usuariosRoutes.patch('/:id/perfil', asyncHandler(controller.mudarPerfil));
 usuariosRoutes.patch('/:id/ativo', asyncHandler(controller.alterarAtivo));
 usuariosRoutes.post('/:id/senha', asyncHandler(controller.resetarSenha));

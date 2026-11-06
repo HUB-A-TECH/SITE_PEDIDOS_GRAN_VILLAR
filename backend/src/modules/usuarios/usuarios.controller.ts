@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import * as service from './usuarios.service';
 import { isUniqueConstraintError } from '../../utils/prisma-errors';
+import { PERFIS, perfilVende } from '../../lib/perfil';
 
 export async function listar(_req: Request, res: Response): Promise<void> {
   const usuarios = await service.listarUsuarios();
@@ -10,7 +11,7 @@ export async function listar(_req: Request, res: Response): Promise<void> {
 
 const criarSchema = z
   .object({
-    tipo: z.enum(['VENDEDOR', 'ADMIN_COMERCIAL', 'ADMIN_TI']),
+    perfil: z.enum(PERFIS),
     username: z
       .string()
       .min(3, 'Usuário deve ter ao menos 3 caracteres')
@@ -22,8 +23,8 @@ const criarSchema = z
     telefone: z.string().max(30).optional(),
     localId: z.string().uuid().optional(),
   })
-  .refine((d) => d.tipo !== 'VENDEDOR' || (!!d.nomeCompleto && !!d.localId), {
-    message: 'Vendedor exige nome completo e filial',
+  .refine((d) => !perfilVende(d.perfil) || (!!d.nomeCompleto && !!d.localId), {
+    message: 'Para vender, informe o nome completo e a filial',
   });
 
 export async function criar(req: Request, res: Response): Promise<void> {
@@ -66,6 +67,35 @@ export async function atualizar(req: Request, res: Response): Promise<void> {
     }
     throw e;
   }
+}
+
+const perfilSchema = z.object({
+  perfil: z.enum(['VENDEDOR', 'ADMIN_COMERCIAL', 'COMERCIAL_VENDEDOR']),
+  nomeCompleto: z.string().trim().min(2).max(120).optional(),
+  localId: z.string().uuid().optional(),
+});
+
+export async function mudarPerfil(req: Request, res: Response): Promise<void> {
+  const parsed = perfilSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: 'Dados inválidos' });
+    return;
+  }
+  // O Admin TI não mexe no próprio perfil (evita se trancar para fora).
+  if (req.user!.sub === req.params.id) {
+    res.status(400).json({ mensagem: 'Você não pode mudar o próprio perfil' });
+    return;
+  }
+  try {
+    await service.mudarPerfil(req.params.id, parsed.data.perfil, parsed.data);
+  } catch (e) {
+    if (e instanceof service.PerfilInvalido) {
+      res.status(400).json({ mensagem: e.message });
+      return;
+    }
+    throw e;
+  }
+  res.json({ ok: true });
 }
 
 const ativoSchema = z.object({ ativo: z.boolean() });

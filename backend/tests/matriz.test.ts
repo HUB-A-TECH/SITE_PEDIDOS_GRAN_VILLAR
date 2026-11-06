@@ -92,6 +92,7 @@ const ROTAS_SO_TI: Chamada[] = [
   ['get', '/api/admin/usuarios'],
   ['post', '/api/admin/usuarios'],
   ['put', `/api/admin/usuarios/${FAKE}`],
+  ['patch', `/api/admin/usuarios/${FAKE}/perfil`],
   ['patch', `/api/admin/usuarios/${FAKE}/ativo`],
   ['post', `/api/admin/usuarios/${FAKE}/senha`],
   ['put', `/api/locais/${FAKE}`],
@@ -112,6 +113,7 @@ const ROTAS_LOGADO: Chamada[] = [
   ['get', '/api/conta'],
   ['put', '/api/conta/senha'],
   ['get', '/api/auth/me'],
+  ['post', '/api/auth/modo'],
 ];
 
 const chamar = (ag: Agente | ReturnType<typeof request>, [m, r]: Chamada) =>
