@@ -23,7 +23,18 @@ export const app = express();
 // Atrás do proxy do Render: sem isso o IP de todo mundo seria o do proxy (limite de tentativas).
 app.set('trust proxy', 1);
 
-app.use(helmet());
+// A política padrão do helmet só deixa o navegador chamar o próprio site
+// (connect-src cai em default-src 'self'), o que bloqueava a busca de CEP.
+// Liberamos só as duas fontes de CEP usadas em frontend/src/lib/cep.ts.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        connectSrc: ["'self'", 'https://viacep.com.br', 'https://brasilapi.com.br'],
+      },
+    },
+  }),
+);
 app.use(cors({ origin: env.frontendOrigin, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
