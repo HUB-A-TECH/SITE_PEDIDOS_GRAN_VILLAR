@@ -133,6 +133,14 @@ export function pdfHref(pedidoId: string): string {
   return `/api/pedidos/${pedidoId}/pdf`;
 }
 
+/** Busca o PDF como Blob em memória (para compartilhamento direto no celular via Web Share API). */
+export async function baixarPdfBlob(pedidoId: string): Promise<Blob> {
+  const res = await api.get<Blob>(`/pedidos/${pedidoId}/pdf`, {
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
 // ---- Alterações do comercial ----
 
 /** O que mudou num item quando o comercial confirmou com alterações. */

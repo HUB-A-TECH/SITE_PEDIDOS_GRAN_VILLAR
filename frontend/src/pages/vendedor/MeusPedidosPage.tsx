@@ -38,6 +38,7 @@ export function MeusPedidosPage() {
   const [pedidos, setPedidos] = useState<MeuPedido[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [processando, setProcessando] = useState<string | null>(null);
+  const [compartilhando, setCompartilhando] = useState<string | null>(null);
   const [historicoAberto, setHistoricoAberto] = useState<Set<string>>(new Set());
   const [recolhidos, setRecolhidos] = useState<Set<Grupo>>(
     () => new Set(GRUPOS.filter((g) => g.recolhidoPorPadrao).map((g) => g.chave)),
@@ -191,6 +192,50 @@ export function MeusPedidosPage() {
     }
   }
 
+  async function compartilharPdf(p: MeuPedido) {
+    setCompartilhando(p.pedidoId);
+    try {
+      const blob = await pedidosApi.baixarPdfBlob(p.pedidoId);
+      const nomeArquivo = p.numeroPedido
+        ? `pedido_${p.numeroPedido}.pdf`
+        : `proposta_${p.pedidoId.slice(0, 8)}.pdf`;
+      const arquivo = new File([blob], nomeArquivo, { type: 'application/pdf' });
+      const titulo = p.numeroPedido
+        ? `Pedido ${p.numeroPedido} — ${p.cliente.nome}`
+        : `Pedido — ${p.cliente.nome}`;
+
+      if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [arquivo] })) {
+        await navigator.share({
+          files: [arquivo],
+          title: titulo,
+        });
+        return;
+      }
+
+      // Fallback (ex.: navegador de computador sem suporte a compartilhar arquivos): baixa o PDF.
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nomeArquivo;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      // Se o vendedor apenas fechou/cancelou a gaveta de compartilhamento do celular, não é erro.
+      if (e && typeof e === 'object' && 'name' in e && (e as { name?: string }).name === 'AbortError') {
+        return;
+      }
+      await dialogo.avisar({
+        titulo: 'Não foi possível compartilhar o PDF',
+        tom: 'erro',
+        mensagem: 'Verifique o sinal e tente novamente.',
+      });
+    } finally {
+      setCompartilhando(null);
+    }
+  }
+
   /** Card de um pedido — mesmo formato em todas as seções. */
   function renderCard(p: MeuPedido) {
           const podeCancelar =
@@ -271,19 +316,21 @@ export function MeusPedidosPage() {
               ) : (
                 <>
                   <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => compartilharPdf(p)}
+                      disabled={compartilhando === p.pedidoId}
+                      className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+                    >
+                      {compartilhando === p.pedidoId ? 'Abrindo…' : 'Compartilhar PDF'}
+                    </button>
                     <a
                       href={pedidosApi.pdfHref(p.pedidoId)}
                       target="_blank"
                       rel="noopener"
-                      className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500"
-                    >
-                      Baixar PDF
-                    </a>
-                    <a
-                      href={pedidosApi.txtHref(p.pedidoId)}
                       className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
                     >
-                      Baixar TXT
+                      Baixar PDF
                     </a>
                   </div>
                   {p.status === 'CONFIRMADO' && (
