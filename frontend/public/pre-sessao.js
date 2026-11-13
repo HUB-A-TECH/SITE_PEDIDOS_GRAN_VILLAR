@@ -11,3 +11,9 @@ window.__sessao = fetch('/api/auth/me', { credentials: 'same-origin' })
   .catch(function () {
     return null;
   });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
+  });
+}
