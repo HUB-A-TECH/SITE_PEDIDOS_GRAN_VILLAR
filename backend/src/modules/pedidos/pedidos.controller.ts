@@ -539,13 +539,17 @@ function dadosExport(pedido: PedidoCompleto) {
   };
 }
 
+function nomeArquivoExport(pedido: PedidoCompleto, ext: 'txt' | 'pdf'): string {
+  const codCliente = pedido.cliente.codigo.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  const codPedido = (pedido.numeroPedido ?? pedido.id.slice(0, 8)).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `${codCliente}_${codPedido}.${ext}`;
+}
+
 export async function baixarTxt(req: Request, res: Response): Promise<void> {
   const pedido = await carregarExportavel(req, res);
   if (!pedido) return;
   const txt = gerarTxtPedido(dadosExport(pedido));
-  const nome = pedido.numeroPedido
-    ? `pedido_${pedido.numeroPedido}.txt`
-    : `proposta_${pedido.id.slice(0, 8)}.txt`;
+  const nome = nomeArquivoExport(pedido, 'txt');
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
   res.send(txt);
@@ -554,9 +558,7 @@ export async function baixarTxt(req: Request, res: Response): Promise<void> {
 export async function baixarPdf(req: Request, res: Response): Promise<void> {
   const pedido = await carregarExportavel(req, res);
   if (!pedido) return;
-  const codCliente = pedido.cliente.codigo.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  const codPedido = (pedido.numeroPedido ?? pedido.id.slice(0, 8)).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  const nome = `${codCliente}_${codPedido}.pdf`;
+  const nome = nomeArquivoExport(pedido, 'pdf');
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
   // bufferPages: necessário para voltar em cada página no fim e escrever o
