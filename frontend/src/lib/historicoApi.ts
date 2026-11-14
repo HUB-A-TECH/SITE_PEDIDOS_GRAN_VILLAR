@@ -25,7 +25,7 @@ export interface PedidoHistorico {
 export interface MeuPedido {
   pedidoId: string;
   numeroPedido: string | null;
-  cliente: { id: string; codigo: string; nome: string };
+  cliente: { id: string; codigo: string; nome: string; nomeFantasia?: string | null };
   data: string;
   total: number;
   status: 'RASCUNHO' | 'CONFIRMADO' | 'CANCELADO';

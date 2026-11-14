@@ -13,6 +13,7 @@ import {
 import * as clientesApi from '../../lib/clientesApi';
 import * as setoresApi from '../../lib/setoresApi';
 import * as tabelasApi from '../../lib/tabelasApi';
+import { nomeCliente, razaoSecundaria } from '../../lib/formatar';
 import type { ClienteCompleto, Local, Setor, TabelaPreco } from '../../lib/types';
 
 const inputCls =
@@ -106,7 +107,7 @@ export function AdminClientesPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-slate-800">
-                    {c.nome}{' '}
+                    {nomeCliente(c)}{' '}
                     {!c.ativo && (
                       <span className="ml-1 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-500">
                         inativo
@@ -114,7 +115,7 @@ export function AdminClientesPage() {
                     )}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {c.nomeFantasia ? `${c.nomeFantasia} · ` : ''}
+                    {razaoSecundaria(c) ? `${razaoSecundaria(c)} · ` : ''}
                     {c.codigo}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
@@ -294,18 +295,18 @@ function ClienteForm({
           className={inputCls}
         />
       </Campo>
+      <Campo label="Nome fantasia (opcional)">
+        <input
+          value={nomeFantasia}
+          onChange={(e) => setNomeFantasia(e.target.value)}
+          className={inputCls}
+        />
+      </Campo>
       <Campo label="Nome / Razão social">
         <input
           value={nome}
           onChange={(e) => setNome(e.target.value)}
           required
-          className={inputCls}
-        />
-      </Campo>
-      <Campo label="Nome fantasia (opcional)">
-        <input
-          value={nomeFantasia}
-          onChange={(e) => setNomeFantasia(e.target.value)}
           className={inputCls}
         />
       </Campo>

@@ -30,6 +30,7 @@ function serialize(p: PedidoComItens) {
       id: p.cliente.id,
       codigo: p.cliente.codigo,
       nome: p.cliente.nome,
+      nomeFantasia: p.cliente.nomeFantasia,
     },
     itens: p.itens.map((i) => ({
       id: i.id,
@@ -671,7 +672,12 @@ function serializeAdmin(p: PedidoAdminComItens, mapa: precos.MapaPrecos = new Ma
     subtotal: Number(p.subtotal),
     total: Number(p.total),
     data: p.confirmadoEm ?? p.criadoEm,
-    cliente: { id: p.cliente.id, codigo: p.cliente.codigo, nome: p.cliente.nome },
+    cliente: {
+      id: p.cliente.id,
+      codigo: p.cliente.codigo,
+      nome: p.cliente.nome,
+      nomeFantasia: p.cliente.nomeFantasia,
+    },
     vendedor: { id: p.vendedor.id, nomeCompleto: p.vendedor.nomeCompleto },
     editadoPor: p.editadoPor ? { username: p.editadoPor.username } : null,
     editadoEm: p.editadoEm,

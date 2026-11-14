@@ -15,7 +15,7 @@ import {
 } from '../../lib/types';
 import { useCategorias } from '../../lib/categoriasApi';
 import { AnotacoesFixadas, useAnotacoes } from '../../components/AnotacoesCliente';
-import { brl } from '../../lib/formatar';
+import { brl, nomeCliente } from '../../lib/formatar';
 
 
 const MESES_ABREV = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -227,7 +227,7 @@ export function PedidoPage() {
       mensagem: (
         <>
           <strong>{p.nome}</strong> passa a aparecer em todos os próximos pedidos
-          de <strong>{pedido.cliente.nome}</strong>. Fica registrado no histórico
+          de <strong>{nomeCliente(pedido.cliente)}</strong>. Fica registrado no histórico
           do cliente.
         </>
       ),
@@ -256,7 +256,7 @@ export function PedidoPage() {
       mensagem: (
         <>
           <strong>{p.nome}</strong> deixa de aparecer nos próximos pedidos de{' '}
-          <strong>{pedido.cliente.nome}</strong>
+          <strong>{nomeCliente(pedido.cliente)}</strong>
           {temNoPedido ? ' (neste pedido ele continua, com a quantidade que já tem)' : ''}.
           Dá para colocar de volta pela aba "Produtos que o cliente não tem". Fica
           registrado no histórico do cliente.
@@ -440,7 +440,7 @@ export function PedidoPage() {
       textoConfirmar: 'Sim, descartar',
       mensagem: (
         <>
-          Todo o pedido salvo para <strong>{pedido.cliente.nome}</strong> será
+          Todo o pedido salvo para <strong>{nomeCliente(pedido.cliente)}</strong> será
           apagado. <strong>Esta ação não pode ser desfeita.</strong>
         </>
       ),
@@ -491,7 +491,7 @@ export function PedidoPage() {
       titulo={
         jaEnviado && pedido.numeroPedido
           ? `Pedido ${pedido.numeroPedido}`
-          : `Pedido · ${pedido.cliente.nome}`
+          : `Pedido · ${nomeCliente(pedido.cliente)}`
       }
       voltarPara="/meus-pedidos"
       acao={

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Aviso } from './Aviso';
 import { paleta } from '../lib/coresSetor';
+import { nomeCliente, razaoSecundaria } from '../lib/formatar';
 import type { Cliente } from '../lib/types';
 
 interface Props {
@@ -82,9 +83,9 @@ export function ListaClientesPorSetor({ clientes, carregando, onEscolher, abrind
                         disabled={abrindoId !== null}
                         className="w-full rounded-xl bg-white p-4 text-left shadow-sm hover:shadow-md disabled:opacity-60"
                       >
-                        <p className="font-semibold text-slate-800">{c.nome}</p>
+                        <p className="font-semibold text-slate-800">{nomeCliente(c)}</p>
                         <p className="text-sm text-slate-500">
-                          {c.nomeFantasia ? `${c.nomeFantasia} · ` : ''}
+                          {razaoSecundaria(c) ? `${razaoSecundaria(c)} · ` : ''}
                           {c.codigo}
                           {abrindoId === c.id && ' · abrindo…'}
                         </p>

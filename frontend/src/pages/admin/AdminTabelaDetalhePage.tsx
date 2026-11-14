@@ -11,7 +11,7 @@ import {
   type TabelaProduto,
 } from '../../lib/types';
 import { useCategorias } from '../../lib/categoriasApi';
-import { brl } from '../../lib/formatar';
+import { brl, nomeCliente, razaoSecundaria } from '../../lib/formatar';
 
 const inputCls =
   'w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500';
@@ -130,8 +130,8 @@ export function AdminTabelaDetalhePage() {
           ) : (
             dados.clientes.map((c) => (
               <li key={c.id} className="text-sm text-slate-700">
-                {c.nome}
-                {c.nomeFantasia ? ` · ${c.nomeFantasia}` : ''}
+                {nomeCliente(c)}
+                {razaoSecundaria(c) ? ` · ${razaoSecundaria(c)}` : ''}
                 {!c.ativo && (
                   <span className="ml-1 text-xs text-slate-400">(inativo)</span>
                 )}

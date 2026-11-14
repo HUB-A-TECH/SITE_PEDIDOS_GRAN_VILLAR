@@ -203,7 +203,7 @@ export async function pedidoSalvoId(vendedorId: string, clienteId: string) {
  * ainda não têm confirmadoEm.
  */
 const meuPedidoInclude = {
-  cliente: { select: { id: true, codigo: true, nome: true } },
+  cliente: { select: { id: true, codigo: true, nome: true, nomeFantasia: true } },
   editadoPor: { select: { username: true } },
   ultimaAlteracaoPor: { select: { username: true } },
   _count: { select: { itens: true } },

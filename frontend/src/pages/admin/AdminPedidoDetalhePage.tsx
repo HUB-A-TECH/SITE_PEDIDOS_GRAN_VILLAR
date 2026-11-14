@@ -9,7 +9,7 @@ import * as pedidosApi from '../../lib/pedidosApi';
 import type { PedidoAdminDetalhe } from '../../lib/pedidosApi';
 import { estiloStatus } from '../../lib/statusPedido';
 import { useDialogo } from '../../context/DialogoContext';
-import { brl, qtd, dataBR, dataHoraBR } from '../../lib/formatar';
+import { brl, qtd, dataBR, dataHoraBR, nomeCliente, razaoSecundaria } from '../../lib/formatar';
 
 const subtotal = (q: number, p: number) => Math.round(q * p * 100) / 100;
 
@@ -215,7 +215,12 @@ export function AdminPedidoDetalhePage() {
       <div className={mostraPainel ? 'pb-56' : ''}>
         <div className={`mb-4 rounded-xl border-l-4 bg-white p-4 shadow-sm ${est.borderClass}`}>
           <div className="flex items-start justify-between gap-2">
-            <p className="font-semibold text-slate-800">{pedido.cliente.nome}</p>
+            <div>
+              <p className="font-semibold text-slate-800">{nomeCliente(pedido.cliente)}</p>
+              {razaoSecundaria(pedido.cliente) && (
+                <p className="text-xs text-slate-500">{razaoSecundaria(pedido.cliente)}</p>
+              )}
+            </div>
             <span className={`text-right text-xs font-medium ${est.textClass}`}>{est.label}</span>
           </div>
           <p className="text-xs text-slate-500">

@@ -8,7 +8,7 @@ import * as clientesApi from '../../lib/clientesApi';
 import { LIMITE_OPCOES, type Limite } from '../../lib/types';
 import type { Cliente } from '../../lib/types';
 import { estiloStatus } from '../../lib/statusPedido';
-import { brl, dataBR, dataHoraBR } from '../../lib/formatar';
+import { brl, dataBR, dataHoraBR, nomeCliente, razaoSecundaria } from '../../lib/formatar';
 
 
 export function AdminPedidosPage() {
@@ -71,7 +71,8 @@ export function AdminPedidosPage() {
         <option value="">Todas as empresas</option>
         {clientes.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.nome}
+            {nomeCliente(c)}
+            {razaoSecundaria(c) ? ` (${razaoSecundaria(c)})` : ''}
           </option>
         ))}
       </select>
@@ -113,13 +114,16 @@ export function AdminPedidosPage() {
               >
                 <div>
                   <p className="flex items-center gap-2 font-semibold text-slate-800 hover:underline">
-                    {p.cliente.nome}
+                    {nomeCliente(p.cliente)}
                     {est.badge && (
                       <span className="rounded-md bg-brandYellow-50 px-1.5 py-0.5 text-[10px] font-bold text-brandYellow-800 ring-1 ring-inset ring-brandYellow-300">
                         {est.badge}
                       </span>
                     )}
                   </p>
+                  {razaoSecundaria(p.cliente) && (
+                    <p className="text-xs text-slate-500">{razaoSecundaria(p.cliente)}</p>
+                  )}
                   <p className="text-xs text-slate-500">
                     {p.numeroPedido ?? '—'} · {dataBR(p.data)} ·{' '}
                     {p.vendedor.nomeCompleto}

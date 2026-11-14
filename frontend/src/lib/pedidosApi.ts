@@ -1,4 +1,5 @@
 import { api } from './api';
+import { nomeCliente } from './formatar';
 import type { Categoria, Limite } from './types';
 import type { Revisao } from './statusPedido';
 
@@ -24,7 +25,7 @@ export interface Pedido {
   observacoes: string | null;
   subtotal: number;
   total: number;
-  cliente: { id: string; codigo: string; nome: string };
+  cliente: { id: string; codigo: string; nome: string; nomeFantasia?: string | null };
   itens: ItemPedido[];
 }
 
@@ -159,14 +160,14 @@ export function nomeArquivoPdf(
 export async function compartilharPdfPedido(dados: {
   pedidoId: string;
   numeroPedido: string | null;
-  cliente: { codigo: string; nome: string };
+  cliente: { codigo: string; nome: string; nomeFantasia?: string | null };
 }): Promise<void> {
   const blob = await baixarPdfBlob(dados.pedidoId);
   const nomeArquivo = nomeArquivoPdf(dados.cliente.codigo, dados.numeroPedido, dados.pedidoId);
   const arquivo = new File([blob], nomeArquivo, { type: 'application/pdf' });
   const titulo = dados.numeroPedido
-    ? `Pedido ${dados.numeroPedido} — ${dados.cliente.nome}`
-    : `Pedido — ${dados.cliente.nome}`;
+    ? `Pedido ${dados.numeroPedido} — ${nomeCliente(dados.cliente)}`
+    : `Pedido — ${nomeCliente(dados.cliente)}`;
 
   if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [arquivo] })) {
     try {
@@ -238,7 +239,7 @@ export async function marcarAlteracoesVistas(pedidoIds: string[]): Promise<void>
 export interface PedidoAdmin {
   pedidoId: string;
   numeroPedido: string | null;
-  cliente: { id: string; codigo: string; nome: string };
+  cliente: { id: string; codigo: string; nome: string; nomeFantasia?: string | null };
   vendedor: { id: string; nomeCompleto: string };
   data: string;
   total: number;
@@ -274,7 +275,7 @@ export interface PedidoAdminDetalhe {
   subtotal: number;
   total: number;
   data: string;
-  cliente: { id: string; codigo: string; nome: string };
+  cliente: { id: string; codigo: string; nome: string; nomeFantasia?: string | null };
   vendedor: { id: string; nomeCompleto: string };
   editadoPor: { username: string } | null;
   editadoEm: string | null;

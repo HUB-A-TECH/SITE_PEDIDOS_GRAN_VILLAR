@@ -15,7 +15,7 @@ import {
   GRUPOS,
   type Grupo,
 } from '../../lib/statusPedido';
-import { brl, dataBR, dataHoraBR } from '../../lib/formatar';
+import { brl, dataBR, dataHoraBR, nomeCliente, razaoSecundaria } from '../../lib/formatar';
 
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
@@ -104,7 +104,7 @@ export function MeusPedidosPage() {
       textoConfirmar: 'Enviar',
       mensagem: (
         <>
-          <strong>{p.cliente.nome}</strong> ·{' '}
+          <strong>{nomeCliente(p.cliente)}</strong> ·{' '}
           {p.itensCount === 1 ? '1 item' : `${p.itensCount} itens`} ·{' '}
           {brl(p.total)}
           <br />
@@ -157,7 +157,7 @@ export function MeusPedidosPage() {
       textoConfirmar: 'Sim, cancelar',
       mensagem: (
         <>
-          O pedido <strong>{p.numeroPedido}</strong> de {p.cliente.nome} será
+          O pedido <strong>{p.numeroPedido}</strong> de {nomeCliente(p.cliente)} será
           cancelado. <strong>Esta ação não pode ser desfeita.</strong>
         </>
       ),
@@ -226,7 +226,10 @@ export function MeusPedidosPage() {
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-slate-800">{p.cliente.nome}</p>
+                  <p className="font-semibold text-slate-800">{nomeCliente(p.cliente)}</p>
+                  {razaoSecundaria(p.cliente) && (
+                    <p className="text-xs text-slate-500">{razaoSecundaria(p.cliente)}</p>
+                  )}
                   <p className="text-xs text-slate-500">
                     {p.numeroPedido ?? '—'} · {dataBR(p.data)} ·{' '}
                     {p.itensCount === 1 ? '1 item' : `${p.itensCount} itens`}

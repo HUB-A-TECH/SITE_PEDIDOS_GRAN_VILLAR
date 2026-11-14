@@ -9,7 +9,7 @@ import * as pedidosApi from '../../lib/pedidosApi';
 import type { AlteracaoMix, PerfilCliente } from '../../lib/clientesApi';
 import { iniciais, linkMapa, linkTelefone, linkWhatsApp } from '../../lib/contato';
 import { AnotacoesFixadas, SecaoAnotacoes, useAnotacoes } from '../../components/AnotacoesCliente';
-import { brl, dataBR } from '../../lib/formatar';
+import { brl, dataBR, nomeCliente, razaoSecundaria } from '../../lib/formatar';
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -119,11 +119,11 @@ export function PerfilClientePage() {
       {/* ---- Cabeçalho ---- */}
       <div className="mb-3 rounded-xl bg-white p-5 text-center shadow-sm">
         <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 text-xl font-bold text-brand-700">
-          {iniciais(c.nome)}
+          {iniciais(nomeCliente(c))}
         </div>
-        <p className="text-lg font-bold text-slate-800">{c.nome}</p>
+        <p className="text-lg font-bold text-slate-800">{nomeCliente(c)}</p>
         <p className="text-sm text-slate-500">
-          {c.nomeFantasia ? `${c.nomeFantasia} · ` : ''}
+          {razaoSecundaria(c) ? `${razaoSecundaria(c)} · ` : ''}
           {c.codigo}
         </p>
         <div className="mt-2 flex flex-wrap justify-center gap-1.5">

@@ -7,7 +7,7 @@ export function getVendedorByUsuario(usuarioId: string): Promise<Vendedor | null
 }
 
 const pedidoInclude = {
-  cliente: { select: { id: true, codigo: true, nome: true, localId: true } },
+  cliente: { select: { id: true, codigo: true, nome: true, nomeFantasia: true, localId: true } },
   itens: {
     include: {
       produto: {
@@ -458,7 +458,7 @@ export function listarPedidosAdmin(filtro: FiltroAdminPedidos) {
       ...(filtro.clienteId ? { clienteId: filtro.clienteId } : {}),
     },
     include: {
-      cliente: { select: { id: true, codigo: true, nome: true } },
+      cliente: { select: { id: true, codigo: true, nome: true, nomeFantasia: true } },
       vendedor: { select: { id: true, nomeCompleto: true } },
       editadoPor: { select: { username: true } },
       ultimaAlteracaoPor: { select: { username: true } },

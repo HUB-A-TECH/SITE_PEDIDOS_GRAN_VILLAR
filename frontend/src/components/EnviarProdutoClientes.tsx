@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Aviso } from './Aviso';
 import * as clientesApi from '../lib/clientesApi';
 import * as produtosApi from '../lib/produtosApi';
+import { nomeCliente, razaoSecundaria } from '../lib/formatar';
 import type { ClienteCompleto, Produto } from '../lib/types';
 
 type Modo = 'escolha' | 'selecionar';
@@ -146,8 +147,9 @@ export function EnviarProdutoClientes({
                         className="h-4 w-4"
                       />
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium text-slate-800">{c.nome}</span>
+                        <span className="block truncate text-sm font-medium text-slate-800">{nomeCliente(c)}</span>
                         <span className="block text-xs text-slate-500">
+                          {razaoSecundaria(c) ? `${razaoSecundaria(c)} · ` : ''}
                           {c.codigo}
                           {c.setor ? ` · ${c.setor.nome}` : ' · Sem setor'}
                         </span>
