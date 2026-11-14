@@ -141,6 +141,58 @@ export async function baixarPdfBlob(pedidoId: string): Promise<Blob> {
   return res.data;
 }
 
+/** Nome padrão do arquivo PDF: <codigoCliente>_<codigoPedido>.pdf */
+export function nomeArquivoPdf(
+  codigoCliente: string,
+  numeroPedido: string | null,
+  pedidoId: string,
+): string {
+  const codCliente = codigoCliente.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  const codPedido = (numeroPedido ?? pedidoId.slice(0, 8)).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `${codCliente}_${codPedido}.pdf`;
+}
+
+/**
+ * Busca o PDF em memória e abre a folha nativa de compartilhamento do celular
+ * (ou baixa o arquivo como fallback em navegadores sem suporte a compartilhar arquivos).
+ */
+export async function compartilharPdfPedido(dados: {
+  pedidoId: string;
+  numeroPedido: string | null;
+  cliente: { codigo: string; nome: string };
+}): Promise<void> {
+  const blob = await baixarPdfBlob(dados.pedidoId);
+  const nomeArquivo = nomeArquivoPdf(dados.cliente.codigo, dados.numeroPedido, dados.pedidoId);
+  const arquivo = new File([blob], nomeArquivo, { type: 'application/pdf' });
+  const titulo = dados.numeroPedido
+    ? `Pedido ${dados.numeroPedido} — ${dados.cliente.nome}`
+    : `Pedido — ${dados.cliente.nome}`;
+
+  if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [arquivo] })) {
+    try {
+      await navigator.share({
+        files: [arquivo],
+        title: titulo,
+      });
+    } catch (e) {
+      if (e && typeof e === 'object' && 'name' in e && (e as { name?: string }).name === 'AbortError') {
+        return;
+      }
+      throw e;
+    }
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nomeArquivo;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 // ---- Alterações do comercial ----
 
 /** O que mudou num item quando o comercial confirmou com alterações. */

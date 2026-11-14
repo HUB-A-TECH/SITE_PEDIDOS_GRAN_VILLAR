@@ -38,6 +38,7 @@ export function AdminPedidoDetalhePage() {
   const [carregando, setCarregando] = useState(true);
   const [historicoVisivel, setHistoricoVisivel] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [compartilhando, setCompartilhando] = useState(false);
   // Pilha de estados da revisão: [0] = como o vendedor deixou.
   const [passos, setPassos] = useState<Estado[]>([]);
   const [posicao, setPosicao] = useState(0);
@@ -140,6 +141,26 @@ export function AdminPedidoDetalhePage() {
 
   function erroDe(e: unknown, padrao: string) {
     return axios.isAxiosError(e) && e.response?.data?.mensagem ? e.response.data.mensagem : padrao;
+  }
+
+  async function compartilharPdf() {
+    if (!pedido) return;
+    setCompartilhando(true);
+    try {
+      await pedidosApi.compartilharPdfPedido({
+        pedidoId: pedido.id,
+        numeroPedido: pedido.numeroPedido,
+        cliente: pedido.cliente,
+      });
+    } catch {
+      await dialogo.avisar({
+        titulo: 'Não foi possível compartilhar o PDF',
+        tom: 'erro',
+        mensagem: 'Verifique o sinal e tente novamente.',
+      });
+    } finally {
+      setCompartilhando(false);
+    }
   }
 
   async function aprovar() {
@@ -367,11 +388,19 @@ export function AdminPedidoDetalhePage() {
         </div>
 
         <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={compartilharPdf}
+            disabled={compartilhando}
+            className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {compartilhando ? 'Abrindo…' : 'Compartilhar'}
+          </button>
           <a
             href={pedidosApi.pdfHref(pedido.id)}
             target="_blank"
             rel="noopener"
-            className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500"
+            className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
           >
             Baixar PDF
           </a>

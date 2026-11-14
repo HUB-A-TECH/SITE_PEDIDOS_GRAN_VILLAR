@@ -195,37 +195,12 @@ export function MeusPedidosPage() {
   async function compartilharPdf(p: MeuPedido) {
     setCompartilhando(p.pedidoId);
     try {
-      const blob = await pedidosApi.baixarPdfBlob(p.pedidoId);
-      const nomeArquivo = p.numeroPedido
-        ? `pedido_${p.numeroPedido}.pdf`
-        : `proposta_${p.pedidoId.slice(0, 8)}.pdf`;
-      const arquivo = new File([blob], nomeArquivo, { type: 'application/pdf' });
-      const titulo = p.numeroPedido
-        ? `Pedido ${p.numeroPedido} — ${p.cliente.nome}`
-        : `Pedido — ${p.cliente.nome}`;
-
-      if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [arquivo] })) {
-        await navigator.share({
-          files: [arquivo],
-          title: titulo,
-        });
-        return;
-      }
-
-      // Fallback (ex.: navegador de computador sem suporte a compartilhar arquivos): baixa o PDF.
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = nomeArquivo;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (e) {
-      // Se o vendedor apenas fechou/cancelou a gaveta de compartilhamento do celular, não é erro.
-      if (e && typeof e === 'object' && 'name' in e && (e as { name?: string }).name === 'AbortError') {
-        return;
-      }
+      await pedidosApi.compartilharPdfPedido({
+        pedidoId: p.pedidoId,
+        numeroPedido: p.numeroPedido,
+        cliente: p.cliente,
+      });
+    } catch {
       await dialogo.avisar({
         titulo: 'Não foi possível compartilhar o PDF',
         tom: 'erro',

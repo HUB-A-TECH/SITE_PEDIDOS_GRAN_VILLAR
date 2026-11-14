@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
+import { useDialogo } from '../../context/DialogoContext';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { PedidoAdmin } from '../../lib/pedidosApi';
 import * as clientesApi from '../../lib/clientesApi';
@@ -11,12 +12,33 @@ import { brl, dataBR, dataHoraBR } from '../../lib/formatar';
 
 
 export function AdminPedidosPage() {
+  const dialogo = useDialogo();
   const [limite, setLimite] = useState<Limite>(12);
   const [clienteId, setClienteId] = useState<string>('');
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [pedidos, setPedidos] = useState<PedidoAdmin[]>([]);
   const [carregando, setCarregando] = useState(true);
+  const [compartilhando, setCompartilhando] = useState<string | null>(null);
   const [historicoAberto, setHistoricoAberto] = useState<Set<string>>(new Set());
+
+  async function compartilharPdf(p: PedidoAdmin) {
+    setCompartilhando(p.pedidoId);
+    try {
+      await pedidosApi.compartilharPdfPedido({
+        pedidoId: p.pedidoId,
+        numeroPedido: p.numeroPedido,
+        cliente: p.cliente,
+      });
+    } catch {
+      await dialogo.avisar({
+        titulo: 'Não foi possível compartilhar o PDF',
+        tom: 'erro',
+        mensagem: 'Verifique o sinal e tente novamente.',
+      });
+    } finally {
+      setCompartilhando(null);
+    }
+  }
 
   function toggleHistorico(pedidoId: string) {
     setHistoricoAberto((s) => {
@@ -132,11 +154,19 @@ export function AdminPedidosPage() {
               </div>
 
               <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => compartilharPdf(p)}
+                  disabled={compartilhando === p.pedidoId}
+                  className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {compartilhando === p.pedidoId ? 'Abrindo…' : 'Compartilhar'}
+                </button>
                 <a
                   href={pedidosApi.pdfHref(p.pedidoId)}
                   target="_blank"
                   rel="noopener"
-                  className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500"
+                  className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
                 >
                   Baixar PDF
                 </a>
