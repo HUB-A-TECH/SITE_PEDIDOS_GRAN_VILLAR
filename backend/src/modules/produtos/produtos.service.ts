@@ -31,6 +31,31 @@ export async function listMixDoCliente(
   return itens.map((cp) => cp.produto);
 }
 
+export const TABELA_PADRAO_ID = '00000000-0000-4000-8000-000000000001';
+
+/**
+ * Catálogo completo de produtos ativos com o preço da Tabela Padrão
+ * (cai no preço do catálogo caso algum item não tenha linha na tabela).
+ */
+export async function listCatalogoPadrao() {
+  const tabela = await prisma.tabelaPreco.findFirst({
+    where: {
+      OR: [
+        { id: TABELA_PADRAO_ID },
+        { nome: { equals: 'Tabela Padrão', mode: 'insensitive' } },
+      ],
+    },
+    select: { id: true, nome: true },
+  });
+  const tabelaId = tabela?.id ?? TABELA_PADRAO_ID;
+  const produtos = await prisma.produto.findMany({
+    where: { ativo: true },
+    include: { tabelaPrecoItens: { where: { tabelaId }, select: { preco: true } } },
+    orderBy: [...ordemCatalogo],
+  });
+  return { tabelaNome: tabela?.nome ?? 'Tabela Padrão', produtos };
+}
+
 // ---- Admin (catálogo completo) ----
 
 export function listCatalogo(filtros: {

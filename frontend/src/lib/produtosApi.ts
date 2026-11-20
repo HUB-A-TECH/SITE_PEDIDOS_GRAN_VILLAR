@@ -20,6 +20,11 @@ export async function listarPorMix(
   return res.data.produtos;
 }
 
+export async function listarCatalogoPadrao(): Promise<{ tabelaNome: string; produtos: Produto[] }> {
+  const res = await api.get<{ tabelaNome: string; produtos: Produto[] }>('/produtos/catalogo');
+  return res.data;
+}
+
 // ---- Admin ----
 
 export async function adminListar(

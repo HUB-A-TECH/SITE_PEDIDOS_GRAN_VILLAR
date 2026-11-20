@@ -8,8 +8,9 @@ import * as precos from '../precos/precos.service';
 import * as carteira from '../../lib/carteira';
 import { isUniqueConstraintError } from '../../utils/prisma-errors';
 import PDFDocument from 'pdfkit';
-import { gerarTxtPedido } from '../../utils/gerar-txt';
+import { gerarExcelPedido } from '../../utils/gerar-excel';
 import { desenharPedidoPdf } from '../../utils/gerar-pdf';
+import { nomeArquivoPedido } from '../../utils/nome-arquivo';
 
 const JANELA_CANCELAMENTO_MS = 24 * 60 * 60 * 1000; // 1 dia (RN-08)
 
@@ -431,7 +432,7 @@ export async function confirmar(req: Request, res: Response): Promise<void> {
       pedidoId: existente.id,
       numeroPedido: existente.numeroPedido,
       status: 'CONFIRMADO',
-      txtDisponivel: true,
+      excelDisponivel: true,
     });
     return;
   }
@@ -453,7 +454,7 @@ export async function confirmar(req: Request, res: Response): Promise<void> {
     pedidoId: pedido.id,
     numeroPedido: numero,
     status: 'CONFIRMADO',
-    txtDisponivel: true,
+    excelDisponivel: true,
   });
 }
 
@@ -492,7 +493,7 @@ type PedidoCompleto = NonNullable<
   Awaited<ReturnType<typeof service.getPedidoCompleto>>
 >;
 
-/** Carrega o pedido para exportação (TXT/PDF), aplicando escopo e validações. */
+/** Carrega o pedido para exportação (Excel/PDF), aplicando escopo e validações. */
 async function carregarExportavel(
   req: Request,
   res: Response,
@@ -540,26 +541,20 @@ function dadosExport(pedido: PedidoCompleto) {
   };
 }
 
-function nomeArquivoExport(pedido: PedidoCompleto, ext: 'txt' | 'pdf'): string {
-  const codCliente = pedido.cliente.codigo.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  const codPedido = (pedido.numeroPedido ?? pedido.id.slice(0, 8)).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  return `${codCliente}_${codPedido}.${ext}`;
-}
-
-export async function baixarTxt(req: Request, res: Response): Promise<void> {
+export async function baixarExcel(req: Request, res: Response): Promise<void> {
   const pedido = await carregarExportavel(req, res);
   if (!pedido) return;
-  const txt = gerarTxtPedido(dadosExport(pedido));
-  const nome = nomeArquivoExport(pedido, 'txt');
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  const buffer = gerarExcelPedido(dadosExport(pedido));
+  const nome = nomeArquivoPedido(pedido, 'xlsx');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
-  res.send(txt);
+  res.send(buffer);
 }
 
 export async function baixarPdf(req: Request, res: Response): Promise<void> {
   const pedido = await carregarExportavel(req, res);
   if (!pedido) return;
-  const nome = nomeArquivoExport(pedido, 'pdf');
+  const nome = nomeArquivoPedido(pedido, 'pdf');
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
   // bufferPages: necessário para voltar em cada página no fim e escrever o
@@ -661,7 +656,7 @@ type PedidoAdminComItens = NonNullable<
 
 /**
  * `precoTabela` = preço da tabela do cliente (ou do catálogo) hoje. Só a tela
- * web usa, para avisar o comercial de item vendido abaixo dele; PDF e TXT não.
+ * web usa, para avisar o comercial de item vendido abaixo dele; PDF e Excel não.
  */
 function serializeAdmin(p: PedidoAdminComItens, mapa: precos.MapaPrecos = new Map()) {
   return {
@@ -742,6 +737,21 @@ export async function adminAprovar(req: Request, res: Response): Promise<void> {
   const pedido = await carregarPedidoAdminEditavel(req.params.id, res);
   if (!pedido) return;
   await service.registrarEdicaoAdmin(pedido.id, req.user!.sub);
+  const atualizado = await service.getPedidoParaAdmin(pedido.id);
+  res.json({ pedido: atualizado ? await serializeAdminComTabela(atualizado) : null });
+}
+
+/** Exclui/cancela um pedido enviado (mesmo já aprovado), movendo-o para Excluídos. */
+export async function adminCancelar(req: Request, res: Response): Promise<void> {
+  const pedido = await carregarPedidoAdminEditavel(req.params.id, res);
+  if (!pedido) return;
+
+  const parsed = z
+    .object({ motivo: z.string().max(500).optional() })
+    .safeParse(req.body ?? {});
+  const motivo = parsed.success ? (parsed.data.motivo ?? null) : null;
+
+  await service.cancelarPedido(pedido.id, motivo);
   const atualizado = await service.getPedidoParaAdmin(pedido.id);
   res.json({ pedido: atualizado ? await serializeAdminComTabela(atualizado) : null });
 }

@@ -112,6 +112,7 @@ export async function historicoCliente(req: Request, res: Response): Promise<voi
       numeroPedido: p.numeroPedido,
       data: p.confirmadoEm ?? p.criadoEm,
       total: Number(p.total),
+      situacao: historico.situacaoPedido(p),
       itens: p.itens.map((i) => ({
         codigo: i.produto.codigo,
         nome: i.produto.nome,

@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import * as XLSX from 'xlsx';
 import {
   MERCADO_X_ID,
   PADARIA_CENTRAL_ID,
@@ -132,14 +133,33 @@ describe('fluxo do pedido (Mercado X)', () => {
     expect(noBanco!.numeroPedido).toBe(depois.body.numeroPedido);
   });
 
-  it('PDF e TXT: 200 para o dono e para o admin, 404 para outro vendedor', async () => {
+  it('PDF e Excel: 200 para o dono e para o admin, 404 para outro vendedor', async () => {
     const pdf = await vendedor.get(`/api/pedidos/${pedidoId}/pdf`);
     expect(pdf.status).toBe(200);
     expect(String(pdf.headers['content-type'])).toContain('pdf');
-    expect((await vendedor.get(`/api/pedidos/${pedidoId}/txt`)).status).toBe(200);
+    expect(String(pdf.headers['content-disposition'])).toMatch(/filename="Gran_Villar_.*Mercado_X.*\.pdf"/);
+    const excel = await vendedor
+      .get(`/api/pedidos/${pedidoId}/excel`)
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+    expect(excel.status).toBe(200);
+    expect(String(excel.headers['content-type'])).toContain('spreadsheetml.sheet');
+    expect(String(excel.headers['content-disposition'])).toMatch(/filename="Gran_Villar_.*Mercado_X.*\.xlsx"/);
+    const wb = XLSX.read(excel.body, { type: 'buffer' });
+    const linhas = XLSX.utils.sheet_to_json<(string | number)[]>(wb.Sheets[wb.SheetNames[0]], {
+      header: 1,
+    });
+    expect(linhas.length).toBeGreaterThan(0);
+    expect(linhas[0]).toHaveLength(2);
     expect((await admin.get(`/api/pedidos/${pedidoId}/pdf`)).status).toBe(200);
+    expect((await admin.get(`/api/pedidos/${pedidoId}/excel`)).status).toBe(200);
     const outro = await entrar('vendedor');
     expect((await outro.get(`/api/pedidos/${pedidoId}/pdf`)).status).toBe(404);
+    expect((await outro.get(`/api/pedidos/${pedidoId}/excel`)).status).toBe(404);
   });
 
   it('comercial aprova: o pedido sai da fila de pendentes', async () => {
@@ -155,5 +175,15 @@ describe('fluxo do pedido (Mercado X)', () => {
   it('vendedor não consegue descartar pedido já enviado', async () => {
     const r = await vendedor.delete(`/api/pedidos/${pedidoId}`);
     expect(r.status).toBe(409);
+  });
+
+  it('admin consegue excluir pedido enviado e ele sai do histórico do cliente', async () => {
+    const excl = await admin.post(`/api/admin/pedidos/${pedidoId}/cancelar`).send({});
+    expect(excl.status).toBe(200);
+    expect(excl.body.pedido.status).toBe('CANCELADO');
+    const hist = await vendedor.get(`/api/clientes/${MERCADO_X_ID}/historico`);
+    expect(hist.status).toBe(200);
+    const ids = (hist.body.historico as { pedidoId: string }[]).map((p) => p.pedidoId);
+    expect(ids).not.toContain(pedidoId);
   });
 });

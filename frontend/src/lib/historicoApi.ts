@@ -19,6 +19,7 @@ export interface PedidoHistorico {
   numeroPedido: string | null;
   data: string;
   total: number;
+  situacao?: 'EM_ANALISE' | 'APROVADO';
   itens: ItemHistorico[];
 }
 

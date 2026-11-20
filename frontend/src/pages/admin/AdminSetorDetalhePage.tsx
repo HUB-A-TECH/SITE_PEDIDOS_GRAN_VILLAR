@@ -5,7 +5,7 @@ import { Aviso } from '../../components/Aviso';
 import { useDialogo } from '../../context/DialogoContext';
 import * as setoresApi from '../../lib/setoresApi';
 import { CORES_SETOR, paleta, type CorSetor } from '../../lib/coresSetor';
-import { nomeCliente, razaoSecundaria } from '../../lib/formatar';
+import { clienteBateBusca, compararClientes, nomeCliente, razaoSecundaria } from '../../lib/formatar';
 import type { ClienteDoSetor, SetorDetalhe } from '../../lib/types';
 import { mensagemErro } from '../../lib/erros';
 
@@ -51,15 +51,15 @@ export function AdminSetorDetalhePage() {
 
   const clientesVisiveis = useMemo(() => {
     if (!dados) return [];
-    const termo = busca.trim().toLowerCase();
-    return dados.clientes.filter((c) => {
-      const okFiltro =
-        filtro === 'TODOS' ||
-        (filtro === 'NESTE' && c.setor?.id === dados.setor.id) ||
-        (filtro === 'SEM' && !c.setor);
-      const texto = `${c.nome} ${c.nomeFantasia ?? ''} ${c.codigo} ${c.bairro ?? ''} ${c.cidade ?? ''}`;
-      return okFiltro && (!termo || texto.toLowerCase().includes(termo));
-    });
+    return dados.clientes
+      .filter((c) => {
+        const okFiltro =
+          filtro === 'TODOS' ||
+          (filtro === 'NESTE' && c.setor?.id === dados.setor.id) ||
+          (filtro === 'SEM' && !c.setor);
+        return okFiltro && clienteBateBusca(c, busca, [c.bairro, c.cidade]);
+      })
+      .sort(compararClientes);
   }, [dados, filtro, busca]);
 
   if (carregando) {
@@ -241,7 +241,7 @@ export function AdminSetorDetalhePage() {
       <h2 className="mb-2 text-sm font-bold text-slate-700">Clientes</h2>
       <input
         type="search"
-        placeholder="Buscar por nome, código, bairro ou cidade…"
+        placeholder="Buscar por código, nome fantasia, razão social, bairro ou cidade…"
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
         className="mb-3 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"

@@ -77,6 +77,20 @@ export async function historicoPorProduto(
   return mapa;
 }
 
+export type SituacaoPedido = 'EM_ANALISE' | 'APROVADO';
+
+/** Situação de revisão de um pedido confirmado, para exibição no perfil e histórico do cliente. */
+export function situacaoPedido(p: {
+  editadoEm: Date | null;
+  ultimaAlteracaoEm: Date | null;
+}): SituacaoPedido {
+  if (!p.editadoEm) return 'EM_ANALISE';
+  if (p.ultimaAlteracaoEm && p.ultimaAlteracaoEm.getTime() > p.editadoEm.getTime()) {
+    return 'EM_ANALISE';
+  }
+  return 'APROVADO';
+}
+
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
 const dataDoPedido = (p: { confirmadoEm: Date | null; criadoEm: Date }) =>
   p.confirmadoEm ?? p.criadoEm;
@@ -99,6 +113,8 @@ export async function resumoDoCliente(clienteId: string) {
         total: true,
         confirmadoEm: true,
         criadoEm: true,
+        editadoEm: true,
+        ultimaAlteracaoEm: true,
         _count: { select: { itens: true, revisoes: { where: { superadaEm: null } } } },
       },
       orderBy: { confirmadoEm: { sort: 'desc', nulls: 'last' } },
@@ -184,6 +200,7 @@ export async function resumoDoCliente(clienteId: string) {
       total: Number(p.total),
       itensCount: p._count.itens,
       alteradoPeloComercial: p._count.revisoes > 0,
+      situacao: situacaoPedido(p),
     })),
   };
 }

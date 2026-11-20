@@ -19,6 +19,7 @@ export const SENHAS = {
 } as const;
 
 export const pedidosCriados: string[] = [];
+let vinculoSetorTemporarioId: string | null = null;
 
 export async function entrar(quem: keyof typeof SENHAS) {
   const agente = request.agent(app);
@@ -45,9 +46,26 @@ export async function conferirBancoLimpo() {
   if (sobras > 0) {
     throw new Error('vendedor2 já tem pedido salvo no Mercado X: abortando.');
   }
+  // Garante temporariamente que vendedor2 atenda o setor do Mercado X durante o teste.
+  const v2 = await prisma.vendedor.findFirst({ where: { usuario: { username: 'vendedor2' } } });
+  if (cliente.setorId && v2) {
+    const existe = await prisma.setorVendedor.findFirst({
+      where: { setorId: cliente.setorId, vendedorId: v2.id },
+    });
+    if (!existe) {
+      const novo = await prisma.setorVendedor.create({
+        data: { setorId: cliente.setorId, vendedorId: v2.id },
+      });
+      vinculoSetorTemporarioId = novo.id;
+    }
+  }
 }
 
 export async function limparPedidosDeTeste() {
+  if (vinculoSetorTemporarioId) {
+    await prisma.setorVendedor.deleteMany({ where: { id: vinculoSetorTemporarioId } });
+    vinculoSetorTemporarioId = null;
+  }
   if (pedidosCriados.length === 0) return;
   // Itens e revisões caem em cascata junto com o pedido.
   await prisma.alteracaoMix.deleteMany({ where: { pedidoId: { in: pedidosCriados } } });

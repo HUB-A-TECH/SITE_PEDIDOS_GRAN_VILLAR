@@ -38,7 +38,7 @@ export function AdminPedidoDetalhePage() {
   const [carregando, setCarregando] = useState(true);
   const [historicoVisivel, setHistoricoVisivel] = useState(false);
   const [enviando, setEnviando] = useState(false);
-  const [compartilhando, setCompartilhando] = useState(false);
+  const [compartilhando, setCompartilhando] = useState<'pdf' | 'excel' | null>(null);
   // Pilha de estados da revisão: [0] = como o vendedor deixou.
   const [passos, setPassos] = useState<Estado[]>([]);
   const [posicao, setPosicao] = useState(0);
@@ -143,23 +143,24 @@ export function AdminPedidoDetalhePage() {
     return axios.isAxiosError(e) && e.response?.data?.mensagem ? e.response.data.mensagem : padrao;
   }
 
-  async function compartilharPdf() {
+  async function compartilharArquivo(tipo: 'pdf' | 'excel') {
     if (!pedido) return;
-    setCompartilhando(true);
+    setCompartilhando(tipo);
     try {
-      await pedidosApi.compartilharPdfPedido({
+      const fn = tipo === 'pdf' ? pedidosApi.compartilharPdfPedido : pedidosApi.compartilharExcelPedido;
+      await fn({
         pedidoId: pedido.id,
         numeroPedido: pedido.numeroPedido,
         cliente: pedido.cliente,
       });
     } catch {
       await dialogo.avisar({
-        titulo: 'Não foi possível compartilhar o PDF',
+        titulo: `Não foi possível compartilhar o ${tipo === 'pdf' ? 'PDF' : 'Excel'}`,
         tom: 'erro',
         mensagem: 'Verifique o sinal e tente novamente.',
       });
     } finally {
-      setCompartilhando(false);
+      setCompartilhando(null);
     }
   }
 
@@ -169,6 +170,45 @@ export function AdminPedidoDetalhePage() {
       iniciar(await pedidosApi.adminAprovar(pedido!.id));
     } catch (e) {
       await dialogo.avisar({ titulo: 'Não foi possível aprovar', tom: 'erro', mensagem: erroDe(e, 'Tente novamente.') });
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function excluirPedido() {
+    if (!pedido) return;
+    const ok = await dialogo.confirmar({
+      titulo: 'Excluir pedido',
+      destrutivo: true,
+      textoConfirmar: 'Sim, excluir',
+      mensagem: (
+        <>
+          O pedido <strong>{pedido.numeroPedido ?? ''}</strong> de{' '}
+          <strong>{nomeCliente(pedido.cliente)}</strong> (Cód. {pedido.cliente.codigo}) será movido
+          para <strong>Excluídos</strong> e não contará no histórico do cliente.
+        </>
+      ),
+    });
+    if (!ok) return;
+
+    const motivo = await dialogo.pedirTexto({
+      titulo: 'Motivo da exclusão',
+      rotulo: 'Motivo',
+      opcional: true,
+      placeholder: 'Ex.: pedido duplicado ou cliente cancelou',
+      mensagem: 'Opcional: ajuda a equipe a entender o motivo depois.',
+    });
+    if (motivo === null) return;
+
+    setEnviando(true);
+    try {
+      iniciar(await pedidosApi.adminCancelar(pedido.id, motivo || undefined));
+    } catch (e) {
+      await dialogo.avisar({
+        titulo: 'Não foi possível excluir',
+        tom: 'erro',
+        mensagem: erroDe(e, 'Tente novamente.'),
+      });
     } finally {
       setEnviando(false);
     }
@@ -216,7 +256,10 @@ export function AdminPedidoDetalhePage() {
         <div className={`mb-4 rounded-xl border-l-4 bg-white p-4 shadow-sm ${est.borderClass}`}>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="font-semibold text-slate-800">{nomeCliente(pedido.cliente)}</p>
+              <p className="flex flex-wrap items-baseline gap-x-2 font-semibold text-slate-800">
+                <span>{nomeCliente(pedido.cliente)}</span>
+                <span className="text-xs font-normal text-slate-500">Cód. {pedido.cliente.codigo}</span>
+              </p>
               {razaoSecundaria(pedido.cliente) && (
                 <p className="text-xs text-slate-500">{razaoSecundaria(pedido.cliente)}</p>
               )}
@@ -392,34 +435,52 @@ export function AdminPedidoDetalhePage() {
           </p>
         </div>
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex">
           <button
             type="button"
-            onClick={compartilharPdf}
-            disabled={compartilhando}
-            className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+            onClick={() => compartilharArquivo('pdf')}
+            disabled={compartilhando !== null}
+            className="rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300 sm:flex-1"
           >
-            {compartilhando ? 'Abrindo…' : 'Compartilhar'}
+            {compartilhando === 'pdf' ? 'Abrindo…' : 'Compartilhar PDF'}
           </button>
           <a
             href={pedidosApi.pdfHref(pedido.id)}
             target="_blank"
             rel="noopener"
-            className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
+            className="rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200 sm:flex-1"
           >
             Baixar PDF
           </a>
-          <a
-            href={pedidosApi.txtHref(pedido.id)}
-            className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
+          <button
+            type="button"
+            onClick={() => compartilharArquivo('excel')}
+            disabled={compartilhando !== null}
+            className="rounded-lg border border-brand-600 bg-white py-2 text-center text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 sm:flex-1"
           >
-            Baixar TXT
+            {compartilhando === 'excel' ? 'Abrindo…' : 'Compartilhar Excel'}
+          </button>
+          <a
+            href={pedidosApi.excelHref(pedido.id)}
+            className="rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200 sm:flex-1"
+          >
+            Baixar Excel
           </a>
         </div>
         {temMudancas && (
           <p className="mt-2 text-center text-[11px] text-slate-400">
-            O PDF e o TXT mostram o pedido como está gravado (sem as alterações não confirmadas).
+            O PDF e o Excel mostram o pedido como está gravado (sem as alterações não confirmadas).
           </p>
+        )}
+        {podeEditar && (
+          <button
+            type="button"
+            onClick={excluirPedido}
+            disabled={enviando}
+            className="mt-3 w-full rounded-lg border border-red-200 bg-white py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            Excluir pedido
+          </button>
         )}
       </div>
 

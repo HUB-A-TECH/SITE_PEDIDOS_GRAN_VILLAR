@@ -14,6 +14,10 @@ import { MeusClientesPage } from './pages/vendedor/MeusClientesPage';
 import { PerfilClientePage } from './pages/vendedor/PerfilClientePage';
 import type { UserType } from './lib/types';
 
+const CatalogoVendedorPage = lazy(() =>
+  import('./pages/vendedor/CatalogoVendedorPage').then((m) => ({ default: m.CatalogoVendedorPage })),
+);
+
 // Telas de administração: só baixam quando alguém abre (o vendedor nunca paga esse peso).
 const AdminProdutosPage = lazy(() =>
   import('./pages/admin/AdminProdutosPage').then((m) => ({ default: m.AdminProdutosPage })),
@@ -54,6 +58,7 @@ const AdminUsuariosPage = lazy(() =>
 
 const ADMIN: UserType[] = ['ADMIN_COMERCIAL', 'ADMIN_TI'];
 const ADMIN_TI: UserType[] = ['ADMIN_TI'];
+const VENDEDOR: UserType[] = ['VENDEDOR'];
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -95,6 +100,16 @@ export const router = createBrowserRouter([
       <ProtectedRoute>
         <MeusPedidosPage />
       </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/catalogo',
+    element: (
+      <RoleRoute permitido={VENDEDOR}>
+        <PaginaLazy>
+          <CatalogoVendedorPage />
+        </PaginaLazy>
+      </RoleRoute>
     ),
   },
   {

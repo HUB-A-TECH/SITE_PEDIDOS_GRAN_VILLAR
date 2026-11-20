@@ -1,13 +1,23 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { MERCADO_X_ID, entrar, prisma } from './helpers';
+import {
+  MERCADO_X_ID,
+  conferirBancoLimpo,
+  entrar,
+  limparPedidosDeTeste,
+  prisma,
+} from './helpers';
 
 type Agente = Awaited<ReturnType<typeof entrar>>;
 let vendedor: Agente;
 
 beforeAll(async () => {
+  await conferirBancoLimpo();
   vendedor = await entrar('vendedor2');
 });
-afterAll(() => prisma.$disconnect());
+afterAll(async () => {
+  await limparPedidosDeTeste();
+  await prisma.$disconnect();
+});
 
 describe('leituras otimizadas devolvem o mesmo que o cálculo direto no banco (somente leitura)', () => {
   it('preço do catálogo do vendedor = tabela do cliente, com fallback no preço do produto', async () => {

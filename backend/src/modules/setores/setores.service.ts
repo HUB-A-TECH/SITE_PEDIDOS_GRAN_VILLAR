@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { ordenarClientesPorFantasia } from '../../lib/carteira';
 
 const setorInclude = {
   vendedores: {
@@ -60,8 +61,8 @@ export function vendedoresDaFilial(localId: string) {
 }
 
 /** Todos os clientes da filial, com o setor atual de cada um. */
-export function clientesDaFilial(localId: string) {
-  return prisma.cliente.findMany({
+export async function clientesDaFilial(localId: string) {
+  const clientes = await prisma.cliente.findMany({
     where: { localId },
     select: {
       id: true,
@@ -75,6 +76,7 @@ export function clientesDaFilial(localId: string) {
     },
     orderBy: { nome: 'asc' },
   });
+  return ordenarClientesPorFantasia(clientes);
 }
 
 export function getVendedor(id: string) {

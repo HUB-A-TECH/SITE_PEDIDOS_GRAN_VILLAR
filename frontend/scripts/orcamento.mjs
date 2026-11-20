@@ -4,8 +4,9 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const dist = new URL('../dist/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const dist = fileURLToPath(new URL('../dist/', import.meta.url));
 const LIMITES_KB = { js: 115, css: 8, total: 130 }; // gzip, só o que a 1ª tela baixa
 
 const html = readFileSync(join(dist, 'index.html'), 'utf8');

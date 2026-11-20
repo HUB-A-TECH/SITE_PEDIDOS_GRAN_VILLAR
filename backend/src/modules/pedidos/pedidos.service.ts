@@ -425,7 +425,7 @@ export function cancelarPedido(pedidoId: string, motivo: string | null) {
   });
 }
 
-/** Pedido com todos os dados necessários para o TXT / detalhe. */
+/** Pedido com todos os dados necessários para o Excel / PDF / detalhe. */
 export function getPedidoCompleto(id: string) {
   return prisma.pedido.findUnique({
     where: { id },

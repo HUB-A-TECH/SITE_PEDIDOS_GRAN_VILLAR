@@ -70,6 +70,18 @@ export async function listarPorMix(req: Request, res: Response): Promise<void> {
   });
 }
 
+/** Catálogo completo com os preços da Tabela Padrão para consulta rápida do vendedor. */
+export async function listarCatalogoPadrao(_req: Request, res: Response): Promise<void> {
+  const { tabelaNome, produtos } = await service.listCatalogoPadrao();
+  res.json({
+    tabelaNome,
+    produtos: produtos.map((p) => {
+      const item = p.tabelaPrecoItens[0];
+      return serialize(p, item ? Number(item.preco) : Number(p.preco));
+    }),
+  });
+}
+
 // ---- Admin ----
 
 const produtoCreateSchema = z.object({

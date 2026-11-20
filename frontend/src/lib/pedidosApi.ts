@@ -124,14 +124,22 @@ export async function cancelar(pedidoId: string, motivo?: string): Promise<void>
   await api.post(`/pedidos/${pedidoId}/cancelar`, { motivo });
 }
 
-/** URL de download do TXT (mesma origem via proxy; cookie enviado). */
-export function txtHref(pedidoId: string): string {
-  return `/api/pedidos/${pedidoId}/txt`;
+/** URL de download do Excel (mesma origem via proxy; cookie enviado). */
+export function excelHref(pedidoId: string): string {
+  return `/api/pedidos/${pedidoId}/excel`;
 }
 
 /** URL de download do PDF (documento para entregar ao cliente). */
 export function pdfHref(pedidoId: string): string {
   return `/api/pedidos/${pedidoId}/pdf`;
+}
+
+/** Busca o Excel como Blob em memória (para compartilhamento direto via Web Share API). */
+export async function baixarExcelBlob(pedidoId: string): Promise<Blob> {
+  const res = await api.get<Blob>(`/pedidos/${pedidoId}/excel`, {
+    responseType: 'blob',
+  });
+  return res.data;
 }
 
 /** Busca o PDF como Blob em memória (para compartilhamento direto no celular via Web Share API). */
@@ -142,29 +150,62 @@ export async function baixarPdfBlob(pedidoId: string): Promise<Blob> {
   return res.data;
 }
 
-/** Nome padrão do arquivo PDF: <codigoCliente>_<codigoPedido>.pdf */
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+function limparParteNome(valor: string): string {
+  return valor
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function nomeArquivoExport(
+  cliente: { codigo: string; nome: string; nomeFantasia?: string | null },
+  numeroPedido: string | null,
+  pedidoId: string,
+  ext: 'pdf' | 'xlsx',
+): string {
+  const codCliente = limparParteNome(cliente.codigo);
+  const fantasia = limparParteNome(cliente.nomeFantasia?.trim() || cliente.nome);
+  const codPedido = limparParteNome(numeroPedido ?? pedidoId.slice(0, 8));
+  return `${['Gran_Villar', codCliente, fantasia, codPedido].filter(Boolean).join('_')}.${ext}`;
+}
+
+/** Nome padrão do arquivo PDF: Gran_Villar_<codigoCliente>_<nomeFantasia>_<codigoPedido>.pdf */
 export function nomeArquivoPdf(
-  codigoCliente: string,
+  cliente: { codigo: string; nome: string; nomeFantasia?: string | null },
   numeroPedido: string | null,
   pedidoId: string,
 ): string {
-  const codCliente = codigoCliente.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  const codPedido = (numeroPedido ?? pedidoId.slice(0, 8)).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-  return `${codCliente}_${codPedido}.pdf`;
+  return nomeArquivoExport(cliente, numeroPedido, pedidoId, 'pdf');
 }
 
-/**
- * Busca o PDF em memória e abre a folha nativa de compartilhamento do celular
- * (ou baixa o arquivo como fallback em navegadores sem suporte a compartilhar arquivos).
- */
-export async function compartilharPdfPedido(dados: {
+/** Nome padrão do arquivo Excel: Gran_Villar_<codigoCliente>_<nomeFantasia>_<codigoPedido>.xlsx */
+export function nomeArquivoExcel(
+  cliente: { codigo: string; nome: string; nomeFantasia?: string | null },
+  numeroPedido: string | null,
+  pedidoId: string,
+): string {
+  return nomeArquivoExport(cliente, numeroPedido, pedidoId, 'xlsx');
+}
+
+interface DadosCompartilhamentoPedido {
   pedidoId: string;
   numeroPedido: string | null;
   cliente: { codigo: string; nome: string; nomeFantasia?: string | null };
-}): Promise<void> {
-  const blob = await baixarPdfBlob(dados.pedidoId);
-  const nomeArquivo = nomeArquivoPdf(dados.cliente.codigo, dados.numeroPedido, dados.pedidoId);
-  const arquivo = new File([blob], nomeArquivo, { type: 'application/pdf' });
+}
+
+async function compartilharArquivoPedido(
+  dados: DadosCompartilhamentoPedido,
+  ext: 'pdf' | 'xlsx',
+  mime: string,
+  baixarBlob: (pedidoId: string) => Promise<Blob>,
+): Promise<void> {
+  const blob = await baixarBlob(dados.pedidoId);
+  const nomeArquivo = nomeArquivoExport(dados.cliente, dados.numeroPedido, dados.pedidoId, ext);
+  const arquivo = new File([blob], nomeArquivo, { type: mime });
   const titulo = dados.numeroPedido
     ? `Pedido ${dados.numeroPedido} — ${nomeCliente(dados.cliente)}`
     : `Pedido — ${nomeCliente(dados.cliente)}`;
@@ -192,6 +233,22 @@ export async function compartilharPdfPedido(dados: {
   a.click();
   a.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+/**
+ * Busca o PDF em memória e abre a folha nativa de compartilhamento do celular
+ * (ou baixa o arquivo como fallback em navegadores sem suporte a compartilhar arquivos).
+ */
+export async function compartilharPdfPedido(dados: DadosCompartilhamentoPedido): Promise<void> {
+  return compartilharArquivoPedido(dados, 'pdf', 'application/pdf', baixarPdfBlob);
+}
+
+/**
+ * Busca o Excel em memória e abre a folha nativa de compartilhamento do celular
+ * (ou baixa o arquivo como fallback em navegadores sem suporte a compartilhar arquivos).
+ */
+export async function compartilharExcelPedido(dados: DadosCompartilhamentoPedido): Promise<void> {
+  return compartilharArquivoPedido(dados, 'xlsx', XLSX_MIME, baixarExcelBlob);
 }
 
 // ---- Alterações do comercial ----
@@ -322,6 +379,18 @@ export async function adminAprovar(pedidoId: string): Promise<PedidoAdminDetalhe
   const res = await api.post<{ pedido: PedidoAdminDetalhe }>(
     `/admin/pedidos/${pedidoId}/aprovar`,
     {},
+  );
+  return res.data.pedido;
+}
+
+/** Exclui/cancela um pedido enviado (admin/comercial). */
+export async function adminCancelar(
+  pedidoId: string,
+  motivo?: string,
+): Promise<PedidoAdminDetalhe> {
+  const res = await api.post<{ pedido: PedidoAdminDetalhe }>(
+    `/admin/pedidos/${pedidoId}/cancelar`,
+    { motivo },
   );
   return res.data.pedido;
 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Aviso } from './Aviso';
 import { paleta } from '../lib/coresSetor';
-import { nomeCliente, razaoSecundaria } from '../lib/formatar';
+import { clienteBateBusca, compararClientes, nomeCliente, razaoSecundaria } from '../lib/formatar';
 import type { Cliente } from '../lib/types';
 
 interface Props {
@@ -20,11 +20,9 @@ export function ListaClientesPorSetor({ clientes, carregando, onEscolher, abrind
   const [busca, setBusca] = useState('');
 
   const grupos = useMemo(() => {
-    const termo = busca.toLowerCase();
     const mapa = new Map<string, { nome: string; cor: string | null; ordem: number; clientes: Cliente[] }>();
     for (const c of clientes) {
-      const texto = `${c.nome} ${c.nomeFantasia ?? ''} ${c.codigo} ${c.bairro ?? ''} ${c.cidade ?? ''}`;
-      if (!texto.toLowerCase().includes(termo)) continue;
+      if (!clienteBateBusca(c, busca, [c.bairro, c.cidade])) continue;
       const chave = c.setor?.id ?? '';
       if (!mapa.has(chave))
         mapa.set(chave, {
@@ -35,6 +33,7 @@ export function ListaClientesPorSetor({ clientes, carregando, onEscolher, abrind
         });
       mapa.get(chave)!.clientes.push(c);
     }
+    for (const g of mapa.values()) g.clientes.sort(compararClientes);
     // Mesma ordem dos cartões coloridos definida pelo admin.
     return [...mapa.values()].sort(
       (a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'),
@@ -45,7 +44,7 @@ export function ListaClientesPorSetor({ clientes, carregando, onEscolher, abrind
     <>
       <input
         type="search"
-        placeholder="Buscar cliente, bairro ou cidade…"
+        placeholder="Buscar por código, nome fantasia, razão social, bairro ou cidade…"
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
         className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"

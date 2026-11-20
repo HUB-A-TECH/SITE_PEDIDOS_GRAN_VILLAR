@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma';
+import { ordenarClientesPorFantasia } from '../../lib/carteira';
 import type { Prisma, TabelaPreco } from '@prisma/client';
 
 export function listar(apenasAtivas: boolean) {
@@ -76,12 +77,13 @@ export function definirPreco(
 }
 
 /** Clientes que usam a tabela — mostrado antes de confirmar um reajuste. */
-export function clientesDaTabela(tabelaId: string) {
-  return prisma.cliente.findMany({
+export async function clientesDaTabela(tabelaId: string) {
+  const clientes = await prisma.cliente.findMany({
     where: { tabelaPrecoId: tabelaId },
     select: { id: true, codigo: true, nome: true, nomeFantasia: true, ativo: true },
     orderBy: { nome: 'asc' },
   });
+  return ordenarClientesPorFantasia(clientes);
 }
 
 export function produtoExiste(id: string) {

@@ -1,21 +1,24 @@
 import { prisma } from '../../lib/prisma';
+import { ordenarClientesPorFantasia } from '../../lib/carteira';
 import type { AcaoMix, Cliente, ClienteProduto, Produto } from '@prisma/client';
 
-export function listByLocal(
+export async function listByLocal(
   localId: string,
   apenasAtivos: boolean,
 ): Promise<Cliente[]> {
-  return prisma.cliente.findMany({
+  const clientes = await prisma.cliente.findMany({
     where: { localId, ...(apenasAtivos ? { ativo: true } : {}) },
     orderBy: { nome: 'asc' },
   });
+  return ordenarClientesPorFantasia(clientes);
 }
 
-export function listTodos(apenasAtivos: boolean): Promise<Cliente[]> {
-  return prisma.cliente.findMany({
+export async function listTodos(apenasAtivos: boolean): Promise<Cliente[]> {
+  const clientes = await prisma.cliente.findMany({
     where: apenasAtivos ? { ativo: true } : {},
     orderBy: { nome: 'asc' },
   });
+  return ordenarClientesPorFantasia(clientes);
 }
 
 export function getById(id: string): Promise<Cliente | null> {
@@ -116,15 +119,16 @@ export type ClienteCompleto = Cliente & {
   } | null;
 };
 
-export function listByLocalCompleto(
+export async function listByLocalCompleto(
   localId: string,
   apenasAtivos: boolean,
 ): Promise<ClienteCompleto[]> {
-  return prisma.cliente.findMany({
+  const clientes = await prisma.cliente.findMany({
     where: { localId, ...(apenasAtivos ? { ativo: true } : {}) },
     include: clienteInclude,
     orderBy: { nome: 'asc' },
   });
+  return ordenarClientesPorFantasia(clientes);
 }
 
 export function getByIdCompleto(id: string): Promise<ClienteCompleto | null> {

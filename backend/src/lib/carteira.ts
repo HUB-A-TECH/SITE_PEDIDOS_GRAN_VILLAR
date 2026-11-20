@@ -33,6 +33,21 @@ export async function vendedorAtendeCliente(
   return total > 0;
 }
 
+/** Ordena clientes de A a Z priorizando o Nome Fantasia (fallback na Razão Social). */
+export function ordenarClientesPorFantasia<
+  T extends { nome: string; nomeFantasia: string | null; codigo?: string },
+>(lista: T[]): T[] {
+  return [...lista].sort((a, b) => {
+    const pa = a.nomeFantasia?.trim() || a.nome.trim();
+    const pb = b.nomeFantasia?.trim() || b.nome.trim();
+    return (
+      pa.localeCompare(pb, 'pt-BR', { sensitivity: 'base' }) ||
+      a.nome.trim().localeCompare(b.nome.trim(), 'pt-BR', { sensitivity: 'base' }) ||
+      (a.codigo ?? '').localeCompare(b.codigo ?? '', 'pt-BR', { sensitivity: 'base' })
+    );
+  });
+}
+
 /** Clientes dos setores do vendedor (por usuarioId), com o setor de cada um. */
 export async function clientesDoUsuarioVendedor(
   usuarioId: string,
@@ -40,7 +55,7 @@ export async function clientesDoUsuarioVendedor(
 ) {
   const vendedor = await getVendedorDoUsuario(usuarioId);
   if (!vendedor) return [];
-  return prisma.cliente.findMany({
+  const clientes = await prisma.cliente.findMany({
     where: {
       ...(apenasAtivos ? { ativo: true } : {}),
       ...doSetorDoVendedor(vendedor.id),
@@ -48,4 +63,5 @@ export async function clientesDoUsuarioVendedor(
     include: { setor: { select: { id: true, nome: true, cor: true, ordem: true } } },
     orderBy: { nome: 'asc' },
   });
+  return ordenarClientesPorFantasia(clientes);
 }

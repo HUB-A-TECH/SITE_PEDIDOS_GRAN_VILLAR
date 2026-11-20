@@ -82,8 +82,9 @@ const ROTAS_ADMIN: Chamada[] = [
   ['get', '/api/admin/pedidos'],
   ['get', `/api/admin/pedidos/${FAKE}`],
   ['get', `/api/admin/pedidos/${FAKE}/pdf`],
-  ['get', `/api/admin/pedidos/${FAKE}/txt`],
+  ['get', `/api/admin/pedidos/${FAKE}/excel`],
   ['post', `/api/admin/pedidos/${FAKE}/aprovar`],
+  ['post', `/api/admin/pedidos/${FAKE}/cancelar`],
   ['post', `/api/admin/pedidos/${FAKE}/revisao`],
   ['get', '/api/locais'],
   ['put', `/api/locais/${FAKE}`],
@@ -234,7 +235,7 @@ describe('vendedor de outro setor não vê nada do Mercado X', () => {
     ).toBe(404);
     expect((await v2.post(`/api/pedidos/${pedidoId}/confirmar`).send({})).status).toBe(404);
     expect((await v2.delete(`/api/pedidos/${pedidoId}`)).status).toBe(404);
-    expect((await v2.get(`/api/pedidos/${pedidoId}/txt`)).status).toBe(404);
+    expect((await v2.get(`/api/pedidos/${pedidoId}/excel`)).status).toBe(404);
   });
 
   it('o pedido do dono continua intacto depois das tentativas', async () => {

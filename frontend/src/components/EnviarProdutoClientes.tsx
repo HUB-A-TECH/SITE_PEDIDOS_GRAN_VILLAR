@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Aviso } from './Aviso';
 import * as clientesApi from '../lib/clientesApi';
 import * as produtosApi from '../lib/produtosApi';
-import { nomeCliente, razaoSecundaria } from '../lib/formatar';
+import { clienteBateBusca, compararClientes, nomeCliente, razaoSecundaria } from '../lib/formatar';
 import type { ClienteCompleto, Produto } from '../lib/types';
 
 type Modo = 'escolha' | 'selecionar';
@@ -36,14 +36,13 @@ export function EnviarProdutoClientes({
       .then((listas) => setClientes(listas.flat().filter((c) => c.ativo)));
   }, [modo, clientes]);
 
-  const visiveis = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
-    return (clientes ?? []).filter((c) =>
-      `${c.nome} ${c.nomeFantasia ?? ''} ${c.codigo} ${c.setor?.nome ?? ''}`
-        .toLowerCase()
-        .includes(termo),
-    );
-  }, [clientes, busca]);
+  const visiveis = useMemo(
+    () =>
+      (clientes ?? [])
+        .filter((c) => clienteBateBusca(c, busca, [c.setor?.nome]))
+        .sort(compararClientes),
+    [clientes, busca],
+  );
 
   async function enviar(alvo: { todos: true } | { clienteIds: string[] }) {
     setSalvando(true);
@@ -116,7 +115,7 @@ export function EnviarProdutoClientes({
         <>
           <input
             type="search"
-            placeholder="Buscar cliente ou setor…"
+            placeholder="Buscar por código, nome fantasia, razão social ou setor…"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-500"

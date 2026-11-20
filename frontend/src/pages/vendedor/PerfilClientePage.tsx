@@ -121,11 +121,12 @@ export function PerfilClientePage() {
         <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 text-xl font-bold text-brand-700">
           {iniciais(nomeCliente(c))}
         </div>
-        <p className="text-lg font-bold text-slate-800">{nomeCliente(c)}</p>
-        <p className="text-sm text-slate-500">
-          {razaoSecundaria(c) ? `${razaoSecundaria(c)} · ` : ''}
-          {c.codigo}
+        <p className="text-lg font-bold text-slate-800">
+          {nomeCliente(c)} <span className="text-sm font-normal text-slate-500">· Cód. {c.codigo}</span>
         </p>
+        {razaoSecundaria(c) && (
+          <p className="text-sm text-slate-500">{razaoSecundaria(c)}</p>
+        )}
         <div className="mt-2 flex flex-wrap justify-center gap-1.5">
           <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700">
             {c.setor ? c.setor.nome : 'Sem setor'}
@@ -270,13 +271,33 @@ export function PerfilClientePage() {
             {perfil.ultimosPedidos.map((p) => (
               <li key={p.pedidoId} className="flex items-center justify-between py-2 text-sm">
                 <div>
-                  <p className="text-slate-800">{p.numeroPedido ?? 'Pedido'}</p>
+                  {ehVendedor ? (
+                    <p className="text-slate-800">{p.numeroPedido ?? 'Pedido'}</p>
+                  ) : (
+                    <Link
+                      to={`/admin/pedidos/${p.pedidoId}`}
+                      className="font-medium text-brand-700 hover:underline"
+                    >
+                      {p.numeroPedido ?? 'Pedido'} →
+                    </Link>
+                  )}
                   <p className="text-xs text-slate-400">
                     {dataBR(p.data)} · {p.itensCount === 1 ? '1 item' : `${p.itensCount} itens`}
                   </p>
                   {p.alteradoPeloComercial && (
-                    <span className="mt-0.5 inline-block rounded-md bg-brandYellow-50 px-1.5 py-0.5 text-[11px] font-medium text-brandYellow-800">
+                    <span className="mt-0.5 mr-1 inline-block rounded-md bg-brandYellow-50 px-1.5 py-0.5 text-[11px] font-medium text-brandYellow-800">
                       alterado pelo comercial
+                    </span>
+                  )}
+                  {p.situacao && (
+                    <span
+                      className={`mt-0.5 inline-block rounded-md px-1.5 py-0.5 text-[11px] font-medium ${
+                        p.situacao === 'APROVADO'
+                          ? 'bg-brand-50 text-brand-700'
+                          : 'bg-brandYellow-50 text-brandYellow-800'
+                      }`}
+                    >
+                      {p.situacao === 'APROVADO' ? 'Aprovado' : 'Em análise'}
                     </span>
                   )}
                 </div>
@@ -288,7 +309,7 @@ export function PerfilClientePage() {
             to={`/clientes/${c.id}/historico`}
             className="mt-2 block rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
           >
-            Ver todos os pedidos e itens →
+            Ver histórico de pedidos (Últimos 6, 12 ou Tudo) →
           </Link>
         </Secao>
       )}

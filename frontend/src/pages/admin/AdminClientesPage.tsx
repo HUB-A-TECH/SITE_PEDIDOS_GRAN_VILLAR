@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
@@ -13,7 +13,7 @@ import {
 import * as clientesApi from '../../lib/clientesApi';
 import * as setoresApi from '../../lib/setoresApi';
 import * as tabelasApi from '../../lib/tabelasApi';
-import { nomeCliente, razaoSecundaria } from '../../lib/formatar';
+import { clienteBateBusca, compararClientes, nomeCliente, razaoSecundaria } from '../../lib/formatar';
 import type { ClienteCompleto, Local, Setor, TabelaPreco } from '../../lib/types';
 
 const inputCls =
@@ -29,6 +29,15 @@ export function AdminClientesPage() {
   const [modalAberto, setModalAberto] = useState(false);
   const [tabelas, setTabelas] = useState<TabelaPreco[]>([]);
   const [setores, setSetores] = useState<Setor[]>([]);
+  const [busca, setBusca] = useState('');
+
+  const clientesVisiveis = useMemo(
+    () =>
+      clientes
+        .filter((c) => clienteBateBusca(c, busca))
+        .sort(compararClientes),
+    [clientes, busca],
+  );
 
   useEffect(() => {
     clientesApi.listarLocais().then((ls) => {
@@ -87,7 +96,7 @@ export function AdminClientesPage() {
       <select
         value={localId}
         onChange={(e) => setLocalId(e.target.value)}
-        className={`${inputCls} mb-4`}
+        className={`${inputCls} mb-3`}
       >
         {locais.map((l) => (
           <option key={l.id} value={l.id}>
@@ -96,28 +105,38 @@ export function AdminClientesPage() {
         ))}
       </select>
 
+      <input
+        type="search"
+        placeholder="Buscar por código, nome fantasia ou razão social…"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
+        className={`${inputCls} mb-4 bg-white`}
+      />
+
       {carregando ? (
         <p className="text-center text-slate-500">Carregando…</p>
       ) : clientes.length === 0 ? (
         <p className="text-center text-slate-500">Nenhum cliente neste local.</p>
+      ) : clientesVisiveis.length === 0 ? (
+        <p className="text-center text-slate-500">Nenhum cliente encontrado.</p>
       ) : (
         <ul className="space-y-2">
-          {clientes.map((c) => (
+          {clientesVisiveis.map((c) => (
             <li key={c.id} className="rounded-xl bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-slate-800">
-                    {nomeCliente(c)}{' '}
+                  <p className="flex flex-wrap items-center gap-x-2 font-semibold text-slate-800">
+                    <span>{nomeCliente(c)}</span>
+                    <span className="text-xs font-normal text-slate-500">Cód. {c.codigo}</span>
                     {!c.ativo && (
-                      <span className="ml-1 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-500">
+                      <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-500">
                         inativo
                       </span>
                     )}
                   </p>
-                  <p className="text-xs text-slate-500">
-                    {razaoSecundaria(c) ? `${razaoSecundaria(c)} · ` : ''}
-                    {c.codigo}
-                  </p>
+                  {razaoSecundaria(c) && (
+                    <p className="text-xs text-slate-500">{razaoSecundaria(c)}</p>
+                  )}
                   <p className="mt-1 text-xs text-slate-500">
                     <span className="rounded bg-brand-50 px-1.5 py-0.5 font-medium text-brand-700">
                       {c.tabelaPreco?.nome ?? 'Sem tabela de preço'}
@@ -145,6 +164,12 @@ export function AdminClientesPage() {
                 className="mt-3 w-full rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
               >
                 Ver perfil do cliente →
+              </button>
+              <button
+                onClick={() => navigate(`/clientes/${c.id}/historico`)}
+                className="mt-2 w-full rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
+              >
+                Histórico de pedidos →
               </button>
               <button
                 onClick={() => navigate(`/admin/clientes/${c.id}/mix`)}

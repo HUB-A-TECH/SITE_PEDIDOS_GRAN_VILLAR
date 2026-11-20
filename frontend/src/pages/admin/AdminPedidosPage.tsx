@@ -1,37 +1,42 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
 import { useDialogo } from '../../context/DialogoContext';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { PedidoAdmin } from '../../lib/pedidosApi';
-import * as clientesApi from '../../lib/clientesApi';
-import { LIMITE_OPCOES, type Limite } from '../../lib/types';
-import type { Cliente } from '../../lib/types';
 import { estiloStatus } from '../../lib/statusPedido';
-import { brl, dataBR, dataHoraBR, nomeCliente, razaoSecundaria } from '../../lib/formatar';
+import { brl, clienteBateBusca, dataBR, dataHoraBR, nomeCliente, razaoSecundaria } from '../../lib/formatar';
 
+type AbaPedidos = 'EM_ANALISE' | 'APROVADOS' | 'TODOS' | 'EXCLUIDOS';
+
+const ABAS: { chave: AbaPedidos; label: string }[] = [
+  { chave: 'EM_ANALISE', label: 'Em análise' },
+  { chave: 'APROVADOS', label: 'Aprovados' },
+  { chave: 'TODOS', label: 'Todos' },
+  { chave: 'EXCLUIDOS', label: 'Excluídos' },
+];
 
 export function AdminPedidosPage() {
   const dialogo = useDialogo();
-  const [limite, setLimite] = useState<Limite>(12);
-  const [clienteId, setClienteId] = useState<string>('');
-  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [aba, setAba] = useState<AbaPedidos>('EM_ANALISE');
+  const [busca, setBusca] = useState('');
   const [pedidos, setPedidos] = useState<PedidoAdmin[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [compartilhando, setCompartilhando] = useState<string | null>(null);
+  const [compartilhando, setCompartilhando] = useState<{ id: string; tipo: 'pdf' | 'excel' } | null>(null);
   const [historicoAberto, setHistoricoAberto] = useState<Set<string>>(new Set());
 
-  async function compartilharPdf(p: PedidoAdmin) {
-    setCompartilhando(p.pedidoId);
+  async function compartilharArquivo(p: PedidoAdmin, tipo: 'pdf' | 'excel') {
+    setCompartilhando({ id: p.pedidoId, tipo });
     try {
-      await pedidosApi.compartilharPdfPedido({
+      const fn = tipo === 'pdf' ? pedidosApi.compartilharPdfPedido : pedidosApi.compartilharExcelPedido;
+      await fn({
         pedidoId: p.pedidoId,
         numeroPedido: p.numeroPedido,
         cliente: p.cliente,
       });
     } catch {
       await dialogo.avisar({
-        titulo: 'Não foi possível compartilhar o PDF',
+        titulo: `Não foi possível compartilhar o ${tipo === 'pdf' ? 'PDF' : 'Excel'}`,
         tom: 'erro',
         mensagem: 'Verifique o sinal e tente novamente.',
       });
@@ -50,58 +55,79 @@ export function AdminPedidosPage() {
   }
 
   useEffect(() => {
-    clientesApi.listar().then(setClientes).catch(() => setClientes([]));
-  }, []);
-
-  useEffect(() => {
     setCarregando(true);
     pedidosApi
-      .adminListarPedidos(limite, clienteId || undefined)
+      .adminListarPedidos('tudo')
       .then(setPedidos)
       .finally(() => setCarregando(false));
-  }, [limite, clienteId]);
+  }, []);
+
+  const filtrados = useMemo(
+    () =>
+      pedidos.filter((p) =>
+        clienteBateBusca(p.cliente, busca, [p.numeroPedido, p.vendedor.nomeCompleto]),
+      ),
+    [pedidos, busca],
+  );
+
+  const porAba = useMemo<Record<AbaPedidos, PedidoAdmin[]>>(() => {
+    const emAnalise: PedidoAdmin[] = [];
+    const aprovados: PedidoAdmin[] = [];
+    const excluidos: PedidoAdmin[] = [];
+    for (const p of filtrados) {
+      if (p.status === 'CANCELADO') {
+        excluidos.push(p);
+      } else if (p.status === 'CONFIRMADO' && p.revisao === 'REVISADO') {
+        aprovados.push(p);
+      } else {
+        emAnalise.push(p);
+      }
+    }
+    return {
+      EM_ANALISE: emAnalise,
+      APROVADOS: aprovados,
+      TODOS: filtrados,
+      EXCLUIDOS: excluidos,
+    };
+  }, [filtrados]);
+
+  const visiveis = porAba[aba];
 
   return (
     <AppLayout titulo="Pedidos" voltarPara="/">
-      <select
-        value={clienteId}
-        onChange={(e) => setClienteId(e.target.value)}
+      <input
+        type="search"
+        placeholder="Buscar por código do cliente, nome fantasia, razão social ou nº do pedido…"
+        value={busca}
+        onChange={(e) => setBusca(e.target.value)}
         className="mb-3 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 outline-none focus:border-brand-500"
-      >
-        <option value="">Todas as empresas</option>
-        {clientes.map((c) => (
-          <option key={c.id} value={c.id}>
-            {nomeCliente(c)}
-            {razaoSecundaria(c) ? ` (${razaoSecundaria(c)})` : ''}
-          </option>
-        ))}
-      </select>
+      />
 
-      <div className="mb-4 flex gap-2">
-        {LIMITE_OPCOES.map((o) => (
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:flex">
+        {ABAS.map((a) => (
           <button
-            key={o.valor}
-            onClick={() => setLimite(o.valor)}
-            className={`flex-1 rounded-lg py-2 text-sm font-medium ${
-              limite === o.valor
+            key={a.chave}
+            onClick={() => setAba(a.chave)}
+            className={`rounded-lg py-2 text-sm font-medium sm:flex-1 ${
+              aba === a.chave
                 ? 'bg-brand-600 text-white'
                 : 'bg-white text-slate-600 hover:bg-slate-200'
             }`}
           >
-            {o.label}
+            {a.label} ({porAba[a.chave].length})
           </button>
         ))}
       </div>
 
       {carregando ? (
         <p className="text-center text-slate-500">Carregando…</p>
-      ) : pedidos.length === 0 ? (
+      ) : visiveis.length === 0 ? (
         <p className="text-center text-slate-500">
-          Nenhum pedido encontrado.
+          Nenhum pedido nesta aba.
         </p>
       ) : (
         <ul className="space-y-2">
-          {pedidos.map((p) => {
+          {visiveis.map((p) => {
             const est = estiloStatus(p.status, p.revisao, p.comAlteracoes);
             return (
             <li
@@ -113,8 +139,9 @@ export function AdminPedidosPage() {
                 className="flex items-center justify-between"
               >
                 <div>
-                  <p className="flex items-center gap-2 font-semibold text-slate-800 hover:underline">
-                    {nomeCliente(p.cliente)}
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 font-semibold text-slate-800 hover:underline">
+                    <span>{nomeCliente(p.cliente)}</span>
+                    <span className="text-xs font-normal text-slate-500">Cód. {p.cliente.codigo}</span>
                     {est.badge && (
                       <span className="rounded-md bg-brandYellow-50 px-1.5 py-0.5 text-[10px] font-bold text-brandYellow-800 ring-1 ring-inset ring-brandYellow-300">
                         {est.badge}
@@ -157,28 +184,40 @@ export function AdminPedidosPage() {
                 )}
               </div>
 
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex">
                 <button
                   type="button"
-                  onClick={() => compartilharPdf(p)}
-                  disabled={compartilhando === p.pedidoId}
-                  className="flex-1 rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  onClick={() => compartilharArquivo(p, 'pdf')}
+                  disabled={compartilhando !== null}
+                  className="rounded-lg bg-brand-600 py-2 text-center text-sm font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300 sm:flex-1"
                 >
-                  {compartilhando === p.pedidoId ? 'Abrindo…' : 'Compartilhar'}
+                  {compartilhando?.id === p.pedidoId && compartilhando.tipo === 'pdf'
+                    ? 'Abrindo…'
+                    : 'Compartilhar PDF'}
                 </button>
                 <a
                   href={pedidosApi.pdfHref(p.pedidoId)}
                   target="_blank"
                   rel="noopener"
-                  className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
+                  className="rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200 sm:flex-1"
                 >
                   Baixar PDF
                 </a>
-                <a
-                  href={pedidosApi.txtHref(p.pedidoId)}
-                  className="flex-1 rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200"
+                <button
+                  type="button"
+                  onClick={() => compartilharArquivo(p, 'excel')}
+                  disabled={compartilhando !== null}
+                  className="rounded-lg border border-brand-600 bg-white py-2 text-center text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 sm:flex-1"
                 >
-                  Baixar TXT
+                  {compartilhando?.id === p.pedidoId && compartilhando.tipo === 'excel'
+                    ? 'Abrindo…'
+                    : 'Compartilhar Excel'}
+                </button>
+                <a
+                  href={pedidosApi.excelHref(p.pedidoId)}
+                  className="rounded-lg bg-slate-100 py-2 text-center text-sm font-medium text-slate-700 hover:bg-slate-200 sm:flex-1"
+                >
+                  Baixar Excel
                 </a>
               </div>
             </li>

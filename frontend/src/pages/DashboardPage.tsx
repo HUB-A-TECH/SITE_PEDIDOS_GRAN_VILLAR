@@ -55,13 +55,13 @@ export function DashboardPage() {
         { titulo: 'Produtos', desc: 'Catálogo: adicionar e editar', to: '/admin/produtos' },
         { titulo: 'Categorias', desc: 'Nomes e ordem em que os produtos aparecem', to: '/admin/categorias' },
         { titulo: 'Tabelas de Preço', desc: 'Preços por grupo de clientes', to: '/admin/tabelas' },
-        { titulo: 'Clientes', desc: 'Cadastro e mix de cada cliente', to: '/admin/clientes' },
+        { titulo: 'Clientes', desc: 'Cadastro, mix e histórico de cada cliente', to: '/admin/clientes' },
         {
           titulo: 'Setores',
           desc: 'Regiões de visita: vendedores e clientes de cada uma',
           to: '/admin/setores',
         },
-        { titulo: 'Pedidos', desc: 'Ver pedidos e baixar TXT', to: '/admin/pedidos' },
+        { titulo: 'Pedidos', desc: 'Ver pedidos e baixar PDF/Excel', to: '/admin/pedidos' },
         ...(isAdminTI
           ? [
               {
@@ -92,6 +92,11 @@ export function DashboardPage() {
               : 'Pedidos salvos, enviados e cancelados',
           to: '/meus-pedidos',
           aviso: aConfirmar,
+        },
+        {
+          titulo: 'Catálogo',
+          desc: 'Todos os produtos com os preços da Tabela Padrão',
+          to: '/catalogo',
         },
       ];
 
