@@ -16,3 +16,5 @@ pedidosAdminRoutes.post('/:id/aprovar', asyncHandler(controller.adminAprovar));
 pedidosAdminRoutes.post('/:id/cancelar', asyncHandler(controller.adminCancelar));
 // Confirma de uma vez as alterações feitas na tela de revisão.
 pedidosAdminRoutes.post('/:id/revisao', asyncHandler(controller.adminRevisar));
+pedidosAdminRoutes.post('/:id/recado', asyncHandler(controller.adminSalvarRecado));
+pedidosAdminRoutes.post('/:id/encerrar-aviso', asyncHandler(controller.adminEncerrarAviso));

@@ -271,10 +271,12 @@ export interface AlteracaoComercial {
   revisadoPor: string;
   revisadoEm: string;
   alteracoes: AlteracaoItem[];
+  recado?: string | null;
   totalAntes: number;
   totalDepois: number;
   /** O vendedor ainda não viu. */
   novo: boolean;
+  vistoPeloVendedorEm?: string | null;
 }
 
 /** Quantas alterações do comercial o vendedor ainda não viu (aviso no menu). */
@@ -309,6 +311,8 @@ export interface PedidoAdmin {
   revisao: Revisao;
   /** Aprovado com alterações do comercial (ainda valendo). */
   comAlteracoes: boolean;
+  /** null quando não há revisão vigente; true se todas foram vistas pelo vendedor. */
+  vistoPeloVendedor?: boolean | null;
 }
 
 export async function adminListarPedidos(
@@ -366,10 +370,35 @@ export interface ItemRevisado {
 export async function adminRevisar(
   pedidoId: string,
   itens: ItemRevisado[],
+  recado?: string,
 ): Promise<PedidoAdminDetalhe> {
+  const texto = recado?.trim();
   const res = await api.post<{ pedido: PedidoAdminDetalhe }>(
     `/admin/pedidos/${pedidoId}/revisao`,
-    { itens },
+    { itens, ...(texto ? { recado: texto } : {}) },
+  );
+  return res.data.pedido;
+}
+
+/** Grava ou atualiza um recado da administração para o vendedor e próximo pedido. */
+export async function adminSalvarRecado(
+  pedidoId: string,
+  recado: string,
+): Promise<PedidoAdminDetalhe> {
+  const res = await api.post<{ pedido: PedidoAdminDetalhe }>(
+    `/admin/pedidos/${pedidoId}/recado`,
+    { recado },
+  );
+  return res.data.pedido;
+}
+
+/** Encerra os avisos/alterações vigentes do pedido (ex.: situação normalizada). */
+export async function adminEncerrarAviso(
+  pedidoId: string,
+): Promise<PedidoAdminDetalhe> {
+  const res = await api.post<{ pedido: PedidoAdminDetalhe }>(
+    `/admin/pedidos/${pedidoId}/encerrar-aviso`,
+    {},
   );
   return res.data.pedido;
 }

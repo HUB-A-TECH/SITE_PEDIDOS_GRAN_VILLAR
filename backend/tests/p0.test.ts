@@ -172,6 +172,52 @@ describe('fluxo do pedido (Mercado X)', () => {
     expect(meu.revisao).toBe('REVISADO');
   });
 
+  it('recado no último pedido aparece ao vendedor, marca leitura e some ao encerrar', async () => {
+    const rec = await admin
+      .post(`/api/admin/pedidos/${pedidoId}/recado`)
+      .send({ recado: 'Só tínhamos 12 pápricas defumadas hoje' });
+    expect(rec.status).toBe(200);
+    expect(rec.body.pedido.alteracoesComercial[0].recado).toBe(
+      'Só tínhamos 12 pápricas defumadas hoje',
+    );
+    expect(rec.body.pedido.alteracoesComercial[0].novo).toBe(true);
+
+    const antes = await vendedor.get(`/api/clientes/${MERCADO_X_ID}/anotacoes`);
+    expect(antes.status).toBe(200);
+    expect(antes.body.avisoUltimoPedido?.pedidoId).toBe(pedidoId);
+    expect(antes.body.avisoUltimoPedido.revisoes[0].novo).toBe(true);
+    expect(antes.body.avisoUltimoPedido.revisoes[0].vistoPeloVendedorEm).toBeNull();
+
+    const listaAntes = await admin.get('/api/admin/pedidos');
+    const itemAntes = listaAntes.body.pedidos.find(
+      (p: { pedidoId: string }) => p.pedidoId === pedidoId,
+    );
+    expect(itemAntes.vistoPeloVendedor).toBe(false);
+
+    const marcou = await vendedor
+      .post('/api/pedidos/alteracoes/vistas')
+      .send({ pedidoIds: [pedidoId] });
+    expect(marcou.status).toBe(200);
+    expect(marcou.body.marcadas).toBeGreaterThanOrEqual(1);
+
+    const depois = await vendedor.get(`/api/clientes/${MERCADO_X_ID}/anotacoes`);
+    expect(depois.body.avisoUltimoPedido.revisoes[0].novo).toBe(false);
+    expect(depois.body.avisoUltimoPedido.revisoes[0].vistoPeloVendedorEm).toBeTruthy();
+
+    const listaDepois = await admin.get('/api/admin/pedidos');
+    const itemDepois = listaDepois.body.pedidos.find(
+      (p: { pedidoId: string }) => p.pedidoId === pedidoId,
+    );
+    expect(itemDepois.vistoPeloVendedor).toBe(true);
+
+    const encerrar = await admin.post(`/api/admin/pedidos/${pedidoId}/encerrar-aviso`).send({});
+    expect(encerrar.status).toBe(200);
+    expect(encerrar.body.pedido.alteracoesComercial).toHaveLength(0);
+
+    const aposEncerrar = await vendedor.get(`/api/clientes/${MERCADO_X_ID}/anotacoes`);
+    expect(aposEncerrar.body.avisoUltimoPedido).toBeNull();
+  });
+
   it('vendedor não consegue descartar pedido já enviado', async () => {
     const r = await vendedor.delete(`/api/pedidos/${pedidoId}`);
     expect(r.status).toBe(409);

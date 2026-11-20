@@ -144,7 +144,7 @@ export async function meuHistorico(req: Request, res: Response): Promise<void> {
       ultimaAlteracaoEm: p.ultimaAlteracaoEm,
       revisao: calcularRevisao(p),
       // O que o comercial alterou e ainda vale (pedido cancelado não mostra).
-      alteracoesComercial: p.status === 'CONFIRMADO' ? serializeRevisoes(p.revisoes) : [],
+      alteracoesComercial: p.status === 'CONFIRMADO' ? service.serializarRevisoes(p.revisoes) : [],
     })),
   });
 }
@@ -631,23 +631,10 @@ export async function adminListar(req: Request, res: Response): Promise<void> {
       ultimaAlteracaoEm: p.ultimaAlteracaoEm,
       revisao: calcularRevisao(p),
       comAlteracoes: p._count.revisoes > 0,
+      vistoPeloVendedor:
+        p.revisoes.length > 0 ? p.revisoes.every((r) => r.vistoPeloVendedorEm !== null) : null,
     })),
   });
-}
-
-type RevisaoVigente = PedidoAdminComItens['revisoes'][number];
-
-/** Revisões do comercial com alterações, no formato das telas. */
-function serializeRevisoes(revisoes: RevisaoVigente[]) {
-  return revisoes.map((r) => ({
-    id: r.id,
-    revisadoPor: r.revisadoPor.username,
-    revisadoEm: r.revisadoEm,
-    alteracoes: r.alteracoes as unknown as service.AlteracaoItem[],
-    totalAntes: Number(r.totalAntes),
-    totalDepois: Number(r.totalDepois),
-    novo: !r.vistoPeloVendedorEm,
-  }));
 }
 
 type PedidoAdminComItens = NonNullable<
@@ -681,7 +668,7 @@ function serializeAdmin(p: PedidoAdminComItens, mapa: precos.MapaPrecos = new Ma
       : null,
     ultimaAlteracaoEm: p.ultimaAlteracaoEm,
     revisao: calcularRevisao(p),
-    alteracoesComercial: serializeRevisoes(p.revisoes),
+    alteracoesComercial: service.serializarRevisoes(p.revisoes),
     itens: p.itens.map((i) => ({
       id: i.id,
       produtoId: i.produtoId,
@@ -756,6 +743,43 @@ export async function adminCancelar(req: Request, res: Response): Promise<void> 
   res.json({ pedido: atualizado ? await serializeAdminComTabela(atualizado) : null });
 }
 
+/** Grava ou atualiza um recado da administração no pedido (aparece ao vendedor e no próximo pedido). */
+export async function adminSalvarRecado(req: Request, res: Response): Promise<void> {
+  const pedido = await carregarPedidoAdminEditavel(req.params.id, res);
+  if (!pedido) return;
+
+  const parsed = z
+    .object({
+      recado: z
+        .string()
+        .trim()
+        .min(1, 'Escreva o recado')
+        .max(500, 'O recado pode ter no máximo 500 caracteres'),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ mensagem: parsed.error.issues[0]?.message ?? 'Dados inválidos' });
+    return;
+  }
+
+  await service.salvarRecadoAdmin({
+    pedidoId: pedido.id,
+    usuarioId: req.user!.sub,
+    recado: parsed.data.recado,
+  });
+  const atualizado = await service.getPedidoParaAdmin(pedido.id);
+  res.json({ pedido: atualizado ? await serializeAdminComTabela(atualizado) : null });
+}
+
+/** Encerra avisos e alertas de alterações vigentes do pedido (ex.: situação normalizada). */
+export async function adminEncerrarAviso(req: Request, res: Response): Promise<void> {
+  const pedido = await carregarPedidoAdminEditavel(req.params.id, res);
+  if (!pedido) return;
+  await service.encerrarAvisosPedido(pedido.id);
+  const atualizado = await service.getPedidoParaAdmin(pedido.id);
+  res.json({ pedido: atualizado ? await serializeAdminComTabela(atualizado) : null });
+}
+
 const revisaoSchema = z.object({
   // Todos os itens do pedido: como o comercial viu ao abrir (base) e como
   // deixou. Quantidade 0 = remover o item.
@@ -770,6 +794,7 @@ const revisaoSchema = z.object({
       }),
     )
     .min(1),
+  recado: z.string().trim().max(500, 'O recado pode ter no máximo 500 caracteres').optional(),
 });
 
 const arred = (v: number, casas: number) => Math.round(v * 10 ** casas) / 10 ** casas;
@@ -833,7 +858,8 @@ export async function adminRevisar(req: Request, res: Response): Promise<void> {
     }
   }
 
-  if (alteracoes.length === 0) {
+  const recado = parsed.data.recado?.trim() || null;
+  if (alteracoes.length === 0 && !recado) {
     res.status(400).json({ mensagem: 'Nenhuma alteração para confirmar. Use "Aprovar pedido".' });
     return;
   }
@@ -848,6 +874,7 @@ export async function adminRevisar(req: Request, res: Response): Promise<void> {
       usuarioId: req.user!.sub,
       itens,
       alteracoes,
+      recado,
     });
   } catch (e) {
     if (e instanceof service.PedidoMudouError) {

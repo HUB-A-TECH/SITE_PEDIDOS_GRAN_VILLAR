@@ -14,7 +14,11 @@ import {
   type Produto,
 } from '../../lib/types';
 import { useCategorias } from '../../lib/categoriasApi';
-import { AnotacoesFixadas, useAnotacoes } from '../../components/AnotacoesCliente';
+import {
+  AnotacoesFixadas,
+  AvisoUltimoPedidoCard,
+  useAnotacoes,
+} from '../../components/AnotacoesCliente';
 import { brl, nomeCliente } from '../../lib/formatar';
 
 
@@ -37,8 +41,12 @@ export function PedidoPage() {
   );
   const dialogo = useDialogo();
   const [pedido, setPedido] = useState<Pedido | null>(null);
-  // Recados fixados do cliente, lembrados na hora de montar o pedido.
-  const { anotacoes } = useAnotacoes(pedido?.clienteId ?? '');
+  // Recados fixados e avisos do último pedido do cliente, lembrados ao tirar o pedido.
+  const {
+    anotacoes,
+    avisoUltimoPedido,
+    recarregar: recarregarAnotacoes,
+  } = useAnotacoes(pedido?.clienteId ?? '');
   const [produtos, setProdutos] = useState<Produto[]>([]);
   // Produtos que o cliente não tem no mix, e os que o vendedor puxou de lá
   // "só neste pedido" (ainda sem quantidade).
@@ -514,6 +522,11 @@ export function PedidoPage() {
     >
       <div className="pb-52">
         <AnotacoesFixadas anotacoes={anotacoes} className="mb-3" />
+        <AvisoUltimoPedidoCard
+          aviso={avisoUltimoPedido}
+          onAtualizar={recarregarAnotacoes}
+          className="mb-3"
+        />
         <input
           type="search"
           placeholder="Buscar produto no mix…"

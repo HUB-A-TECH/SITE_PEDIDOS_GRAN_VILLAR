@@ -147,6 +147,20 @@ export function AdminPedidosPage() {
                         {est.badge}
                       </span>
                     )}
+                    {p.status === 'CONFIRMADO' &&
+                      p.comAlteracoes &&
+                      p.vistoPeloVendedor !== null &&
+                      p.vistoPeloVendedor !== undefined && (
+                        <span
+                          className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+                            p.vistoPeloVendedor
+                              ? 'bg-brand-50 text-brand-700'
+                              : 'bg-brandYellow-50 text-brandYellow-800'
+                          }`}
+                        >
+                          {p.vistoPeloVendedor ? '✓ Visto pelo vendedor' : '● Não visto'}
+                        </span>
+                      )}
                   </p>
                   {razaoSecundaria(p.cliente) && (
                     <p className="text-xs text-slate-500">{razaoSecundaria(p.cliente)}</p>

@@ -149,11 +149,67 @@ export class PedidoMudouError extends Error {}
 const mesmaQuantidade = (a: number, b: number) => Math.abs(a - b) < 0.0005;
 const mesmoPreco = (a: number, b: number) => Math.abs(a - b) < 0.005;
 
+export function empacotarRevisaoJson(
+  itens: AlteracaoItem[],
+  recado?: string | null,
+): Prisma.InputJsonValue {
+  const texto = recado?.trim();
+  if (texto) {
+    return { itens, recado: texto } as unknown as Prisma.InputJsonValue;
+  }
+  return itens as unknown as Prisma.InputJsonValue;
+}
+
+export function desempacotarRevisaoJson(raw: unknown): {
+  alteracoes: AlteracaoItem[];
+  recado: string | null;
+} {
+  if (Array.isArray(raw)) {
+    return { alteracoes: raw as AlteracaoItem[], recado: null };
+  }
+  if (raw && typeof raw === 'object') {
+    const obj = raw as { itens?: unknown; recado?: unknown };
+    return {
+      alteracoes: Array.isArray(obj.itens) ? (obj.itens as AlteracaoItem[]) : [],
+      recado: typeof obj.recado === 'string' && obj.recado.trim() ? obj.recado.trim() : null,
+    };
+  }
+  return { alteracoes: [], recado: null };
+}
+
+export interface RevisaoBruta {
+  id: string;
+  revisadoEm: Date;
+  alteracoes: Prisma.JsonValue;
+  totalAntes: Prisma.Decimal;
+  totalDepois: Prisma.Decimal;
+  vistoPeloVendedorEm: Date | null;
+  revisadoPor: { username: string };
+}
+
+/** Revisões do comercial serializadas para exibição (suporta array legado ou objeto com recado). */
+export function serializarRevisoes(revisoes: RevisaoBruta[]) {
+  return revisoes.map((r) => {
+    const { alteracoes, recado } = desempacotarRevisaoJson(r.alteracoes);
+    return {
+      id: r.id,
+      revisadoPor: r.revisadoPor.username,
+      revisadoEm: r.revisadoEm,
+      alteracoes,
+      recado,
+      totalAntes: Number(r.totalAntes),
+      totalDepois: Number(r.totalDepois),
+      novo: !r.vistoPeloVendedorEm,
+      vistoPeloVendedorEm: r.vistoPeloVendedorEm,
+    };
+  });
+}
+
 /**
  * Aplica de uma vez (transação) a revisão confirmada pelo comercial: novas
- * quantidades/preços, itens removidos, totais, o registro do que mudou e a
- * marca de revisão. Antes, confere que os itens no banco ainda são os que o
- * comercial viu — se o vendedor mexeu nesse meio-tempo, lança
+ * quantidades/preços, itens removidos, totais, o registro do que mudou, recado
+ * opcional e a marca de revisão. Antes, confere que os itens no banco ainda são
+ * os que o comercial viu — se o vendedor mexeu nesse meio-tempo, lança
  * PedidoMudouError e nada é gravado.
  */
 export function aplicarRevisaoComercial(params: {
@@ -161,8 +217,9 @@ export function aplicarRevisaoComercial(params: {
   usuarioId: string;
   itens: ItemRevisado[];
   alteracoes: AlteracaoItem[];
+  recado?: string | null;
 }) {
-  const { pedidoId, usuarioId, itens, alteracoes } = params;
+  const { pedidoId, usuarioId, itens, alteracoes, recado } = params;
   const agora = new Date();
   return prisma.$transaction(async (tx) => {
     const atuais = await tx.itemPedido.findMany({ where: { pedidoId } });
@@ -224,12 +281,97 @@ export function aplicarRevisaoComercial(params: {
         pedidoId,
         revisadoPorId: usuarioId,
         revisadoEm: agora,
-        alteracoes: alteracoes as unknown as Prisma.InputJsonValue,
+        alteracoes: empacotarRevisaoJson(alteracoes, recado),
         totalAntes,
         totalDepois: total,
       },
     });
   }, { maxWait: 10_000, timeout: 30_000 }); // folga: o banco fica na nuvem
+}
+
+/**
+ * Grava ou atualiza um recado da administração no pedido para o vendedor e para o
+ * próximo pedido do cliente, mantendo as alterações de itens já registradas.
+ */
+export function salvarRecadoAdmin(params: {
+  pedidoId: string;
+  usuarioId: string;
+  recado: string;
+}) {
+  const { pedidoId, usuarioId, recado } = params;
+  const agora = new Date();
+  return prisma.$transaction(async (tx) => {
+    const pedido = await tx.pedido.update({
+      where: { id: pedidoId },
+      data: {
+        editadoPorId: usuarioId,
+        editadoEm: agora,
+        ultimaAlteracaoPorId: usuarioId,
+        ultimaAlteracaoEm: agora,
+      },
+      select: { total: true },
+    });
+    const existente = await tx.revisaoPedido.findFirst({
+      where: { pedidoId, superadaEm: null },
+      orderBy: { revisadoEm: 'desc' },
+    });
+    if (existente) {
+      const { alteracoes } = desempacotarRevisaoJson(existente.alteracoes);
+      await tx.revisaoPedido.update({
+        where: { id: existente.id },
+        data: {
+          revisadoPorId: usuarioId,
+          revisadoEm: agora,
+          alteracoes: empacotarRevisaoJson(alteracoes, recado),
+          vistoPeloVendedorEm: null,
+        },
+      });
+    } else {
+      await tx.revisaoPedido.create({
+        data: {
+          pedidoId,
+          revisadoPorId: usuarioId,
+          revisadoEm: agora,
+          alteracoes: empacotarRevisaoJson([], recado),
+          totalAntes: pedido.total,
+          totalDepois: pedido.total,
+        },
+      });
+    }
+  });
+}
+
+/** Encerra os avisos/alterações vigentes do pedido (ex.: situação normalizada). */
+export function encerrarAvisosPedido(pedidoId: string) {
+  return prisma.revisaoPedido.updateMany({
+    where: { pedidoId, superadaEm: null },
+    data: { superadaEm: new Date() },
+  });
+}
+
+/**
+ * Aviso vigente no último pedido confirmado do cliente (alterações e/ou recado
+ * da administração) para aparecer na tela ao tirar o próximo pedido.
+ */
+export async function getAvisoUltimoPedidoCliente(clienteId: string) {
+  const ultimo = await prisma.pedido.findFirst({
+    where: { clienteId, status: 'CONFIRMADO' },
+    orderBy: [{ confirmadoEm: { sort: 'desc', nulls: 'last' } }, { criadoEm: 'desc' }],
+    select: {
+      id: true,
+      numeroPedido: true,
+      confirmadoEm: true,
+      criadoEm: true,
+      revisoes: revisoesVigentesInclude,
+    },
+  });
+  if (!ultimo || ultimo.revisoes.length === 0) return null;
+  return {
+    pedidoId: ultimo.id,
+    numeroPedido: ultimo.numeroPedido,
+    data: ultimo.confirmadoEm ?? ultimo.criadoEm,
+    revisoes: serializarRevisoes(ultimo.revisoes),
+  };
 }
 
 /** Revisões com alterações ainda não vistas pelo vendedor (aviso no menu). */
@@ -248,13 +390,19 @@ export function contarAConfirmar(vendedorId: string) {
   return prisma.pedido.count({ where: { vendedorId, status: 'RASCUNHO' } });
 }
 
-/** Marca como vistas as revisões desses pedidos (só os do próprio vendedor). */
+/** Marca como vistas as revisões desses pedidos (pelo vendedor do pedido ou do setor). */
 export function marcarAlteracoesVistas(vendedorId: string, pedidoIds: string[]) {
   return prisma.revisaoPedido.updateMany({
     where: {
       pedidoId: { in: pedidoIds },
+      superadaEm: null,
       vistoPeloVendedorEm: null,
-      pedido: { vendedorId },
+      pedido: {
+        OR: [
+          { vendedorId },
+          { cliente: { setor: { vendedores: { some: { vendedorId } } } } },
+        ],
+      },
     },
     data: { vistoPeloVendedorEm: new Date() },
   });
@@ -462,6 +610,10 @@ export function listarPedidosAdmin(filtro: FiltroAdminPedidos) {
       vendedor: { select: { id: true, nomeCompleto: true } },
       editadoPor: { select: { username: true } },
       ultimaAlteracaoPor: { select: { username: true } },
+      revisoes: {
+        where: { superadaEm: null },
+        select: { vistoPeloVendedorEm: true },
+      },
       _count: { select: { itens: true, revisoes: { where: { superadaEm: null } } } },
     },
     orderBy: { confirmadoEm: 'desc' },

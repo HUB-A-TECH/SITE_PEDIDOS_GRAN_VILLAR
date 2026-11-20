@@ -1,4 +1,5 @@
 import { api } from './api';
+import type { AlteracaoComercial } from './pedidosApi';
 import type { Cliente, ClienteCompleto, Local, MixProduto, Produto } from './types';
 
 interface ClienteInput {
@@ -80,9 +81,28 @@ export interface Anotacao {
   podeApagar: boolean;
 }
 
+export interface AvisoUltimoPedido {
+  pedidoId: string;
+  numeroPedido: string | null;
+  data: string;
+  revisoes: AlteracaoComercial[];
+}
+
+export async function listarAnotacoesComAviso(
+  clienteId: string,
+): Promise<{ anotacoes: Anotacao[]; avisoUltimoPedido: AvisoUltimoPedido | null }> {
+  const res = await api.get<{
+    anotacoes: Anotacao[];
+    avisoUltimoPedido?: AvisoUltimoPedido | null;
+  }>(`/clientes/${clienteId}/anotacoes`);
+  return {
+    anotacoes: res.data.anotacoes,
+    avisoUltimoPedido: res.data.avisoUltimoPedido ?? null,
+  };
+}
+
 export async function listarAnotacoes(clienteId: string): Promise<Anotacao[]> {
-  const res = await api.get<{ anotacoes: Anotacao[] }>(`/clientes/${clienteId}/anotacoes`);
-  return res.data.anotacoes;
+  return (await listarAnotacoesComAviso(clienteId)).anotacoes;
 }
 
 export async function criarAnotacao(

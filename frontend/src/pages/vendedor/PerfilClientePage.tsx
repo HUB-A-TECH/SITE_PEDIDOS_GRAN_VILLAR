@@ -8,7 +8,12 @@ import * as clientesApi from '../../lib/clientesApi';
 import * as pedidosApi from '../../lib/pedidosApi';
 import type { AlteracaoMix, PerfilCliente } from '../../lib/clientesApi';
 import { iniciais, linkMapa, linkTelefone, linkWhatsApp } from '../../lib/contato';
-import { AnotacoesFixadas, SecaoAnotacoes, useAnotacoes } from '../../components/AnotacoesCliente';
+import {
+  AnotacoesFixadas,
+  AvisoUltimoPedidoCard,
+  SecaoAnotacoes,
+  useAnotacoes,
+} from '../../components/AnotacoesCliente';
 import { brl, dataBR, nomeCliente, razaoSecundaria } from '../../lib/formatar';
 
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
@@ -34,7 +39,11 @@ export function PerfilClientePage() {
   const [erro, setErro] = useState('');
   const [abrindoPedido, setAbrindoPedido] = useState(false);
   const [mudancasMix, setMudancasMix] = useState<AlteracaoMix[]>([]);
-  const { anotacoes, recarregar: recarregarAnotacoes } = useAnotacoes(clienteId);
+  const {
+    anotacoes,
+    avisoUltimoPedido,
+    recarregar: recarregarAnotacoes,
+  } = useAnotacoes(clienteId);
 
   useEffect(() => {
     setPerfil(null);
@@ -140,6 +149,11 @@ export function PerfilClientePage() {
       </div>
 
       <AnotacoesFixadas anotacoes={anotacoes} className="mb-3" />
+      <AvisoUltimoPedidoCard
+        aviso={avisoUltimoPedido}
+        onAtualizar={recarregarAnotacoes}
+        className="mb-3"
+      />
 
       {erro && (
         <Aviso tom="erro" className="mb-3">

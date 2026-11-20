@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useBlocker, useParams } from 'react-router-dom';
+import { Link, useBlocker, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { AppLayout } from '../../components/AppLayout';
 import { Aviso } from '../../components/Aviso';
@@ -42,12 +42,15 @@ export function AdminPedidoDetalhePage() {
   // Pilha de estados da revisão: [0] = como o vendedor deixou.
   const [passos, setPassos] = useState<Estado[]>([]);
   const [posicao, setPosicao] = useState(0);
+  const [recadoTexto, setRecadoTexto] = useState('');
 
   /** Recomeça a revisão a partir do pedido como está no servidor. */
   const iniciar = useCallback((p: PedidoAdminDetalhe) => {
     setPedido(p);
     setPassos([estadoDoPedido(p)]);
     setPosicao(0);
+    const ultimoRecado = [...p.alteracoesComercial].reverse().find((r) => r.recado)?.recado ?? '';
+    setRecadoTexto(ultimoRecado);
   }, []);
 
   const carregar = useCallback(() => {
@@ -224,11 +227,11 @@ export function AdminPedidoDetalhePage() {
         quantidade: atual[i.id].quantidade,
         precoUnitario: atual[i.id].precoUnitario,
       }));
-      iniciar(await pedidosApi.adminRevisar(pedido!.id, itens));
+      iniciar(await pedidosApi.adminRevisar(pedido!.id, itens, recadoTexto));
       await dialogo.avisar({
         titulo: 'Pedido aprovado com alterações',
         tom: 'dica',
-        mensagem: 'O vendedor vai ver no pedido o que foi alterado.',
+        mensagem: 'O vendedor verá o que foi alterado neste pedido e ao tirar o próximo pedido do cliente.',
       });
     } catch (e) {
       if (axios.isAxiosError(e) && e.response?.status === 409) {
@@ -238,6 +241,50 @@ export function AdminPedidoDetalhePage() {
         return;
       }
       await dialogo.avisar({ titulo: 'Não foi possível confirmar', tom: 'erro', mensagem: erroDe(e, 'Tente novamente.') });
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function salvarRecado() {
+    if (!pedido || !recadoTexto.trim()) return;
+    setEnviando(true);
+    try {
+      iniciar(await pedidosApi.adminSalvarRecado(pedido.id, recadoTexto.trim()));
+      await dialogo.avisar({
+        titulo: 'Recado salvo',
+        tom: 'dica',
+        mensagem: 'O vendedor verá este recado no pedido e ao tirar o próximo pedido deste cliente.',
+      });
+    } catch (e) {
+      await dialogo.avisar({
+        titulo: 'Não foi possível salvar o recado',
+        tom: 'erro',
+        mensagem: erroDe(e, 'Tente novamente.'),
+      });
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function encerrarAviso() {
+    if (!pedido) return;
+    const ok = await dialogo.confirmar({
+      titulo: 'Encerrar aviso deste pedido',
+      textoConfirmar: 'Sim, encerrar',
+      mensagem:
+        'A mensagem e o alerta de alteração deste pedido deixarão de aparecer no próximo pedido do cliente.',
+    });
+    if (!ok) return;
+    setEnviando(true);
+    try {
+      iniciar(await pedidosApi.adminEncerrarAviso(pedido.id));
+    } catch (e) {
+      await dialogo.avisar({
+        titulo: 'Não foi possível encerrar',
+        tom: 'erro',
+        mensagem: erroDe(e, 'Tente novamente.'),
+      });
     } finally {
       setEnviando(false);
     }
@@ -269,14 +316,26 @@ export function AdminPedidoDetalhePage() {
           <p className="text-xs text-slate-500">
             {pedido.vendedor.nomeCompleto} · {dataBR(pedido.data)}
           </p>
-          <button
-            onClick={() => setHistoricoVisivel((v) => !v)}
-            className="mt-1 text-xs font-medium text-slate-400 underline decoration-dotted"
+          <Link
+            to={`/clientes/${pedido.cliente.id}`}
+            className="mt-1 inline-block text-xs font-medium text-brand-700 hover:underline"
           >
-            Histórico
-          </button>
-          {historicoVisivel && (
-            <>
+            Perfil e avisos fixos do cliente →
+          </Link>
+          {pedido.observacoes && (
+            <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <strong className="text-slate-800">Obs. do vendedor:</strong> {pedido.observacoes}
+            </p>
+          )}
+          <AlteracoesComercial revisoes={pedido.alteracoesComercial} />
+          <div className="mt-2">
+            <button
+              onClick={() => setHistoricoVisivel((v) => !v)}
+              className="text-xs font-medium text-slate-400 underline decoration-dotted"
+            >
+              Histórico
+            </button>
+            {historicoVisivel && (
               <p className="mt-1 text-[11px] text-slate-400">
                 {pedido.ultimaAlteracaoPor
                   ? `Última alteração por ${pedido.ultimaAlteracaoPor.username}${
@@ -284,9 +343,8 @@ export function AdminPedidoDetalhePage() {
                     }`
                   : 'Sem alterações após o envio.'}
               </p>
-              <AlteracoesComercial revisoes={pedido.alteracoesComercial} />
-            </>
-          )}
+            )}
+          </div>
         </div>
 
         {!podeEditar && (
@@ -471,6 +529,51 @@ export function AdminPedidoDetalhePage() {
           <p className="mt-2 text-center text-[11px] text-slate-400">
             O PDF e o Excel mostram o pedido como está gravado (sem as alterações não confirmadas).
           </p>
+        )}
+        {podeEditar && (
+          <div className="mt-4 rounded-xl bg-white p-4 shadow-sm">
+            <label htmlFor="recado-admin" className="mb-1 block text-sm font-bold text-slate-700">
+              Recado e aviso para o próximo pedido
+            </label>
+            <p className="mb-2 text-xs text-slate-500">
+              Aparece para o vendedor neste pedido e no topo do próximo pedido deste cliente até
+              haver novo pedido ou você encerrar o aviso.
+            </p>
+            <textarea
+              id="recado-admin"
+              value={recadoTexto}
+              onChange={(e) => setRecadoTexto(e.target.value.slice(0, 500))}
+              rows={2}
+              placeholder="Ex.: Só tínhamos 12 pápricas defumadas hoje"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500"
+            />
+            {temMudancas ? (
+              <p className="mt-1 text-xs text-brandYellow-800">
+                Este recado será gravado junto ao confirmar as alterações abaixo.
+              </p>
+            ) : (
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={salvarRecado}
+                  disabled={enviando || !recadoTexto.trim()}
+                  className="flex-1 rounded-lg bg-brand-600 py-2 text-sm font-medium text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+                >
+                  {enviando ? 'Salvando…' : 'Salvar recado'}
+                </button>
+                {comAlteracoes && (
+                  <button
+                    type="button"
+                    onClick={encerrarAviso}
+                    disabled={enviando}
+                    className="flex-1 rounded-lg border border-slate-300 bg-white py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Encerrar aviso
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         )}
         {podeEditar && (
           <button

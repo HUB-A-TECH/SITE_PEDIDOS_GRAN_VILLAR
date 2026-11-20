@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import * as service from './anotacoes.service';
+import * as pedidosService from '../pedidos/pedidos.service';
 import { clienteAcessivel } from './clientes.controller';
 
 /**
@@ -36,8 +37,11 @@ const textoSchema = z
 export async function listar(req: Request, res: Response): Promise<void> {
   const cliente = await clienteAcessivel(req, res);
   if (!cliente) return;
-  const lista = await service.listar(cliente.id);
-  res.json({ anotacoes: lista.map((a) => serialize(a, req)) });
+  const [lista, avisoUltimoPedido] = await Promise.all([
+    service.listar(cliente.id),
+    pedidosService.getAvisoUltimoPedidoCliente(cliente.id),
+  ]);
+  res.json({ anotacoes: lista.map((a) => serialize(a, req)), avisoUltimoPedido });
 }
 
 export async function criar(req: Request, res: Response): Promise<void> {

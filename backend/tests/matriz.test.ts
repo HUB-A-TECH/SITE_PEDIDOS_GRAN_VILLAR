@@ -86,6 +86,8 @@ const ROTAS_ADMIN: Chamada[] = [
   ['post', `/api/admin/pedidos/${FAKE}/aprovar`],
   ['post', `/api/admin/pedidos/${FAKE}/cancelar`],
   ['post', `/api/admin/pedidos/${FAKE}/revisao`],
+  ['post', `/api/admin/pedidos/${FAKE}/recado`],
+  ['post', `/api/admin/pedidos/${FAKE}/encerrar-aviso`],
   ['get', '/api/locais'],
   ['put', `/api/locais/${FAKE}`],
 ];

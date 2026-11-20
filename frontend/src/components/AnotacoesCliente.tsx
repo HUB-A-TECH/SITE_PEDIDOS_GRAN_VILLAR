@@ -1,30 +1,139 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Aviso } from './Aviso';
+import { AlteracoesComercial } from './AlteracoesComercial';
+import { useAuth } from '../context/AuthContext';
 import { useDialogo } from '../context/DialogoContext';
 import * as clientesApi from '../lib/clientesApi';
-import type { Anotacao } from '../lib/clientesApi';
-import { dataHoraBR } from '../lib/formatar';
+import * as pedidosApi from '../lib/pedidosApi';
+import type { Anotacao, AvisoUltimoPedido } from '../lib/clientesApi';
+import { dataBR, dataHoraBR } from '../lib/formatar';
 import { mensagemErro } from '../lib/erros';
 
 const LIMITE = 500;
 
-/** Carrega as anotações do cliente (perfil e tela de pedido usam). */
+/** Carrega as anotações do cliente e avisos vigentes do último pedido (perfil e tela de pedido usam). */
 export function useAnotacoes(clienteId: string) {
   const [anotacoes, setAnotacoes] = useState<Anotacao[]>([]);
+  const [avisoUltimoPedido, setAvisoUltimoPedido] = useState<AvisoUltimoPedido | null>(null);
   const [carregando, setCarregando] = useState(true);
   const recarregar = useCallback(() => {
     if (!clienteId) return Promise.resolve();
     return clientesApi
-      .listarAnotacoes(clienteId)
-      .then(setAnotacoes)
-      .catch(() => setAnotacoes([]))
+      .listarAnotacoesComAviso(clienteId)
+      .then((res) => {
+        setAnotacoes(res.anotacoes);
+        setAvisoUltimoPedido(res.avisoUltimoPedido);
+      })
+      .catch(() => {
+        setAnotacoes([]);
+        setAvisoUltimoPedido(null);
+      })
       .finally(() => setCarregando(false));
   }, [clienteId]);
   useEffect(() => {
     setCarregando(true);
     recarregar();
   }, [recarregar]);
-  return { anotacoes, carregando, recarregar };
+  return { anotacoes, avisoUltimoPedido, carregando, recarregar };
+}
+
+/**
+ * Aviso do último pedido do cliente (alterações do comercial e/ou recado da
+ * administração), exibido no perfil e no topo da tela ao tirar novo pedido.
+ * O vendedor confirma que leu; a administração pode encerrar quando normalizar.
+ */
+export function AvisoUltimoPedidoCard({
+  aviso,
+  onAtualizar,
+  className = '',
+}: {
+  aviso: AvisoUltimoPedido | null;
+  onAtualizar: () => Promise<void>;
+  className?: string;
+}) {
+  const { usuario } = useAuth();
+  const dialogo = useDialogo();
+  const [ocupado, setOcupado] = useState(false);
+
+  if (!aviso || aviso.revisoes.length === 0) return null;
+
+  const ehVendedor = usuario?.type === 'VENDEDOR';
+  const temNaoVisto = aviso.revisoes.some((r) => r.novo);
+
+  async function confirmarLeitura() {
+    if (!aviso) return;
+    setOcupado(true);
+    try {
+      await pedidosApi.marcarAlteracoesVistas([aviso.pedidoId]);
+      await onAtualizar();
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function encerrarAviso() {
+    if (!aviso) return;
+    const ok = await dialogo.confirmar({
+      titulo: 'Encerrar aviso deste pedido',
+      textoConfirmar: 'Sim, encerrar aviso',
+      mensagem:
+        'A mensagem e o alerta de alteração deste pedido deixarão de aparecer no próximo pedido do cliente.',
+    });
+    if (!ok) return;
+    setOcupado(true);
+    try {
+      await pedidosApi.adminEncerrarAviso(aviso.pedidoId);
+      await onAtualizar();
+    } catch (e) {
+      await dialogo.avisar({
+        titulo: 'Não foi possível encerrar',
+        tom: 'erro',
+        mensagem: mensagemErro(e, 'Tente novamente.'),
+      });
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <div className={`rounded-xl border border-brandYellow-300 bg-white p-3 shadow-sm ${className}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-bold text-slate-700">
+          Último pedido ({aviso.numeroPedido ?? 'enviado'} · {dataBR(aviso.data)})
+        </p>
+        {!ehVendedor && (
+          <Link
+            to={`/admin/pedidos/${aviso.pedidoId}`}
+            className="text-xs font-medium text-brand-700 hover:underline"
+          >
+            Abrir pedido →
+          </Link>
+        )}
+      </div>
+      <AlteracoesComercial revisoes={aviso.revisoes} destacarNovo={temNaoVisto} compacto />
+      {ehVendedor && temNaoVisto && (
+        <button
+          type="button"
+          onClick={confirmarLeitura}
+          disabled={ocupado}
+          className="mt-2.5 w-full rounded-lg bg-brand-600 py-2 text-xs font-semibold text-white hover:bg-brand-500 disabled:opacity-60"
+        >
+          {ocupado ? 'Confirmando…' : 'Confirmar leitura (Marcar como visto)'}
+        </button>
+      )}
+      {!ehVendedor && (
+        <button
+          type="button"
+          onClick={encerrarAviso}
+          disabled={ocupado}
+          className="mt-2.5 w-full rounded-lg border border-slate-300 bg-white py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+        >
+          {ocupado ? 'Encerrando…' : 'Encerrar aviso (situação normalizada)'}
+        </button>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -125,9 +234,9 @@ export function SecaoAnotacoes({
 
   return (
     <section className="mb-3 rounded-xl bg-white p-4 shadow-sm">
-      <h2 className="mb-1 text-sm font-bold text-slate-700">Anotações</h2>
+      <h2 className="mb-1 text-sm font-bold text-slate-700">Anotações e avisos fixos</h2>
       <p className="mb-3 text-xs text-slate-500">
-        Recados sobre este cliente. Quem atende o cliente e a administração veem.
+        Recados sobre este cliente (ex.: dias em que não recebe). Quem atende e a administração veem.
       </p>
 
       <label htmlFor="nova-anotacao" className="sr-only">
@@ -147,7 +256,7 @@ export function SecaoAnotacoes({
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input type="checkbox" checked={fixar} onChange={(e) => setFixar(e.target.checked)} />
-          Fixar no topo (recado importante)
+          Fixar no topo (aparece ao tirar pedido)
         </label>
         <span className="text-xs text-slate-400">
           {texto.length}/{LIMITE}
