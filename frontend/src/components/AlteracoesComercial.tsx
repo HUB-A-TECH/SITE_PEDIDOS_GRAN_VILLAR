@@ -85,6 +85,11 @@ export function AlteracoesComercial({
                 <strong className="text-brandYellow-800">Recado:</strong> {r.recado}
               </p>
             )}
+            {r.encerradoEm && (
+              <p className="mt-1 text-[11px] text-slate-500">
+                Aviso encerrado no próximo pedido em {dataHoraBR(r.encerradoEm)}
+              </p>
+            )}
           </div>
         );
       })}

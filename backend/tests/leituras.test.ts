@@ -67,10 +67,18 @@ describe('leituras otimizadas devolvem o mesmo que o cálculo direto no banco (s
         if (l.length < 12) l.push(Number(it.quantidade));
       }
     }
-    const recebido = r.body.historico as Record<string, { quantidade: number }[]>;
-    expect(Object.keys(recebido).sort()).toEqual(Object.keys(esperado).sort());
+    const recebido = r.body.historico as Record<
+      string,
+      { quantidade: number; cortado?: boolean }[]
+    >;
+    const semCortados = Object.fromEntries(
+      Object.entries(recebido)
+        .map(([k, v]) => [k, v.filter((x) => !x.cortado)] as const)
+        .filter(([, v]) => v.length > 0),
+    );
+    expect(Object.keys(semCortados).sort()).toEqual(Object.keys(esperado).sort());
     for (const k of Object.keys(esperado)) {
-      expect(recebido[k].map((x) => x.quantidade)).toEqual(esperado[k]);
+      expect(semCortados[k].map((x) => x.quantidade)).toEqual(esperado[k]);
     }
   });
 

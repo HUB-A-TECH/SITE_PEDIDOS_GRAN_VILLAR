@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Cliente } from '@prisma/client';
 import * as service from './clientes.service';
 import * as historico from '../historico/historico.service';
+import * as pedidosService from '../pedidos/pedidos.service';
 import { isUniqueConstraintError, isNotFoundError } from '../../utils/prisma-errors';
 import * as carteira from '../../lib/carteira';
 import * as precos from '../precos/precos.service';
@@ -113,6 +114,7 @@ export async function historicoCliente(req: Request, res: Response): Promise<voi
       data: p.confirmadoEm ?? p.criadoEm,
       total: Number(p.total),
       situacao: historico.situacaoPedido(p),
+      alteracoesComercial: pedidosService.serializarRevisoes(p.revisoes),
       itens: p.itens.map((i) => ({
         codigo: i.produto.codigo,
         nome: i.produto.nome,

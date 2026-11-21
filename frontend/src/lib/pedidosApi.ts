@@ -272,6 +272,7 @@ export interface AlteracaoComercial {
   revisadoEm: string;
   alteracoes: AlteracaoItem[];
   recado?: string | null;
+  encerradoEm?: string | null;
   totalAntes: number;
   totalDepois: number;
   /** O vendedor ainda não viu. */

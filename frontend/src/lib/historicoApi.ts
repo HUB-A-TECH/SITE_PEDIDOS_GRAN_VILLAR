@@ -20,6 +20,7 @@ export interface PedidoHistorico {
   data: string;
   total: number;
   situacao?: 'EM_ANALISE' | 'APROVADO';
+  alteracoesComercial?: AlteracaoComercial[];
   itens: ItemHistorico[];
 }
 
@@ -54,6 +55,8 @@ export async function historicoCliente(
 export interface ItemHistoricoProduto {
   data: string;
   quantidade: number;
+  quantidadeOriginal?: number;
+  cortado?: boolean;
 }
 
 /** Histórico por produto do cliente (últimos 12 meses), indexado por produtoId. */

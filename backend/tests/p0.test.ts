@@ -172,15 +172,34 @@ describe('fluxo do pedido (Mercado X)', () => {
     expect(meu.revisao).toBe('REVISADO');
   });
 
-  it('recado no último pedido aparece ao vendedor, marca leitura e some ao encerrar', async () => {
-    const rec = await admin
-      .post(`/api/admin/pedidos/${pedidoId}/recado`)
-      .send({ recado: 'Só tínhamos 12 pápricas defumadas hoje' });
-    expect(rec.status).toBe(200);
-    expect(rec.body.pedido.alteracoesComercial[0].recado).toBe(
+  it('revisão com recado atualiza histórico do produto, marca leitura e preserva histórico ao encerrar', async () => {
+    const det = await admin.get(`/api/admin/pedidos/${pedidoId}`);
+    expect(det.status).toBe(200);
+    const item = det.body.pedido.itens[0];
+    const rev = await admin.post(`/api/admin/pedidos/${pedidoId}/revisao`).send({
+      itens: [
+        {
+          itemId: item.id,
+          quantidadeBase: item.quantidade,
+          precoBase: item.precoUnitario,
+          quantidade: 1,
+          precoUnitario: item.precoUnitario,
+        },
+      ],
+      recado: 'Só tínhamos 12 pápricas defumadas hoje',
+    });
+    expect(rev.status).toBe(200);
+    expect(rev.body.pedido.alteracoesComercial[0].recado).toBe(
       'Só tínhamos 12 pápricas defumadas hoje',
     );
-    expect(rec.body.pedido.alteracoesComercial[0].novo).toBe(true);
+    expect(rev.body.pedido.alteracoesComercial[0].novo).toBe(true);
+
+    const histItens = await vendedor.get(`/api/clientes/${MERCADO_X_ID}/historico-itens`);
+    expect(histItens.status).toBe(200);
+    const entradaProd = histItens.body.historico[produtoId]?.[0];
+    expect(entradaProd).toBeDefined();
+    expect(entradaProd.quantidade).toBe(1);
+    expect(entradaProd.quantidadeOriginal).toBe(2);
 
     const antes = await vendedor.get(`/api/clientes/${MERCADO_X_ID}/anotacoes`);
     expect(antes.status).toBe(200);
@@ -212,10 +231,40 @@ describe('fluxo do pedido (Mercado X)', () => {
 
     const encerrar = await admin.post(`/api/admin/pedidos/${pedidoId}/encerrar-aviso`).send({});
     expect(encerrar.status).toBe(200);
-    expect(encerrar.body.pedido.alteracoesComercial).toHaveLength(0);
+    expect(encerrar.body.pedido.alteracoesComercial).toHaveLength(1);
+    expect(encerrar.body.pedido.alteracoesComercial[0].encerradoEm).toBeTruthy();
 
     const aposEncerrar = await vendedor.get(`/api/clientes/${MERCADO_X_ID}/anotacoes`);
     expect(aposEncerrar.body.avisoUltimoPedido).toBeNull();
+
+    const histCli = await vendedor.get(`/api/clientes/${MERCADO_X_ID}/historico`);
+    expect(histCli.status).toBe(200);
+    const pedHist = histCli.body.historico.find((h: { pedidoId: string }) => h.pedidoId === pedidoId);
+    expect(pedHist.alteracoesComercial).toHaveLength(1);
+
+    let anotId: string | null = null;
+    try {
+      const criada = await admin
+        .post(`/api/clientes/${MERCADO_X_ID}/anotacoes`)
+        .send({ texto: 'Teste: fechado quarta à tarde', fixada: true });
+      expect(criada.status).toBe(201);
+      anotId = criada.body.id;
+      expect(criada.body.vistoPeloVendedorEm).toBeNull();
+
+      const okVisto = await vendedor
+        .post(`/api/clientes/${MERCADO_X_ID}/anotacoes/vistas`)
+        .send({});
+      expect(okVisto.status).toBe(200);
+      expect(okVisto.body.marcadas).toBeGreaterThanOrEqual(1);
+
+      const listApos = await admin.get(`/api/clientes/${MERCADO_X_ID}/anotacoes`);
+      const achada = listApos.body.anotacoes.find((a: { id: string }) => a.id === anotId);
+      expect(achada.vistoPeloVendedorEm).toBeTruthy();
+    } finally {
+      if (anotId) {
+        await admin.delete(`/api/clientes/${MERCADO_X_ID}/anotacoes/${anotId}`);
+      }
+    }
   });
 
   it('vendedor não consegue descartar pedido já enviado', async () => {

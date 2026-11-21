@@ -148,7 +148,12 @@ export function PerfilClientePage() {
         </div>
       </div>
 
-      <AnotacoesFixadas anotacoes={anotacoes} className="mb-3" />
+      <AnotacoesFixadas
+        anotacoes={anotacoes}
+        clienteId={c.id}
+        onAtualizar={recarregarAnotacoes}
+        className="mb-3"
+      />
       <AvisoUltimoPedidoCard
         aviso={avisoUltimoPedido}
         onAtualizar={recarregarAnotacoes}

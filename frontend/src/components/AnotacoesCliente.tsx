@@ -142,22 +142,89 @@ export function AvisoUltimoPedidoCard({
  */
 export function AnotacoesFixadas({
   anotacoes,
+  clienteId,
+  onAtualizar,
   className = '',
 }: {
   anotacoes: Anotacao[];
+  clienteId?: string;
+  onAtualizar?: () => Promise<void>;
   className?: string;
 }) {
+  const { usuario } = useAuth();
+  const [ocupado, setOcupado] = useState(false);
   const fixadas = anotacoes.filter((a) => a.fixada);
   if (fixadas.length === 0) return null;
+
+  const ehVendedor = usuario?.type === 'VENDEDOR';
+  const temNaoVisto = fixadas.some((a) => !a.vistoPeloVendedorEm);
+
+  async function confirmarLeitura() {
+    if (!clienteId) return;
+    setOcupado(true);
+    try {
+      await clientesApi.marcarAnotacoesVistas(clienteId);
+      await onAtualizar?.();
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function encerrarTopo(a: Anotacao) {
+    if (!clienteId) return;
+    setOcupado(true);
+    try {
+      await clientesApi.atualizarAnotacao(clienteId, a.id, { fixada: false });
+      await onAtualizar?.();
+    } finally {
+      setOcupado(false);
+    }
+  }
+
   return (
     <Aviso tom="atencao" compacto className={className} titulo="Atenção com este cliente">
-      <ul className="space-y-1">
+      <ul className="space-y-2">
         {fixadas.map((a) => (
           <li key={a.id}>
-            {a.texto} <span className="text-xs opacity-75">({a.autor})</span>
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <span>
+                {a.texto} <span className="text-xs opacity-75">({a.autor})</span>
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  a.vistoPeloVendedorEm
+                    ? 'bg-brand-100 text-brand-800'
+                    : 'bg-brandYellow-400 text-brandYellow-800'
+                }`}
+              >
+                {a.vistoPeloVendedorEm
+                  ? `✓ Visto em ${dataHoraBR(a.vistoPeloVendedorEm)}`
+                  : 'Não visto pelo vendedor'}
+              </span>
+            </div>
+            {!ehVendedor && clienteId && (
+              <button
+                type="button"
+                onClick={() => encerrarTopo(a)}
+                disabled={ocupado}
+                className="mt-1 text-xs font-medium text-slate-600 underline decoration-dotted hover:text-slate-800 disabled:opacity-50"
+              >
+                Encerrar aviso do topo (mantém no histórico)
+              </button>
+            )}
           </li>
         ))}
       </ul>
+      {ehVendedor && clienteId && temNaoVisto && (
+        <button
+          type="button"
+          onClick={confirmarLeitura}
+          disabled={ocupado}
+          className="mt-2 w-full rounded-lg bg-brand-600 py-1.5 text-xs font-semibold text-white hover:bg-brand-500 disabled:opacity-60"
+        >
+          {ocupado ? 'Confirmando…' : 'Confirmar leitura do aviso'}
+        </button>
+      )}
     </Aviso>
   );
 }
@@ -322,6 +389,19 @@ export function SecaoAnotacoes({
                   <p className="mt-1 text-xs text-slate-400">
                     {a.autor} · {dataHoraBR(a.criadoEm)}
                     {a.editadoEm && ` · editado em ${dataHoraBR(a.editadoEm)}`}
+                    {a.fixada && (
+                      <span
+                        className={`ml-2 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                          a.vistoPeloVendedorEm
+                            ? 'bg-brand-100 text-brand-800'
+                            : 'bg-brandYellow-400 text-brandYellow-800'
+                        }`}
+                      >
+                        {a.vistoPeloVendedorEm
+                          ? `✓ Visto em ${dataHoraBR(a.vistoPeloVendedorEm)}`
+                          : 'Não visto pelo vendedor'}
+                      </span>
+                    )}
                   </p>
                   {(a.podeEditar || a.podeApagar) && (
                     <div className="mt-1 flex gap-3 text-xs font-medium">

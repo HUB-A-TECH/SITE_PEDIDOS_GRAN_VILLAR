@@ -112,6 +112,7 @@ export function AdminPedidoDetalhePage() {
 
   const podeEditar = pedido.status === 'CONFIRMADO';
   const comAlteracoes = pedido.alteracoesComercial.length > 0;
+  const temAvisoAtivo = pedido.alteracoesComercial.some((r) => !r.encerradoEm);
   // Itens com preço abaixo da tabela do cliente (desconto dado no pedido).
   const comDesconto = pedido.itens.filter((i) => i.precoUnitario < i.precoTabela - 0.001);
   const est = estiloStatus(pedido.status, pedido.revisao, comAlteracoes);
@@ -561,7 +562,7 @@ export function AdminPedidoDetalhePage() {
                 >
                   {enviando ? 'Salvando…' : 'Salvar recado'}
                 </button>
-                {comAlteracoes && (
+                {temAvisoAtivo && (
                   <button
                     type="button"
                     onClick={encerrarAviso}

@@ -13,6 +13,7 @@ clientesRoutes.get('/:id/perfil', asyncHandler(controller.perfilCliente));
 // Anotações de visita (perfil do cliente).
 clientesRoutes.get('/:id/anotacoes', asyncHandler(anotacoes.listar));
 clientesRoutes.post('/:id/anotacoes', asyncHandler(anotacoes.criar));
+clientesRoutes.post('/:id/anotacoes/vistas', asyncHandler(anotacoes.marcarVistas));
 clientesRoutes.put('/:id/anotacoes/:anotacaoId', asyncHandler(anotacoes.atualizar));
 clientesRoutes.delete('/:id/anotacoes/:anotacaoId', asyncHandler(anotacoes.excluir));
 clientesRoutes.get('/:id/historico', asyncHandler(controller.historicoCliente));

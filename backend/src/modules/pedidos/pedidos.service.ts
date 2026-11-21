@@ -152,10 +152,16 @@ const mesmoPreco = (a: number, b: number) => Math.abs(a - b) < 0.005;
 export function empacotarRevisaoJson(
   itens: AlteracaoItem[],
   recado?: string | null,
+  encerradoEm?: string | null,
 ): Prisma.InputJsonValue {
-  const texto = recado?.trim();
-  if (texto) {
-    return { itens, recado: texto } as unknown as Prisma.InputJsonValue;
+  const texto = recado?.trim() || null;
+  const encerrado = encerradoEm?.trim() || null;
+  if (texto || encerrado) {
+    return {
+      itens,
+      ...(texto ? { recado: texto } : {}),
+      ...(encerrado ? { encerradoEm: encerrado } : {}),
+    } as unknown as Prisma.InputJsonValue;
   }
   return itens as unknown as Prisma.InputJsonValue;
 }
@@ -163,18 +169,23 @@ export function empacotarRevisaoJson(
 export function desempacotarRevisaoJson(raw: unknown): {
   alteracoes: AlteracaoItem[];
   recado: string | null;
+  encerradoEm: string | null;
 } {
   if (Array.isArray(raw)) {
-    return { alteracoes: raw as AlteracaoItem[], recado: null };
+    return { alteracoes: raw as AlteracaoItem[], recado: null, encerradoEm: null };
   }
   if (raw && typeof raw === 'object') {
-    const obj = raw as { itens?: unknown; recado?: unknown };
+    const obj = raw as { itens?: unknown; recado?: unknown; encerradoEm?: unknown };
     return {
       alteracoes: Array.isArray(obj.itens) ? (obj.itens as AlteracaoItem[]) : [],
       recado: typeof obj.recado === 'string' && obj.recado.trim() ? obj.recado.trim() : null,
+      encerradoEm:
+        typeof obj.encerradoEm === 'string' && obj.encerradoEm.trim()
+          ? obj.encerradoEm.trim()
+          : null,
     };
   }
-  return { alteracoes: [], recado: null };
+  return { alteracoes: [], recado: null, encerradoEm: null };
 }
 
 export interface RevisaoBruta {
@@ -190,13 +201,14 @@ export interface RevisaoBruta {
 /** Revisões do comercial serializadas para exibição (suporta array legado ou objeto com recado). */
 export function serializarRevisoes(revisoes: RevisaoBruta[]) {
   return revisoes.map((r) => {
-    const { alteracoes, recado } = desempacotarRevisaoJson(r.alteracoes);
+    const { alteracoes, recado, encerradoEm } = desempacotarRevisaoJson(r.alteracoes);
     return {
       id: r.id,
       revisadoPor: r.revisadoPor.username,
       revisadoEm: r.revisadoEm,
       alteracoes,
       recado,
+      encerradoEm,
       totalAntes: Number(r.totalAntes),
       totalDepois: Number(r.totalDepois),
       novo: !r.vistoPeloVendedorEm,
@@ -341,17 +353,36 @@ export function salvarRecadoAdmin(params: {
   });
 }
 
-/** Encerra os avisos/alterações vigentes do pedido (ex.: situação normalizada). */
-export function encerrarAvisosPedido(pedidoId: string) {
-  return prisma.revisaoPedido.updateMany({
-    where: { pedidoId, superadaEm: null },
-    data: { superadaEm: new Date() },
+/**
+ * Encerra os avisos vigentes do pedido no topo do próximo pedido do cliente
+ * (marcando encerradoEm no JSON), preservando o histórico no pedido e no cliente.
+ */
+export async function encerrarAvisosPedido(pedidoId: string) {
+  const agora = new Date();
+  const iso = agora.toISOString();
+  await prisma.$transaction(async (tx) => {
+    const revisoes = await tx.revisaoPedido.findMany({
+      where: { pedidoId, superadaEm: null },
+      select: { id: true, alteracoes: true, vistoPeloVendedorEm: true },
+    });
+    await Promise.all(
+      revisoes.map((r) => {
+        const { alteracoes, recado } = desempacotarRevisaoJson(r.alteracoes);
+        return tx.revisaoPedido.update({
+          where: { id: r.id },
+          data: {
+            alteracoes: empacotarRevisaoJson(alteracoes, recado, iso),
+            ...(r.vistoPeloVendedorEm ? {} : { vistoPeloVendedorEm: agora }),
+          },
+        });
+      }),
+    );
   });
 }
 
 /**
  * Aviso vigente no último pedido confirmado do cliente (alterações e/ou recado
- * da administração) para aparecer na tela ao tirar o próximo pedido.
+ * da administração) ainda não encerrado, para aparecer ao tirar o próximo pedido.
  */
 export async function getAvisoUltimoPedidoCliente(clienteId: string) {
   const ultimo = await prisma.pedido.findFirst({
@@ -365,12 +396,14 @@ export async function getAvisoUltimoPedidoCliente(clienteId: string) {
       revisoes: revisoesVigentesInclude,
     },
   });
-  if (!ultimo || ultimo.revisoes.length === 0) return null;
+  if (!ultimo) return null;
+  const ativas = serializarRevisoes(ultimo.revisoes).filter((r) => !r.encerradoEm);
+  if (ativas.length === 0) return null;
   return {
     pedidoId: ultimo.id,
     numeroPedido: ultimo.numeroPedido,
     data: ultimo.confirmadoEm ?? ultimo.criadoEm,
-    revisoes: serializarRevisoes(ultimo.revisoes),
+    revisoes: ativas,
   };
 }
 

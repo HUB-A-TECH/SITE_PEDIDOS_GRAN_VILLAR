@@ -105,6 +105,7 @@ const ROTAS_LOGADO: Chamada[] = [
   ['get', `/api/clientes/${MERCADO_X_ID}/perfil`],
   ['get', `/api/clientes/${MERCADO_X_ID}/anotacoes`],
   ['post', `/api/clientes/${MERCADO_X_ID}/anotacoes`],
+  ['post', `/api/clientes/${FAKE}/anotacoes/vistas`],
   ['get', '/api/pedidos/historico'],
   ['get', '/api/pedidos/resumo-menu'],
   ['post', '/api/pedidos'],
@@ -198,6 +199,7 @@ describe('vendedor de outro setor não vê nada do Mercado X', () => {
     ['get', `/api/clientes/${MERCADO_X_ID}/historico-mix`],
     ['get', `/api/clientes/${MERCADO_X_ID}/anotacoes`],
     ['post', `/api/clientes/${MERCADO_X_ID}/anotacoes`],
+    ['post', `/api/clientes/${MERCADO_X_ID}/anotacoes/vistas`],
     ['post', `/api/clientes/${MERCADO_X_ID}/mix`],
   ];
   it.each(rotas)('%s %s = 403', async (m, r) => {

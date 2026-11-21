@@ -74,9 +74,11 @@ export interface Anotacao {
   id: string;
   texto: string;
   fixada: boolean;
+  vistoPeloVendedorEm?: string | null;
   criadoEm: string;
   editadoEm: string | null;
   autor: string;
+  autorTipo?: string | null;
   podeEditar: boolean;
   podeApagar: boolean;
 }
@@ -124,6 +126,10 @@ export async function atualizarAnotacao(
 
 export async function apagarAnotacao(clienteId: string, id: string): Promise<void> {
   await api.delete(`/clientes/${clienteId}/anotacoes/${id}`);
+}
+
+export async function marcarAnotacoesVistas(clienteId: string): Promise<void> {
+  await api.post(`/clientes/${clienteId}/anotacoes/vistas`, {});
 }
 
 // ---- Admin ----

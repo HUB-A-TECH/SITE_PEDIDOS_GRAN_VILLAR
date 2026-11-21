@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma';
 
 const autorSelect = {
-  select: { id: true, username: true, vendedor: { select: { nomeCompleto: true } } },
+  select: { id: true, username: true, type: true, vendedor: { select: { nomeCompleto: true } } },
 } as const;
 
 /** Anotações do cliente: fixadas primeiro, depois as mais recentes. */
@@ -22,12 +22,24 @@ export function criar(data: { clienteId: string; autorId: string; texto: string;
   return prisma.anotacaoCliente.create({ data, include: { autor: autorSelect } });
 }
 
-/** Mudar o texto marca "editado"; só fixar/desafixar não. */
+/** Mudar o texto marca "editado" e reinicia a leitura; só desafixar não altera visto. */
 export function atualizar(id: string, data: { texto?: string; fixada?: boolean }) {
+  const reiniciarLeitura = data.texto !== undefined || data.fixada === true;
   return prisma.anotacaoCliente.update({
     where: { id },
-    data: { ...data, ...(data.texto !== undefined ? { editadoEm: new Date() } : {}) },
+    data: {
+      ...data,
+      ...(data.texto !== undefined ? { editadoEm: new Date() } : {}),
+      ...(reiniciarLeitura ? { vistoPeloVendedorEm: null } : {}),
+    },
     include: { autor: autorSelect },
+  });
+}
+
+export function marcarFixadasComoVistas(clienteId: string) {
+  return prisma.anotacaoCliente.updateMany({
+    where: { clienteId, fixada: true, vistoPeloVendedorEm: null },
+    data: { vistoPeloVendedorEm: new Date() },
   });
 }
 

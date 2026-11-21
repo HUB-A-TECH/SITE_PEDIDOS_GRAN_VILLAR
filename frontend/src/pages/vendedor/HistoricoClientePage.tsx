@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AppLayout } from '../../components/AppLayout';
+import { AlteracoesComercial } from '../../components/AlteracoesComercial';
 import { useAuth } from '../../context/AuthContext';
 import * as historicoApi from '../../lib/historicoApi';
 import type { PedidoHistorico } from '../../lib/historicoApi';
@@ -110,6 +111,7 @@ export function HistoricoClientePage() {
                     ))}
                   </tbody>
                 </table>
+                <AlteracoesComercial revisoes={p.alteracoesComercial ?? []} compacto />
               </li>
             ))}
           </ul>

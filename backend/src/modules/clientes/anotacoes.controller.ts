@@ -20,10 +20,12 @@ function serialize(a: Anotacao, req: Request) {
     id: a.id,
     texto: a.texto,
     fixada: a.fixada,
+    vistoPeloVendedorEm: a.vistoPeloVendedorEm,
     criadoEm: a.criadoEm,
     editadoEm: a.editadoEm,
     autor: a.autor ? a.autor.vendedor?.nomeCompleto ?? a.autor.username : 'Usuário removido',
-    podeEditar: minha,
+    autorTipo: a.autor?.type ?? null,
+    podeEditar: minha || ehAdmin(req),
     podeApagar: minha || ehAdmin(req),
   };
 }
@@ -86,13 +88,13 @@ export async function atualizar(req: Request, res: Response): Promise<void> {
     return;
   }
   const minha = a.autorId === req.user!.sub;
-  // Texto: só o autor. Fixar/desafixar: o autor ou a administração.
-  if (parsed.data.texto !== undefined && !minha) {
-    res.status(403).json({ mensagem: 'Só quem escreveu pode editar a anotação' });
+  // Texto ou fixar/desafixar: o autor ou a administração.
+  if (parsed.data.texto !== undefined && !minha && !ehAdmin(req)) {
+    res.status(403).json({ mensagem: 'Só quem escreveu ou a administração pode editar a anotação' });
     return;
   }
   if (parsed.data.fixada !== undefined && !minha && !ehAdmin(req)) {
-    res.status(403).json({ mensagem: 'Só quem escreveu pode fixar esta anotação' });
+    res.status(403).json({ mensagem: 'Só quem escreveu ou a administração pode fixar esta anotação' });
     return;
   }
   const atualizada = await service.atualizar(a.id, {
@@ -111,4 +113,15 @@ export async function excluir(req: Request, res: Response): Promise<void> {
   }
   await service.excluir(a.id);
   res.json({ mensagem: 'Anotação apagada' });
+}
+
+export async function marcarVistas(req: Request, res: Response): Promise<void> {
+  const cliente = await clienteAcessivel(req, res);
+  if (!cliente) return;
+  if (req.user!.type !== 'VENDEDOR') {
+    res.status(403).json({ mensagem: 'Apenas vendedores confirmam leitura dos avisos' });
+    return;
+  }
+  const r = await service.marcarFixadasComoVistas(cliente.id);
+  res.json({ marcadas: r.count });
 }

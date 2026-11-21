@@ -521,7 +521,12 @@ export function PedidoPage() {
       }
     >
       <div className="pb-52">
-        <AnotacoesFixadas anotacoes={anotacoes} className="mb-3" />
+        <AnotacoesFixadas
+          anotacoes={anotacoes}
+          clienteId={pedido.clienteId}
+          onAtualizar={recarregarAnotacoes}
+          className="mb-3"
+        />
         <AvisoUltimoPedidoCard
           aviso={avisoUltimoPedido}
           onAtualizar={recarregarAnotacoes}
@@ -565,6 +570,7 @@ export function PedidoPage() {
             const item = itemPorProduto.get(p.id);
             const qtd = item?.quantidade ?? 0;
             const ocupado = processando.has(p.id);
+            const ultimoHist = histProdutos[p.id]?.[0];
             return (
               <li
                 key={p.id}
@@ -576,6 +582,16 @@ export function PedidoPage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-semibold text-slate-800">{p.nome}</p>
+                    {ultimoHist &&
+                      (ultimoHist.cortado ||
+                        (ultimoHist.quantidadeOriginal !== undefined &&
+                          ultimoHist.quantidadeOriginal !== ultimoHist.quantidade)) && (
+                        <p className="mt-0.5 rounded bg-brandYellow-50 px-1.5 py-0.5 text-[11px] font-medium text-brandYellow-800">
+                          {ultimoHist.cortado
+                            ? `Último pedido: pediu ${ultimoHist.quantidadeOriginal ?? 0} → cortado pela adm.`
+                            : `Último pedido: pediu ${ultimoHist.quantidadeOriginal} → enviado ${ultimoHist.quantidade} (alterado pela adm.)`}
+                        </p>
+                      )}
                     {!noMix.has(p.id) && (
                       <span className="mb-0.5 inline-block rounded-md bg-brandYellow-50 px-1.5 py-0.5 text-[11px] font-medium text-brandYellow-800">
                         fora do mix · só neste pedido
@@ -658,9 +674,20 @@ export function PedidoPage() {
                             <p className="text-[11px] font-medium leading-tight text-slate-500">
                               {diaMes(e.data)}
                             </p>
-                            <p className="text-sm font-bold leading-tight text-brand-700">
+                            <p
+                              className={`text-sm font-bold leading-tight ${
+                                e.cortado ? 'text-red-600' : 'text-brand-700'
+                              }`}
+                            >
                               {e.quantidade}
                             </p>
+                            {e.quantidadeOriginal !== undefined && (
+                              <p className="text-[10px] leading-tight text-brandYellow-800">
+                                {e.cortado
+                                  ? `pediu ${e.quantidadeOriginal} (cortado)`
+                                  : `pediu ${e.quantidadeOriginal}`}
+                              </p>
+                            )}
                           </div>
                         ))}
                       </div>

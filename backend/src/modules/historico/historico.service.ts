@@ -1,5 +1,8 @@
 import { prisma } from '../../lib/prisma';
-import { revisoesVigentesInclude } from '../pedidos/pedidos.service';
+import {
+  desempacotarRevisaoJson,
+  revisoesVigentesInclude,
+} from '../pedidos/pedidos.service';
 
 /**
  * Interpreta o parâmetro de limite: "tudo" -> undefined (sem limite);
@@ -36,23 +39,33 @@ const itemInclude = {
 export function pedidosConfirmadosDoCliente(clienteId: string, limite?: number) {
   return prisma.pedido.findMany({
     where: { clienteId, status: 'CONFIRMADO' },
-    include: itemInclude,
+    include: {
+      ...itemInclude,
+      revisoes: revisoesVigentesInclude,
+    },
     orderBy: { confirmadoEm: 'desc' },
     ...(limite ? { take: limite } : {}),
   });
 }
 
+export interface ItemHistoricoProduto {
+  data: Date;
+  quantidade: number;
+  quantidadeOriginal?: number;
+  cortado?: boolean;
+}
+
 /**
  * Histórico por produto do cliente: para cada produto comprado, a lista de
- * { data, quantidade } dos pedidos confirmados (mais recentes primeiro).
- * Uma consulta só, usada na tela de pedido.
+ * { data, quantidade, quantidadeOriginal?, cortado? } dos pedidos confirmados
+ * (mais recentes primeiro). Quando o comercial reduz ou corta um item na
+ * revisão, a quantidade final (ou 0) aparece aqui com a original sinalizada.
  */
 export async function historicoPorProduto(
   clienteId: string,
   maxPorProduto = 12,
-): Promise<Record<string, { data: Date; quantidade: number }[]>> {
+): Promise<Record<string, ItemHistoricoProduto[]>> {
   // Últimos 60 pedidos garantem 12 compras de cada produto mesmo em mix grande.
-  // Só o que o cálculo usa (produto, quantidade, data), numa consulta só.
   const pedidos = await prisma.pedido.findMany({
     where: { clienteId, status: 'CONFIRMADO' },
     relationLoadStrategy: 'join',
@@ -60,17 +73,58 @@ export async function historicoPorProduto(
       confirmadoEm: true,
       criadoEm: true,
       itens: { select: { produtoId: true, quantidade: true } },
+      revisoes: {
+        where: { superadaEm: null },
+        orderBy: { revisadoEm: 'asc' },
+        select: { alteracoes: true },
+      },
     },
     orderBy: { confirmadoEm: 'desc' },
     take: 60,
   });
-  const mapa: Record<string, { data: Date; quantidade: number }[]> = {};
+  const mapa: Record<string, ItemHistoricoProduto[]> = {};
   for (const p of pedidos) {
     const data = p.confirmadoEm ?? p.criadoEm;
+    const originais = new Map<string, number>();
+    const cortados = new Set<string>();
+    for (const r of p.revisoes) {
+      const { alteracoes } = desempacotarRevisaoJson(r.alteracoes);
+      for (const a of alteracoes) {
+        if (!originais.has(a.produtoId)) {
+          originais.set(a.produtoId, a.quantidadeAntes);
+        }
+        if (a.removido) cortados.add(a.produtoId);
+        else cortados.delete(a.produtoId);
+      }
+    }
+
+    const presentes = new Set<string>();
     for (const it of p.itens) {
+      presentes.add(it.produtoId);
       const lista = (mapa[it.produtoId] ??= []);
       if (lista.length < maxPorProduto) {
-        lista.push({ data, quantidade: Number(it.quantidade) });
+        const qtdFinal = Number(it.quantidade);
+        const qtdOriginal = originais.get(it.produtoId);
+        lista.push({
+          data,
+          quantidade: qtdFinal,
+          ...(qtdOriginal !== undefined && Math.abs(qtdOriginal - qtdFinal) >= 0.0005
+            ? { quantidadeOriginal: qtdOriginal }
+            : {}),
+        });
+      }
+    }
+
+    for (const produtoId of cortados) {
+      if (presentes.has(produtoId)) continue;
+      const lista = (mapa[produtoId] ??= []);
+      if (lista.length < maxPorProduto) {
+        lista.push({
+          data,
+          quantidade: 0,
+          quantidadeOriginal: originais.get(produtoId),
+          cortado: true,
+        });
       }
     }
   }
